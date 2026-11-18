@@ -342,7 +342,7 @@ function parseOne(raw){
   if (!day){
     // «mañana» = día siguiente, salvo «por/esta/de la mañana»
     const m = title.match(/(^|\s)(?:para\s+)?ma[ñn]ana\b/i);
-    if (m && !/(la|esta)\s+$/i.test(title.slice(0, m.index + m[1].length))){
+    if (m && !/(^|\s)(la|esta)\s+$/i.test(title.slice(0, m.index + m[1].length))){
       day = iso(addDays(now,1));
       title = title.slice(0, m.index) + ' ' + title.slice(m.index + m[0].length);
     }
@@ -406,10 +406,11 @@ function card(t, hide={}){
     <button class="chk" aria-label="${done?'Marcar como pendiente':'Completar'}"></button>
     <div class="body"><p class="tt">${esc(t.title)}</p>${meta.length?`<div class="meta">${meta.join('')}</div>`:''}</div></article>`;
 }
-function column({title, sub='', field, value='', tasks, hide, cls='', dot, undone=false, empty='Arrastra aquí'}){
+function column({title, sub='', field, value='', tasks, hide, cls='', dot, undone=false, empty='Arrastra aquí', add}){
   return `<section class="col ${cls}" data-field="${field}" data-value="${value}" ${undone?'data-undone="1"':''}>
     <header><h3>${dot?`<i style="--c:${dot}"></i>`:''}${esc(title)} ${sub?`<span class="csub">${esc(sub)}</span>`:''}</h3><span class="count">${tasks.length}</span></header>
-    <div class="list">${tasks.length ? tasks.map(t => card(t, hide)).join('') : `<div class="empty">${empty}</div>`}</div></section>`;
+    <div class="list">${tasks.length ? tasks.map(t => card(t, hide)).join('') : `<div class="empty">${empty}</div>`}</div>
+    ${add !== undefined ? `<form class="qadd" data-qclient="${add}"><input placeholder="+ Añadir tarea" aria-label="Añadir tarea a ${esc(title)}" autocomplete="off"></form>` : ''}</section>`;
 }
 function setToolbar(title, sub, extra='', hint='Arrastra las tareas para moverlas'){
   toolbar.innerHTML = `<h2>${title}</h2><span class="sub">${sub}</span><span class="sp"></span>${extra}<span class="hint">${hint}</span>`;
@@ -464,7 +465,7 @@ const views = {
         const ts = T.filter(x => x.client === c.id);
         const pend = ts.filter(x => x.status !== 'done').sort((a,b)=>(a.day||'9').localeCompare(b.day||'9')||byOrder(a,b));
         const hechas = ts.length - pend.length;
-        html += column({title:c.name, sub: hechas ? `${hechas} hecha${hechas>1?'s':''}` : '', field:'client', value:c.id, tasks:pend, hide:{client:true}, dot:c.color});
+        html += column({title:c.name, sub: hechas ? `${hechas} hecha${hechas>1?'s':''}` : '', field:'client', value:c.id, tasks:pend, hide:{client:true}, dot:c.color, add:c.id});
       }
     }
     const sin = T.filter(x => (!x.client || !client(x.client)) && x.status !== 'done');
@@ -653,6 +654,20 @@ function addFromInput(){
   if (online()) nuevas.forEach(pushCreate);
   toast(items.length === 1 ? `Añadida: ${items[0].title}` : `${items.length} tareas añadidas`);
 }
+// Añadir una tarea directamente debajo de un cliente (Clientes → Tareas). Entiende fechas y «urgente» como el dictado.
+main.addEventListener('submit', e => {
+  const f = e.target.closest('.qadd'); if (!f) return;
+  e.preventDefault();
+  const input = f.querySelector('input'), txt = input.value.trim(); if (!txt) return;
+  const cid = f.dataset.qclient || null;
+  let o = maxOrder();
+  const nuevas = parse(txt).map(p => ({id:uid(), ...p, client:cid, status:'todo', order:++o, doneAt:null}));
+  if (!nuevas.length) return;
+  S.tasks.push(...nuevas); save(); render();
+  const again = main.querySelector(`.qadd[data-qclient="${cid || ''}"] input`); if (again) again.focus();
+  if (online()) nuevas.forEach(pushCreate);
+  toast(nuevas.length === 1 ? `Añadida a ${client(cid)?.name || 'Sin cliente'}` : `${nuevas.length} tareas añadidas`);
+});
 q.addEventListener('input', preview);
 q.addEventListener('keydown', e => { if (e.key === 'Enter'){ e.preventDefault(); if (rec) rec.stop(); addFromInput(); } });
 $('#addBtn').addEventListener('click', addFromInput);
