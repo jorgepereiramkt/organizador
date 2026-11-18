@@ -146,9 +146,11 @@ function calStatus(){
   const accs = P().accounts;
   if (!GCAL_CLIENT_ID) return '';
   if (!accs.length) return `<button class="chip" data-gcal="add">📅 Conectar Google Calendar</button>`;
+  const short = e => { const [u, d] = e.split('@'); return d === 'gmail.com' ? u : d.split('.')[0]; };
   return accs.map(a => tokenOk(a.email)
-    ? `<span class="chip on" title="${esc(a.email)}">📅 ${esc(a.email.split('@')[0])}</span>`
-    : `<button class="chip warn" data-gcal="${esc(a.email)}" title="Google pide confirmar cada hora">↻ ${esc(a.email.split('@')[0])}</button>`).join('');
+    ? `<span class="chip on" title="${esc(a.email)}">📅 ${esc(short(a.email))}</span>`
+    : `<button class="chip warn" data-gcal="${esc(a.email)}" title="Google pide confirmar cada hora">↻ ${esc(short(a.email))}</button>`).join('')
+    + `<button class="chip" data-gcal="add" title="Conectar otra cuenta de Google">+ Calendario</button>`;
 }
 O.views.dia = function(){
   const d = O.fromIso(planDay), isToday = planDay === O.today();
