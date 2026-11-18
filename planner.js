@@ -5,7 +5,7 @@
 const O = window.__org, S = O.S, $ = s => document.querySelector(s), esc = O.esc;
 
 // ID de cliente OAuth (público) del proyecto organizador-jp. Se rellena al configurar Google Cloud.
-const GCAL_CLIENT_ID = '';
+const GCAL_CLIENT_ID = '59642019941-05m7v8u7o9n22ch98kl6rb491oggn6l9.apps.googleusercontent.com';
 const GCAL_SCOPE = 'https://www.googleapis.com/auth/calendar.readonly';
 
 const PLAN_DEFAULT = () => ({
