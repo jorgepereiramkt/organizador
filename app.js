@@ -204,7 +204,7 @@ function fromCU(raw, clientId, prev){
   const p = raw.priority ? +raw.priority.id : 3;
   const old = prev.get(raw.id);
   return {id:raw.id, title:raw.name, client:clientId, day: raw.due_date ? iso(new Date(+raw.due_date)) : null,
-    status, priority: p <= 2 ? 'alta' : p === 4 ? 'baja' : 'normal',
+    status, priority: p === 1 ? 'super' : p === 2 ? 'alta' : p === 4 ? 'baja' : 'normal',
     order: old ? old.order : +raw.date_created / 1e6,
     doneAt: status === 'done' ? iso(new Date(+(raw.date_done || raw.date_closed || Date.now()))) : null,
     url: raw.url, cu: true, listId: raw.list && raw.list.id, listName: raw.list && raw.list.name};
@@ -265,7 +265,7 @@ async function statusName(listId, target){
     review: rev || doing, doing: doing || rev}[target];
   return pick && pick.status;
 }
-const PRIO = {alta:1, normal:3, baja:4};
+const PRIO = {super:1, alta:2, normal:3, baja:4};
 const dueMs = day => { const d = fromIso(day); d.setHours(12); return d.getTime(); };
 const snap = t => ({title:t.title, day:t.day, status:t.status, priority:t.priority, client:t.client});
 
@@ -322,12 +322,19 @@ async function pushDelete(t){
 /* ---------- Clasificador de voz/texto (sin IA, sin tokens) ---------- */
 const STOP = new Set(['agency','leadfluence','tier','onboarding','cliente','clientes','agencia','tienda','store','shop','interno','general','proyecto','proyectos','marketing','digital','personal','tareas','lista','grupo','studio','estudio']);
 function nextDow(target){ const now = new Date(); let n = (target - now.getDay() + 7) % 7; if (n === 0) n = 7; return iso(addDays(now,n)); }
+// Las tareas nuevas NO llevan fecha: van a «Por colocar» (la fecha, si hace falta, va en el propio nombre)
+const PARSE_DATES = false;
+// Urgencia: 4 niveles (en ClickUp: Urgent, High, Normal, Low)
+const URG = {super:{label:'Súper urgente', icon:'🔥', rank:0}, alta:{label:'Urgente', icon:'🔴', rank:1},
+             normal:{label:'Media', icon:'🟡', rank:2}, baja:{label:'Cuando pueda', icon:'🟢', rank:3}};
+const urgRank = t => (URG[t.priority] || URG.normal).rank;
 function parseOne(raw){
   let title = ' ' + raw.trim() + ' ';
   let day = null, dayLabel = null, priority = 'normal';
   const now = new Date();
   const take = (re, fn) => { const m = title.match(re); if (!m) return false; fn(m); title = title.replace(re,' '); return true; };
 
+  if (PARSE_DATES){
   take(/\b(?:para\s+)?pasado\s+ma[ñn]ana\b/i, () => day = iso(addDays(now,2))) ||
   take(/\b(?:para\s+(?:el\s+)?|el\s+|este\s+)?(lunes|martes|mi[eé]rcoles|jueves|viernes|s[aá]bado|domingo)(?:\s+que\s+viene)?\b/i,
        m => day = nextDow(['domingo','lunes','martes','miercoles','jueves','viernes','sabado'].indexOf(norm(m[1])))) ||
@@ -347,8 +354,11 @@ function parseOne(raw){
       title = title.slice(0, m.index) + ' ' + title.slice(m.index + m[0].length);
     }
   }
-  take(/\b(?:es\s+)?(?:muy\s+)?(urgente|urgent[ií]simo|asap|cuanto\s+antes|important[ií]sim[oa]|importante|prioridad\s+alta)\b/i, () => priority = 'alta') ||
-  take(/\b(sin\s+prisa|cuando\s+pueda|baja\s+prioridad|prioridad\s+baja)\b/i, () => priority = 'baja');
+  }
+  take(/\b(?:es\s+)?(s[uú]per\s*urgente|muy\s+urgente|urgent[ií]simo|asap|ya\s+mismo|cr[ií]tic[oa]|para\s+ya)\b/i, () => priority = 'super') ||
+  take(/\b(?:es\s+)?(urgente|cuanto\s+antes|important[ií]sim[oa]|importante|prioridad\s+alta)\b/i, () => priority = 'alta') ||
+  take(/\b(urgencia\s+media|prioridad\s+media)\b/i, () => priority = 'normal') ||
+  take(/\b(sin\s+prisa|cuando\s+pueda|poco\s+urgente|baja\s+prioridad|prioridad\s+baja)\b/i, () => priority = 'baja');
 
   // Cliente: palabra clave más larga que aparezca
   const n = ' ' + norm(raw).replace(/[^a-z0-9ñ ]/g,' ') + ' ';
@@ -398,8 +408,9 @@ function card(t, hide={}){
   if (!hide.client) meta.push(c ? `<span class="cl" style="--c:${c.color}"><i></i>${esc(c.name)}</span>` : `<span class="cl" style="--c:var(--faint)"><i></i>Sin cliente</span>`);
   if (!hide.day && t.day) meta.push(`<span class="${late?'late':''}">${late?'Atrasada · ':''}${dayLabel(t.day)}</span>`);
   if (t.cu && t.listName) meta.push(`<span class="st">${esc(t.listName)}</span>`);
+  if (t.priority === 'super' && !done) meta.push('<span class="alta">🔥 Súper urgente</span>');
   if (t.priority === 'alta' && !done) meta.push('<span class="alta">Urgente</span>');
-  if (t.priority === 'baja' && !done) meta.push('<span class="st">Sin prisa</span>');
+  if (t.priority === 'baja' && !done) meta.push('<span class="st">Cuando pueda</span>');
   if (!hide.status && t.status !== 'todo' && !done) meta.push(`<span class="st">${STATUS[t.status]}</span>`);
   if (online() && !t.cu && isAgency(t.client)) meta.push('<span class="st">Sin subir a ClickUp</span>');
   return `<article class="card ${done?'done':''}" data-id="${t.id}" style="--c:${c?c.color:'var(--faint)'}" tabindex="0">
@@ -422,7 +433,7 @@ const views = {
     const d = new Date();
     setToolbar('Hoy', `${DIAS_L[d.getDay()]} ${d.getDate()} de ${MESES[d.getMonth()]}`);
     const hoy = T.filter(x => x.status !== 'done' && x.day && x.day <= t)
-      .sort((a,b) => (a.priority==='alta'?0:1) - (b.priority==='alta'?0:1) || byOrder(a,b));
+      .sort((a,b) => urgRank(a) - urgRank(b) || byOrder(a,b));
     return `<div class="board stack">
       ${column({title:'Hoy', field:'day', value:t, tasks:hoy, undone:true, cls:'today', empty:'Nada para hoy. Arrastra aquí lo que quieras hacer.'})}
       ${column({title:'Bandeja', sub:'sin fecha', field:'day', value:'', tasks:T.filter(x => x.status!=='done' && !x.day).sort(byOrder), undone:true, empty:'Lo que dictes sin fecha cae aquí'})}
@@ -550,7 +561,7 @@ function endDrag(){
   if (f === 'client') t.client = v || null;
   // Planificador: meter/sacar la tarea de un bloque del día (no toca la fecha ni ClickUp)
   if (f === 'slot') S.slots[t.id] = {day: zone.dataset.day, at: v};
-  if (f === 'unslot') delete S.slots[t.id];
+  if (f === 'unslot'){ delete S.slots[t.id]; if (zone.dataset.urg) t.priority = zone.dataset.urg; }
   save(); S._keepScroll = true; render();
   afterChange(t, was);
 }
@@ -640,8 +651,8 @@ function preview(){
     return `<div class="pv"><b>${esc(p.title)}</b>
       ${c ? `<span class="tag" style="--c:${c.color}"><i></i>${esc(c.name)}</span>` : '<span class="tag miss">sin cliente</span>'}
       ${c && c.group === 'agency' && online() ? (l => l ? `<span class="tag">ClickUp › ${esc(l.name)}</span>` : '')(chooseList(c, p.title)) : c && c.group === 'mine' ? '<span class="tag">🔒 solo app</span>' : ''}
-      ${p.day ? `<span class="tag">${dayLabel(p.day)}</span>` : '<span class="tag miss">a la bandeja</span>'}
-      ${p.priority==='alta' ? '<span class="tag warn">Urgente</span>' : p.priority==='baja' ? '<span class="tag">Sin prisa</span>' : ''}</div>`;
+      <span class="tag ${p.priority === 'super' || p.priority === 'alta' ? 'warn' : ''}">${URG[p.priority].icon} ${URG[p.priority].label}</span>
+      <span class="tag miss">por colocar</span></div>`;
   }).join('');
 }
 function addFromInput(){
@@ -795,5 +806,5 @@ if (online()) sync(true);
 // Mantener PC y móvil al día: cada 60 s con la app abierta y al volver a ella
 setInterval(() => { if (document.visibilityState === 'visible') sync(true); }, 60000);
 document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') sync(true); });
-window.__org = {S, parse, clientLists, online, PALETA, cu, listInfo, norm, isRegTask, applyCloud, cloudEmpty, cloudReady, wipeLocal, toast, views, render, save, card, setToolbar, visibleTasks, client, task, esc, iso, fromIso, addDays, today, dayLabel, DIAS_L, MESES, pad, byOrder};
+window.__org = {S, URG, urgRank, parse, clientLists, online, PALETA, cu, listInfo, norm, isRegTask, applyCloud, cloudEmpty, cloudReady, wipeLocal, toast, views, render, save, card, setToolbar, visibleTasks, client, task, esc, iso, fromIso, addDays, today, dayLabel, DIAS_L, MESES, pad, byOrder};
 })();

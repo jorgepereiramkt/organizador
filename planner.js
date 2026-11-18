@@ -182,10 +182,14 @@ O.views.dia = function(){
       tl += `<div class="blk ${cls}${live}" style="--c:${it.color || 'var(--accent)'}"><span class="rg">${range}</span><b>${esc(it.title)}</b>${it.cal ? `<span class="cal">${esc(it.cal)}</span>` : ''}</div>`;
     }
   }
-  const pend = T.filter(t => t.status !== 'done' && !slotted(t) && (!t.day || t.day <= planDay))
-    .sort((a,b) => (a.priority==='alta'?0:1) - (b.priority==='alta'?0:1) || (a.day||'9').localeCompare(b.day||'9') || O.byOrder(a,b));
-  const side = `<section class="col side" data-field="unslot"><header><h3>Por colocar</h3><span class="count">${pend.length}</span></header>
-    <div class="list">${pend.map(t => O.card(t)).join('') || '<div class="empty">Todo colocado 👌</div>'}</div></section>`;
+  // «Por colocar»: TODAS las tareas pendientes que no estén en un bloque de este día, agrupadas por urgencia
+  const pend = T.filter(t => t.status !== 'done' && !slotted(t)).sort(O.byOrder);
+  const side = `<section class="col side"><header><h3>Por colocar</h3><span class="count">${pend.length}</span></header>`
+    + Object.entries(O.URG).map(([k, u]) => {
+      const ts = pend.filter(t => (O.URG[t.priority] ? t.priority : 'normal') === k);
+      return `<div class="urg u-${k}" data-field="unslot" data-urg="${k}"><h4>${u.icon} ${u.label}<span>${ts.length}</span></h4>
+        <div class="list">${ts.map(t => O.card(t)).join('') || '<div class="empty">Arrastra aquí</div>'}</div></div>`;
+    }).join('') + '</section>';
   const msg = calError ? `<div class="note warnbox">${esc(calError)}</div>` : loading ? '<div class="note">Cargando calendario…</div>' : '';
   return `${msg}<div class="planner"><div class="timeline">${tl}</div>${side}</div>`;
 };
