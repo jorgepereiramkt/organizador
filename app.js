@@ -17,7 +17,7 @@ const PALETA = ['#FF6B3D','#4F8CFF','#3DDC97','#C77DFF','#FFC93D','#FF5C8A','#3D
 /* ---------- Estado ---------- */
 const KEY = 'jp-organizador-v1';
 const CU_DEFAULT = () => ({token:'', me:null, meName:'', lists:[], teams:[], hidden:[], statuses:{}, lastSync:0});
-const S = { tasks:[], clients:[], view:'hoy', group:'all', weekOffset:0, cu:CU_DEFAULT(), plan:null, slots:{} };
+const S = { tasks:[], clients:[], view:'hoy', group:'all', weekOffset:0, cu:CU_DEFAULT(), plan:null, slots:{}, hours:null };
 
 function seed(){
   S.clients = [
@@ -46,10 +46,10 @@ function seed(){
   ];
 }
 function load(){
-  try { const d = JSON.parse(localStorage.getItem(KEY)); if (d && d.tasks && d.clients){ Object.assign(S, {tasks:d.tasks, clients:d.clients, view:d.view||'hoy', group:d.group||'all', cu:{...CU_DEFAULT(), ...(d.cu||{})}, plan:d.plan||null, slots:d.slots||{}}); return; } } catch(e){}
+  try { const d = JSON.parse(localStorage.getItem(KEY)); if (d && d.tasks && d.clients){ Object.assign(S, {tasks:d.tasks, clients:d.clients, view:d.view||'hoy', group:d.group||'all', cu:{...CU_DEFAULT(), ...(d.cu||{})}, plan:d.plan||null, slots:d.slots||{}, hours:d.hours||null}); return; } } catch(e){}
   seed();
 }
-function saveLocal(){ try { localStorage.setItem(KEY, JSON.stringify({tasks:S.tasks, clients:S.clients, view:S.view, group:S.group, cu:S.cu, plan:S.plan, slots:S.slots})); } catch(e){} }
+function saveLocal(){ try { localStorage.setItem(KEY, JSON.stringify({tasks:S.tasks, clients:S.clients, view:S.view, group:S.group, cu:S.cu, plan:S.plan, slots:S.slots, hours:S.hours})); } catch(e){} }
 function save(){ saveLocal(); scheduleCloud(); }
 
 /* ---------- Sincronización con tu cuenta de Google (cloud.js) ---------- */
@@ -60,7 +60,7 @@ function cloudData(){
   return JSON.parse(JSON.stringify({
     clients: S.clients.map(({id,name,group,color,keywords,listId,auto,services,hours,notes}) => ({id,name,group,color,keywords,listId,auto,services,hours,notes})),
     tasks: S.tasks.filter(t => !t.cu && !t.demo),
-    token: S.cu.token || '', hidden: S.cu.hidden || [], plan: S.plan || null, slots: S.slots || {} }));
+    token: S.cu.token || '', hidden: S.cu.hidden || [], plan: S.plan || null, slots: S.slots || {}, hours: S.hours || null }));
 }
 function scheduleCloud(){
   if (!window.__cloud) return;
@@ -85,6 +85,7 @@ function applyCloud(d){
   S.cu.hidden = d.hidden || [];
   if (d.plan) S.plan = d.plan;
   S.slots = d.slots || {};
+  if (d.hours) S.hours = d.hours;
   const tokenChanged = (d.token || '') !== (S.cu.token || '');
   if (tokenChanged && !d.token){ S.cu = CU_DEFAULT(); S.tasks = S.tasks.filter(t => !t.cu); }
   lastSent = JSON.stringify({...cloudData(), token: d.token || ''});
@@ -777,5 +778,5 @@ if (online()) sync(true);
 // Mantener PC y móvil al día: cada 60 s con la app abierta y al volver a ella
 setInterval(() => { if (document.visibilityState === 'visible') sync(true); }, 60000);
 document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') sync(true); });
-window.__org = {S, parse, clientLists, online, PALETA, applyCloud, cloudEmpty, cloudReady, wipeLocal, toast, views, render, save, card, setToolbar, visibleTasks, client, task, esc, iso, fromIso, addDays, today, dayLabel, DIAS_L, MESES, pad, byOrder};
+window.__org = {S, parse, clientLists, online, PALETA, cu, listInfo, norm, applyCloud, cloudEmpty, cloudReady, wipeLocal, toast, views, render, save, card, setToolbar, visibleTasks, client, task, esc, iso, fromIso, addDays, today, dayLabel, DIAS_L, MESES, pad, byOrder};
 })();

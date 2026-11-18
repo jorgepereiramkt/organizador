@@ -21,6 +21,7 @@ if (!S.plan) S.plan = PLAN_DEFAULT();
 const P = () => (S.plan = S.plan || PLAN_DEFAULT());
 
 let planDay = O.today();
+O.planDay = () => planDay;
 const toMin = hm => { const [h,m] = hm.split(':').map(Number); return h*60 + m; };
 const toHM = m => `${O.pad(Math.floor(m/60))}:${O.pad(m%60)}`;
 const dur = m => m >= 60 ? `${Math.floor(m/60)} h${m%60 ? ' ' + (m%60) + ' min' : ''}` : `${m} min`;
@@ -194,7 +195,7 @@ O.views.dia.after = () => {
 };
 async function refresh(){
   loading = true; calError = '';
-  try { lastEvents = await fetchEvents(planDay); }
+  try { lastEvents = await fetchEvents(planDay); O.planEvents = {day: planDay, events: lastEvents}; }
   catch(e){ calError = 'Calendario: ' + e.message; }
   loading = false;
   if (S.view === 'dia') O.render();

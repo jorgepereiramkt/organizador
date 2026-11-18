@@ -218,6 +218,34 @@ a.btn{display:inline-flex;align-items:center;text-decoration:none;color:var(--te
 .sv-top select{width:auto}
 .sug{display:flex;flex-wrap:wrap;gap:6px}
 .sug .chip{font-size:12px;padding:5px 10px}
+
+/* Horas */
+.objetivos{display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin-bottom:10px}
+.objetivos .lbl{font-size:12px;color:var(--muted);margin-right:4px}
+.hbox{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:12px;display:flex;flex-direction:column;gap:6px}
+.hhead{display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;padding-bottom:8px;border-bottom:1px solid var(--line);font-size:13px;color:var(--muted)}
+.hhead input{width:60px;background:var(--bg);border:1px solid var(--line);border-radius:8px;padding:4px 6px;color:var(--text)}
+.hrow{display:grid;grid-template-columns:minmax(120px,1.4fr) 80px minmax(80px,2fr) 110px 80px;gap:10px;align-items:center;padding:8px 4px;border-radius:8px;cursor:pointer;font-size:13px}
+.hrow:hover{background:var(--surface-2)}
+.hrow b{display:flex;align-items:center;gap:7px;font-weight:600}
+.hrow b i{width:9px;height:9px;border-radius:50%;background:var(--c);flex:none}
+.hrow em{color:var(--faint);font-style:normal}
+.hrow .bar{height:7px;border-radius:9px;background:var(--surface-3);overflow:hidden}
+.hrow .bar span{display:block;height:100%;background:var(--c)}
+.hrow .num{font-variant-numeric:tabular-nums;color:var(--muted);text-align:right}
+.hrow .hoy{color:var(--accent)}
+#closeDlg{width:min(600px,calc(100vw - 24px))}
+.crows{display:flex;flex-direction:column;gap:8px}
+.crow{display:grid;grid-template-columns:1fr auto;gap:6px 10px;align-items:center;background:var(--surface-2);border-radius:10px;padding:8px 10px;border-left:3px solid var(--c)}
+.crow b{display:flex;align-items:center;gap:7px}
+.crow b i{display:none}
+.crow select,.crow .lock{grid-column:1/-1;font-size:12px;padding:6px 8px}
+.stepper{display:flex;align-items:center;gap:4px}
+.stepper button{width:30px;height:30px;border-radius:8px;border:1px solid var(--line);font-size:16px}
+.stepper input{width:64px;text-align:center;padding:6px}
+.stepper span{font-size:12px;color:var(--muted)}
+.ctot{text-align:right;color:var(--muted)}
+@media (max-width:760px){ .hrow{grid-template-columns:1fr auto;} .hrow .bar{grid-column:1/-1} .hrow>span:nth-child(2){display:none} }
 @media (max-width:760px){
   :root{--nav-h:64px}
   .app{padding:10px 12px calc(20px + var(--nav-h) + env(safe-area-inset-bottom))}
@@ -312,6 +340,7 @@ a.btn{display:inline-flex;align-items:center;text-decoration:none;color:var(--te
 <script src="app.js"></script>
 <script src="planner.js"></script>
 <script src="clients.js"></script>
+<script src="hours.js"></script>
 <script type="module" src="cloud.js"></script>
 </body>
 </html>
