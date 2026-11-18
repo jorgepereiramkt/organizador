@@ -384,8 +384,8 @@ function dayLabel(s){
 /* ---------- Render ---------- */
 const main = $('#main'), toolbar = $('#toolbar');
 function visibleClients(){ return S.clients.filter(c => S.group === 'all' || c.group === S.group); }
-// «⭐ Tarea Principal ⭐» de ClickUp: solo sirven para registrar horas, no salen en los paneles de tareas
-const isRegTask = t => !!(t.cu && /tarea principal/i.test(t.title || ''));
+// Tareas de ClickUp con ⭐: solo sirven para registrar horas, no salen en los paneles de tareas
+const isRegTask = t => !!(t.cu && /\u2B50|tarea principal/i.test(t.title || ''));   // cualquier tarea con ⭐
 function visibleTasks(){
   const ids = new Set(visibleClients().map(c => c.id));
   return S.tasks.filter(t => !isRegTask(t) && (t.client && client(t.client) ? ids.has(t.client) : S.group === 'all'));
