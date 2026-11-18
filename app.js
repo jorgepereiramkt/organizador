@@ -330,7 +330,7 @@ const URG = {super:{label:'Súper urgente', icon:'🔥', rank:0}, alta:{label:'U
 const urgRank = t => (URG[t.priority] || URG.normal).rank;
 function parseOne(raw){
   let title = ' ' + raw.trim() + ' ';
-  let day = null, dayLabel = null, priority = 'normal';
+  let day = null, dayLabel = null, priority = 'baja';   // sin decir nada → «Cuando pueda»
   const now = new Date();
   const take = (re, fn) => { const m = title.match(re); if (!m) return false; fn(m); title = title.replace(re,' '); return true; };
 
@@ -564,7 +564,7 @@ function endDrag(){
   if (f === 'client') t.client = v || null;
   // Planificador: meter/sacar la tarea de un bloque del día (no toca la fecha ni ClickUp)
   if (f === 'slot') S.slots[t.id] = {day: zone.dataset.day, at: v};
-  if (f === 'unslot'){ delete S.slots[t.id]; if (zone.dataset.urg) t.priority = zone.dataset.urg; }
+  if (f === 'unslot' && zone.dataset.urg){ delete S.slots[t.id]; t.priority = zone.dataset.urg; }   // a una urgencia: sale del bloque
   save(); S._keepScroll = true; render();
   afterChange(t, was);
 }
@@ -809,5 +809,5 @@ if (online()) sync(true);
 // Mantener PC y móvil al día: cada 60 s con la app abierta y al volver a ella
 setInterval(() => { if (document.visibilityState === 'visible') sync(true); }, 60000);
 document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') sync(true); });
-window.__org = {S, URG, urgRank, parse, clientLists, online, PALETA, cu, listInfo, norm, isRegTask, applyCloud, cloudEmpty, cloudReady, wipeLocal, toast, views, render, save, card, setToolbar, visibleTasks, client, task, esc, iso, fromIso, addDays, today, dayLabel, DIAS_L, MESES, pad, byOrder};
+window.__org = {S, URG, urgRank, parse, pushCreate, uid, maxOrder, clientLists, online, PALETA, cu, listInfo, norm, isRegTask, applyCloud, cloudEmpty, cloudReady, wipeLocal, toast, views, render, save, card, setToolbar, visibleTasks, client, task, esc, iso, fromIso, addDays, today, dayLabel, DIAS_L, MESES, pad, byOrder};
 })();

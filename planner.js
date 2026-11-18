@@ -184,9 +184,15 @@ O.views.dia = function(){
   }
   // «Por colocar»: TODAS las tareas pendientes que no estén en un bloque de este día, agrupadas por urgencia
   const pend = T.filter(t => t.status !== 'done' && !slotted(t)).sort(O.byOrder);
+  // Las que estaban en un bloque de un día anterior y no se marcaron como hechas: arriba del todo
+  const isLeft = t => { const sl = S.slots[t.id]; return !!(sl && sl.day < planDay); };
+  const left = pend.filter(isLeft).sort((a,b) => O.urgRank(a) - O.urgRank(b) || O.byOrder(a,b));
+  const rest = pend.filter(t => !isLeft(t));
   const side = `<section class="col side"><header><h3>Por colocar</h3><span class="count">${pend.length}</span></header>`
+    + (left.length ? `<div class="urg u-left" data-field="unslot"><h4>⏪ Pendientes de días anteriores<span>${left.length}</span></h4>
+        <div class="list">${left.map(t => O.card(t)).join('')}</div></div>` : '')
     + Object.entries(O.URG).map(([k, u]) => {
-      const ts = pend.filter(t => (O.URG[t.priority] ? t.priority : 'normal') === k);
+      const ts = rest.filter(t => (O.URG[t.priority] ? t.priority : 'normal') === k);
       return `<div class="urg u-${k}" data-field="unslot" data-urg="${k}"><h4>${u.icon} ${u.label}<span>${ts.length}</span></h4>
         <div class="list">${ts.map(t => O.card(t)).join('') || '<div class="empty">Arrastra aquí</div>'}</div></div>`;
     }).join('') + '</section>';
