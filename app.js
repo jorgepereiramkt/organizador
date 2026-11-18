@@ -490,7 +490,10 @@ const views = {
 
 function render(){
   const sx = main.querySelector('.board')?.scrollLeft || 0;
-  const vw = views[S.view] ? S.view : 'hoy';
+  // Solo quedan las vistas Día y Clientes
+  if (!['dia','clientes'].includes(S.view)) S.view = 'dia';
+  const vw = S.view;
+  if (!views[vw]) return;   // la vista Día la añade planner.js, que se carga después
   main.innerHTML = views[vw]();
   if (views[vw].after) views[vw].after();
   if (S.view === 'semana' && S._keepScroll) main.querySelector('.board').scrollLeft = sx;
@@ -802,7 +805,9 @@ setInterval(() => { if (today() !== lastDay){ lastDay = today(); render(); } }, 
 let tt;
 function toast(msg){ const el = $('#toast'); el.textContent = msg; el.classList.add('on'); clearTimeout(tt); tt = setTimeout(() => el.classList.remove('on'), 2200); }
 
-load(); render(); modeIdle();
+load();
+S.view = 'clientes'; S.clientMode = 'tareas';   // cada mañana se empieza revisando los clientes
+render(); modeIdle();
 $('#mode').classList.add('mode-btn');
 $('#mode').addEventListener('click', () => online() ? sync() : ($('#settingsBtn').click()));
 if (online()) sync(true);

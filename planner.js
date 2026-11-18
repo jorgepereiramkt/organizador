@@ -164,24 +164,54 @@ O.views.dia = function(){
   const items = buildDay(planDay, lastEvents);
   const workAts = new Set(items.filter(i => i.kind === 'work').map(i => i.at));
   const T = O.visibleTasks();
-  const slotted = t => { const sl = S.slots[t.id]; return sl && sl.day === planDay && workAts.has(sl.at) ? sl.at : null; };
+  // Cada tarea va al bloque de trabajo que contiene su hora (aunque los bloques se muevan al cargar el calendario)
+  const works = items.filter(i => i.kind === 'work');
+  const blockAt = at => { const m = toMin(at); const b = works.find(w => m >= w.start && m < w.end) || works.find(w => w.start >= m) || works[works.length - 1]; return b ? b.at : null; };
+  const slotted = t => { const sl = S.slots[t.id]; return sl && sl.day === planDay ? blockAt(sl.at) : null; };
   const now = new Date(), nowMin = isToday ? now.getHours()*60 + now.getMinutes() : -1;
   const allDay = lastEvents.filter(e => e.allDay);
 
+  // Color de cada reunión: el del cliente si su nombre aparece en el título
+  const evClient = title => { const t = O.norm(title); return S.clients.find(c => O.norm(c.name).split(/\s+/).some(w => w.length >= 4 && t.includes(w))); };
+  const ROUT = {comida:'#FFC93D', cena:'#C77DFF', deporte:'#3DDC97'};
   let tl = allDay.length ? `<div class="allday">${allDay.map(e => `<span class="tag" style="--c:${e.color}"><i></i>${esc(e.title)}</span>`).join('')}</div>` : '';
   for (const it of items){
-    const range = `${toHM(it.start)}–${toHM(it.end)}`, live = nowMin >= it.start && nowMin < it.end ? ' live' : '';
+    const st = !isToday ? 'future' : nowMin >= it.end ? 'past' : nowMin >= it.start ? 'now' : 'future';
+    const pct = st === 'past' ? 100 : st === 'now' ? Math.round((nowMin - it.start) / (it.end - it.start) * 100) : 0;
+    let body, color;
     if (it.kind === 'work'){
       const ts = T.filter(t => slotted(t) === it.at).sort(O.byOrder);
-      const used = ts.length;
-      tl += `<section class="blk work${live}" data-field="slot" data-value="${it.at}" data-day="${planDay}">
-        <header><b>Trabajo</b><span class="rg">${range} · ${dur(it.end - it.start)}</span><span class="count">${used || ''}</span></header>
+      const hechas = ts.filter(t => t.status === 'done').length;
+      color = 'var(--accent)';
+      body = `<section class="blk work" data-field="slot" data-value="${it.at}" data-day="${planDay}">
+        <header><b>Trabajo</b><span class="rg">${dur(it.end - it.start)}</span>${ts.length ? `<span class="count">${hechas}/${ts.length} ✓</span>` : ''}</header>
         <div class="list">${ts.map(t => O.card(t)).join('') || '<div class="empty">Suelta tareas aquí</div>'}</div></section>`;
+    } else if (it.kind === 'routine'){
+      color = ROUT[it.id] || '#A3A3AD';
+      body = `<div class="blk routine" style="--c:${color}"><b>${esc(it.title)}</b><span class="rg">${dur(it.end - it.start)}</span></div>`;
     } else {
-      const cls = it.kind === 'routine' ? 'routine' : it.kind === 'free' ? 'free' : 'event';
-      tl += `<div class="blk ${cls}${live}" style="--c:${it.color || 'var(--accent)'}"><span class="rg">${range}</span><b>${esc(it.title)}</b>${it.cal ? `<span class="cal">${esc(it.cal)}</span>` : ''}</div>`;
+      const c = evClient(it.title); color = c ? c.color : (it.color || '#8B8BFF');
+      body = `<div class="blk event${it.kind === 'free' ? ' free' : ''}" style="--c:${color}"><b>${esc(it.title)}</b>
+        <span class="cal">${c ? esc(c.name) : esc(it.cal || '')} · ${dur(it.end - it.start)}</span></div>`;
     }
+    tl += `<div class="trow ${st}" style="--c:${color};--p:${pct}%">
+      <div class="tcol"><b>${toHM(it.start)}</b><small>${toHM(it.end)}</small></div>
+      <div class="rail"><span></span>${st === 'now' ? '<i class="nowdot"></i>' : ''}</div>
+      <div class="tbody">${body}</div></div>`;
   }
+  // Cabecera del día: reloj, jornada y contador de tareas
+  const plan = P(), ws = toMin(plan.workStart), we = Math.max(toMin(plan.workEnd), ...items.map(i => i.end).filter(e => e <= 24 * 60));
+  const jorn = isToday ? Math.max(0, Math.min(100, Math.round((nowMin - ws) / (we - ws) * 100))) : 0;
+  const hoyTs = T.filter(t => slotted(t));
+  const hechasHoy = hoyTs.filter(t => t.status === 'done').length;
+  const quedan = isToday ? Math.max(0, we - nowMin) : 0;
+  const ring = hoyTs.length ? Math.round(hechasHoy / hoyTs.length * 100) : 0;
+  const head = `<div class="dayhead">
+    <div class="clock">${isToday ? `${O.pad(now.getHours())}:${O.pad(now.getMinutes())}` : `${d.getDate()} ${O.MESES[d.getMonth()]}`}</div>
+    <div class="jorn"><div class="jbar"><span style="width:${jorn}%"></span></div>
+      <small>${isToday ? (nowMin < ws ? `Tu día empieza a las ${plan.workStart}` : quedan ? `${jorn}% del día · quedan ${dur(quedan)}` : 'Día terminado') : 'Planificando otro día'}</small></div>
+    <div class="ring" style="--r:${ring}"><b>${hechasHoy}/${hoyTs.length}</b><small>hechas</small></div>
+  </div>`;
   // «Por colocar»: TODAS las tareas pendientes que no estén en un bloque de este día, agrupadas por urgencia
   const pend = T.filter(t => t.status !== 'done' && !slotted(t)).sort(O.byOrder);
   // Las que estaban en un bloque de un día anterior y no se marcaron como hechas: arriba del todo
@@ -197,7 +227,7 @@ O.views.dia = function(){
         <div class="list">${ts.map(t => O.card(t)).join('') || '<div class="empty">Arrastra aquí</div>'}</div></div>`;
     }).join('') + '</section>';
   const msg = calError ? `<div class="note warnbox">${esc(calError)}</div>` : loading ? '<div class="note">Cargando calendario…</div>' : '';
-  return `${msg}<div class="planner"><div class="timeline">${tl}</div>${side}</div>`;
+  return `${msg}${head}<div class="planner"><div class="timeline">${tl}</div>${side}</div>`;
 };
 O.views.dia.after = () => {
   const need = P().accounts.some(a => tokenOk(a.email) && !evCache[a.email + '|' + planDay]);
@@ -273,6 +303,8 @@ document.addEventListener('change', e => {
 function done(){ O.save(); renderPlanSettings(); if (S.view === 'dia') { O.render(); refresh(); } }
 $('#settingsBtn').addEventListener('click', renderPlanSettings);
 
+// Cada minuto: reloj y barra del día
+setInterval(() => { if (S.view === 'dia' && !document.querySelector('.ghost') && !document.querySelector('dialog[open]') && !document.activeElement?.matches('input,textarea')) O.render(); }, 60e3);
 // Refresco suave: la marca de «ahora» y el calendario cada 5 min
 setInterval(() => { if (S.view === 'dia' && !document.querySelector('.ghost')){ clearCache(); refresh(); } }, 5 * 60e3);
 if (S.view === 'dia') O.render();
