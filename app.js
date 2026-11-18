@@ -17,7 +17,7 @@ const PALETA = ['#FF6B3D','#4F8CFF','#3DDC97','#C77DFF','#FFC93D','#FF5C8A','#3D
 /* ---------- Estado ---------- */
 const KEY = 'jp-organizador-v1';
 const CU_DEFAULT = () => ({token:'', me:null, meName:'', lists:[], teams:[], hidden:[], statuses:{}, lastSync:0});
-const S = { tasks:[], clients:[], view:'hoy', group:'all', weekOffset:0, cu:CU_DEFAULT() };
+const S = { tasks:[], clients:[], view:'hoy', group:'all', weekOffset:0, cu:CU_DEFAULT(), plan:null, slots:{} };
 
 function seed(){
   S.clients = [
@@ -46,10 +46,10 @@ function seed(){
   ];
 }
 function load(){
-  try { const d = JSON.parse(localStorage.getItem(KEY)); if (d && d.tasks && d.clients){ Object.assign(S, {tasks:d.tasks, clients:d.clients, view:d.view||'hoy', group:d.group||'all', cu:{...CU_DEFAULT(), ...(d.cu||{})}}); return; } } catch(e){}
+  try { const d = JSON.parse(localStorage.getItem(KEY)); if (d && d.tasks && d.clients){ Object.assign(S, {tasks:d.tasks, clients:d.clients, view:d.view||'hoy', group:d.group||'all', cu:{...CU_DEFAULT(), ...(d.cu||{})}, plan:d.plan||null, slots:d.slots||{}}); return; } } catch(e){}
   seed();
 }
-function saveLocal(){ try { localStorage.setItem(KEY, JSON.stringify({tasks:S.tasks, clients:S.clients, view:S.view, group:S.group, cu:S.cu})); } catch(e){} }
+function saveLocal(){ try { localStorage.setItem(KEY, JSON.stringify({tasks:S.tasks, clients:S.clients, view:S.view, group:S.group, cu:S.cu, plan:S.plan, slots:S.slots})); } catch(e){} }
 function save(){ saveLocal(); scheduleCloud(); }
 
 /* ---------- Sincronización con tu cuenta de Google (cloud.js) ---------- */
@@ -60,7 +60,7 @@ function cloudData(){
   return JSON.parse(JSON.stringify({
     clients: S.clients.map(({id,name,group,color,keywords,listId}) => ({id,name,group,color,keywords,listId})),
     tasks: S.tasks.filter(t => !t.cu && !t.demo),
-    token: S.cu.token || '', hidden: S.cu.hidden || [] }));
+    token: S.cu.token || '', hidden: S.cu.hidden || [], plan: S.plan || null, slots: S.slots || {} }));
 }
 function scheduleCloud(){
   if (!window.__cloud) return;
@@ -83,6 +83,8 @@ function applyCloud(d){
   S.clients = d.clients || [];
   S.tasks = [...S.tasks.filter(t => t.cu), ...(d.tasks || [])];
   S.cu.hidden = d.hidden || [];
+  if (d.plan) S.plan = d.plan;
+  S.slots = d.slots || {};
   const tokenChanged = (d.token || '') !== (S.cu.token || '');
   if (tokenChanged && !d.token){ S.cu = CU_DEFAULT(); S.tasks = S.tasks.filter(t => !t.cu); }
   lastSent = JSON.stringify({...cloudData(), token: d.token || ''});
@@ -470,7 +472,9 @@ const views = {
 
 function render(){
   const sx = main.querySelector('.board')?.scrollLeft || 0;
-  main.innerHTML = views[S.view]();
+  const vw = views[S.view] ? S.view : 'hoy';
+  main.innerHTML = views[vw]();
+  if (views[vw].after) views[vw].after();
   if (S.view === 'semana' && S._keepScroll) main.querySelector('.board').scrollLeft = sx;
   S._keepScroll = false;
   document.querySelectorAll('#tabs button').forEach(b => b.setAttribute('aria-current', b.dataset.view === S.view));
@@ -508,7 +512,7 @@ function beginDrag(cardEl, x, y){
 }
 function hitTest(){
   const el = document.elementFromPoint(D.x, D.y);
-  const zone = el && el.closest('.col[data-field]');
+  const zone = el && el.closest('[data-field]');
   if (zone !== D.zone){ D.zone && D.zone.classList.remove('over'); zone && zone.classList.add('over'); D.zone = zone; }
   let before = null;
   if (zone){
@@ -540,6 +544,9 @@ function endDrag(){
   if (f === 'day'){ t.day = v || null; if (zone.dataset.undone && t.status === 'done') setStatus(t,'todo'); }
   if (f === 'status') setStatus(t, v);
   if (f === 'client') t.client = v || null;
+  // Planificador: meter/sacar la tarea de un bloque del día (no toca la fecha ni ClickUp)
+  if (f === 'slot') S.slots[t.id] = {day: zone.dataset.day, at: v};
+  if (f === 'unslot') delete S.slots[t.id];
   save(); S._keepScroll = true; render();
   afterChange(t, was);
 }
@@ -770,5 +777,5 @@ if (online()) sync(true);
 // Mantener PC y móvil al día: cada 60 s con la app abierta y al volver a ella
 setInterval(() => { if (document.visibilityState === 'visible') sync(true); }, 60000);
 document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') sync(true); });
-window.__org = {S, parse, applyCloud, cloudEmpty, cloudReady, wipeLocal, toast};
+window.__org = {S, parse, applyCloud, cloudEmpty, cloudReady, wipeLocal, toast, views, render, save, card, setToolbar, visibleTasks, client, task, esc, iso, fromIso, addDays, today, dayLabel, DIAS_L, MESES, pad, byOrder};
 })();
