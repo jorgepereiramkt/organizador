@@ -189,6 +189,35 @@ a.btn{display:inline-flex;align-items:center;text-decoration:none;color:var(--te
 .acc .dot{width:9px;height:9px;border-radius:50%;display:inline-block}
 .acc .btn{align-self:flex-start;height:32px;font-size:12px}
 @media (max-width:760px){ .planner{grid-template-columns:1fr} .planner .side{position:static;max-height:40vh;order:-1} .toolbar{flex-wrap:wrap} }
+
+/* Fichas de clientes */
+.modes{display:flex;gap:6px}
+.rama{font:600 13px var(--head);margin:6px 0 10px;display:flex;gap:10px;align-items:baseline}
+.rama span{font:400 12px var(--body);color:var(--muted)}
+.fichas{display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:12px;margin-bottom:22px}
+.ficha{background:var(--surface);border:1px solid var(--line);border-top:3px solid var(--c);border-radius:var(--r);padding:12px;cursor:pointer;display:flex;flex-direction:column;gap:8px}
+.ficha:hover{border-color:var(--c)}
+.ficha header{display:flex;align-items:center;gap:8px}
+.ficha header i{width:9px;height:9px;border-radius:50%;background:var(--c)}
+.ficha header b{font:600 15px var(--head)}
+.ficha .hrs{margin-left:auto;font-size:12px;color:var(--accent);white-space:nowrap}
+.ficha ul{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:4px;font-size:13px}
+.ficha li{display:flex;gap:6px}
+.ficha .bar{height:5px;border-radius:9px;background:var(--surface-3);overflow:hidden}
+.ficha .bar span{display:block;height:100%;background:var(--ok)}
+.ficha small{color:var(--faint);font-size:11.5px}
+.vacio{color:var(--faint);font-size:13px;margin:0}
+#fichaDlg{width:min(620px,calc(100vw - 24px))}
+#fichaDlg h2{display:flex;align-items:center;gap:8px}
+#fichaDlg .dot{width:12px;height:12px;border-radius:50%}
+.badge{font:500 11px var(--body);color:var(--muted);border:1px solid var(--line);padding:2px 8px;border-radius:99px}
+.svs{display:flex;flex-direction:column;gap:10px}
+.sv{background:var(--surface-2);border-radius:12px;padding:10px;display:flex;flex-direction:column;gap:6px}
+.sv-top{display:flex;gap:6px;align-items:center}
+.sv-top input{flex:1}
+.sv-top select{width:auto}
+.sug{display:flex;flex-wrap:wrap;gap:6px}
+.sug .chip{font-size:12px;padding:5px 10px}
 @media (max-width:760px){
   :root{--nav-h:64px}
   .app{padding:10px 12px calc(20px + var(--nav-h) + env(safe-area-inset-bottom))}
@@ -282,6 +311,7 @@ a.btn{display:inline-flex;align-items:center;text-decoration:none;color:var(--te
 
 <script src="app.js"></script>
 <script src="planner.js"></script>
+<script src="clients.js"></script>
 <script type="module" src="cloud.js"></script>
 </body>
 </html>

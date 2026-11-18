@@ -58,7 +58,7 @@ const DEMO_IDS = new Set(['mio-1','mio-2','ag-a','ag-b','ag-int']);
 let lastSent = '', cloudTimer = null;
 function cloudData(){
   return JSON.parse(JSON.stringify({
-    clients: S.clients.map(({id,name,group,color,keywords,listId}) => ({id,name,group,color,keywords,listId})),
+    clients: S.clients.map(({id,name,group,color,keywords,listId,auto,services,hours,notes}) => ({id,name,group,color,keywords,listId,auto,services,hours,notes})),
     tasks: S.tasks.filter(t => !t.cu && !t.demo),
     token: S.cu.token || '', hidden: S.cu.hidden || [], plan: S.plan || null, slots: S.slots || {} }));
 }
@@ -777,5 +777,5 @@ if (online()) sync(true);
 // Mantener PC y móvil al día: cada 60 s con la app abierta y al volver a ella
 setInterval(() => { if (document.visibilityState === 'visible') sync(true); }, 60000);
 document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') sync(true); });
-window.__org = {S, parse, applyCloud, cloudEmpty, cloudReady, wipeLocal, toast, views, render, save, card, setToolbar, visibleTasks, client, task, esc, iso, fromIso, addDays, today, dayLabel, DIAS_L, MESES, pad, byOrder};
+window.__org = {S, parse, clientLists, online, PALETA, applyCloud, cloudEmpty, cloudReady, wipeLocal, toast, views, render, save, card, setToolbar, visibleTasks, client, task, esc, iso, fromIso, addDays, today, dayLabel, DIAS_L, MESES, pad, byOrder};
 })();
