@@ -467,17 +467,20 @@ const views = {
   clientes(){
     const T = visibleTasks();
     setToolbar('Clientes', 'tareas pendientes de cada uno', '', 'Arrastra para cambiar de cliente');
-    let html = '<div class="board">';
+    // En filas que se adaptan a la pantalla (sin deslizar). Primero los clientes con tareas pendientes, luego el resto.
+    let html = '<div class="board grid">';
     for (const [g, label] of [['mine','Mis clientes'],['agency','Agencia']]){
       const cs = visibleClients().filter(c => c.group === g);
       if (!cs.length) continue;
-      html += `<div class="sep">${label}</div>`;
-      for (const c of cs){
+      const cols = cs.map((c, i) => {
         const ts = T.filter(x => x.client === c.id);
-        const pend = ts.filter(x => x.status !== 'done').sort((a,b)=>(a.day||'9').localeCompare(b.day||'9')||byOrder(a,b));
-        const hechas = ts.length - pend.length;
-        html += column({title:c.name, sub: hechas ? `${hechas} hecha${hechas>1?'s':''}` : '', field:'client', value:c.id, tasks:pend, hide:{client:true}, dot:c.color, add:c.id});
-      }
+        const pend = ts.filter(x => x.status !== 'done').sort((a,b) => urgRank(a) - urgRank(b) || byOrder(a,b));
+        return {c, i, pend, hechas: ts.length - pend.length};
+      }).sort((a, b) => (b.pend.length > 0) - (a.pend.length > 0) || a.i - b.i);
+      const conT = cols.filter(x => x.pend.length).length;
+      html += `<div class="sep">${label}<span>${conT} con tareas · ${cols.length - conT} sin pendientes</span></div>`;
+      for (const {c, pend, hechas} of cols)
+        html += column({title:c.name, sub: hechas ? `${hechas} hecha${hechas>1?'s':''}` : '', field:'client', value:c.id, tasks:pend, hide:{client:true}, dot:c.color, add:c.id, cls: pend.length ? '' : 'quiet'});
     }
     const sin = T.filter(x => (!x.client || !client(x.client)) && x.status !== 'done');
     if (S.group === 'all' && sin.length) html += column({title:'Sin cliente', field:'client', value:'', tasks:sin, hide:{client:true}, dot:'var(--faint)'});
