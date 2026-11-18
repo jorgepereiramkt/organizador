@@ -16,7 +16,7 @@ const PALETA = ['#FF6B3D','#4F8CFF','#3DDC97','#C77DFF','#FFC93D','#FF5C8A','#3D
 
 /* ---------- Estado ---------- */
 const KEY = 'jp-organizador-v1';
-const CU_DEFAULT = () => ({token:'', me:null, meName:'', lists:[], onlyMine:true, statuses:{}, lastSync:0});
+const CU_DEFAULT = () => ({token:'', me:null, meName:'', lists:[], teams:[], hidden:[], statuses:{}, lastSync:0});
 const S = { tasks:[], clients:[], view:'hoy', group:'all', weekOffset:0, cu:CU_DEFAULT() };
 
 function seed(){
@@ -60,7 +60,7 @@ function cloudData(){
   return JSON.parse(JSON.stringify({
     clients: S.clients.map(({id,name,group,color,keywords,listId}) => ({id,name,group,color,keywords,listId})),
     tasks: S.tasks.filter(t => !t.cu && !t.demo),
-    token: S.cu.token || '', onlyMine: S.cu.onlyMine !== false }));
+    token: S.cu.token || '', hidden: S.cu.hidden || [] }));
 }
 function scheduleCloud(){
   if (!window.__cloud) return;
@@ -73,7 +73,7 @@ function scheduleCloud(){
   }, 700);
 }
 async function adoptToken(token){
-  S.cu = {...CU_DEFAULT(), token, onlyMine: S.cu.onlyMine};
+  S.cu = {...CU_DEFAULT(), token, hidden: S.cu.hidden || []};
   setMode('Conectando…');
   try { const {user} = await cu('/user'); S.cu.me = user.id; S.cu.meName = user.username || user.email || ''; await loadLists(); saveLocal(); await sync(); }
   catch(e){ toast('ClickUp: ' + e.message); modeIdle(); }
@@ -82,7 +82,7 @@ function applyCloud(d){
   if (D || (typeof ed !== 'undefined' && ed.open)) return setTimeout(() => applyCloud(d), 800);
   S.clients = d.clients || [];
   S.tasks = [...S.tasks.filter(t => t.cu), ...(d.tasks || [])];
-  S.cu.onlyMine = d.onlyMine !== false;
+  S.cu.hidden = d.hidden || [];
   const tokenChanged = (d.token || '') !== (S.cu.token || '');
   if (tokenChanged && !d.token){ S.cu = CU_DEFAULT(); S.tasks = S.tasks.filter(t => !t.cu); }
   lastSent = JSON.stringify({...cloudData(), token: d.token || ''});
@@ -132,13 +132,14 @@ async function loadLists(){
   const {teams} = await cu('/team');
   for (const t of teams){
     const {spaces} = await cu(`/team/${t.id}/space?archived=false`);
-    for (const s of spaces){
+    await Promise.all(spaces.map(async s => {
       const [{folders}, {lists}] = await Promise.all([cu(`/space/${s.id}/folder?archived=false`), cu(`/space/${s.id}/list?archived=false`)]);
-      for (const l of lists) out.push({id:l.id, name:l.name, team:t.id, path:`${t.name} › ${s.name}`});
-      for (const f of folders) for (const l of (f.lists || [])) out.push({id:l.id, name:l.name, team:t.id, path:`${t.name} › ${s.name} › ${f.name}`});
-    }
+      for (const l of lists) out.push({id:l.id, name:l.name, team:t.id, folder:null, folderName:'', path:`${s.name}`});
+      for (const f of folders) for (const l of (f.lists || [])) out.push({id:l.id, name:l.name, team:t.id, folder:f.id, folderName:f.name, path:`${s.name} › ${f.name}`});
+    }));
   }
   S.cu.lists = out;
+  S.cu.teams = teams.map(t => t.id);
 }
 async function connect(token){
   S.cu = {...CU_DEFAULT(), token: token.trim()};
@@ -148,16 +149,50 @@ async function connect(token){
     S.cu.me = user.id; S.cu.meName = user.username || user.email || '';
     await loadLists();
   } catch(e){ S.cu = CU_DEFAULT(); modeIdle(); throw e; }
-  // Fuera los clientes de ejemplo y las tareas de ejemplo
   S.clients = S.clients.filter(c => !c.id.startsWith('ag-'));
-  for (const c of S.clients.filter(c => c.group === 'agency')){
-    const m = S.cu.lists.find(l => norm(l.name).includes(norm(c.name)) || norm(c.name).includes(norm(l.name)));
-    if (m && !c.listId) c.listId = m.id;
-  }
   S.tasks = S.tasks.filter(t => !t.demo && !t.cu);
   save(); await sync();
 }
-function disconnect(){ S.cu = CU_DEFAULT(); S.tasks = S.tasks.filter(t => !t.cu); save(); render(); modeIdle(); }
+function disconnect(){ S.cu = CU_DEFAULT(); S.tasks = S.tasks.filter(t => !t.cu); S.clients = S.clients.filter(c => !c.auto); save(); render(); modeIdle(); }
+
+/* Clientes de la agencia = carpetas de ClickUp (o listas sueltas sin carpeta). Se crean solos con tus tareas. */
+const folderKey = (folderId, listId) => folderId ? 'f:' + folderId : 'l:' + listId;
+function ensureAgencyClient(key, name){
+  let c = client(key);
+  if (!c){
+    c = {id:key, name, group:'agency', color:PALETA[S.clients.length % PALETA.length], keywords:'', auto:true};
+    S.clients.push(c);
+  }
+  return c;
+}
+const hidden = () => new Set(S.cu.hidden || []);
+// Listas de un cliente de la agencia
+function clientLists(c){
+  if (!c) return [];
+  if (c.id.startsWith('f:')) return S.cu.lists.filter(l => l.folder === c.id.slice(2));
+  if (c.id.startsWith('l:')) return S.cu.lists.filter(l => l.id === c.id.slice(2));
+  return [];
+}
+// Elegir la lista según lo que digas: «meta», «google», «email»…
+const LIST_HINTS = [
+  [/meta|facebook|instagram|\bfb\b|\big\b|reels?|ads? de meta/, /meta/],
+  [/google|gads|pmax|shopping|search|merchant/, /google/],
+  [/tiktok shop/, /tiktok shop/],
+  [/tiktok/, /tiktok ads|tiktok/],
+  [/email|mail|klaviyo|newsletter|flujo/, /email|mail/],
+  [/dise[nñ]o|banner|creatividad|creativo|imagen|imagenes/, /dise/],
+  [/\bcro\b|landing|conversion|web\b/, /cro|web/],
+  [/\bugc\b/, /ugc/],
+  [/analitica|analytics|ga4|tracking|pixel|gtm/, /anal/],
+  [/informe|reporte|revision|review|estrategia|reunion|llamada/, /review|strategy/],
+];
+function chooseList(c, title, prefer){
+  const ls = clientLists(c); if (!ls.length) return null;
+  if (prefer){ const same = ls.find(l => norm(l.name) === norm(prefer)); if (same) return same; }
+  const t = norm(title || '');
+  for (const [re, target] of LIST_HINTS) if (re.test(t)){ const l = ls.find(l => target.test(norm(l.name))); if (l) return l; }
+  return ls.find(l => /review|strategy/.test(norm(l.name))) || ls[0];
+}
 
 function fromCU(raw, clientId, prev){
   const st = raw.status || {};
@@ -169,31 +204,37 @@ function fromCU(raw, clientId, prev){
     status, priority: p <= 2 ? 'alta' : p === 4 ? 'baja' : 'normal',
     order: old ? old.order : +raw.date_created / 1e6,
     doneAt: status === 'done' ? iso(new Date(+(raw.date_done || raw.date_closed || Date.now()))) : null,
-    url: raw.url, cu: true};
+    url: raw.url, cu: true, listId: raw.list && raw.list.id, listName: raw.list && raw.list.name};
 }
 async function pages(path){
   let all = [];
-  for (let p = 0; p < 10; p++){
+  for (let p = 0; p < 20; p++){
     const r = await cu(path + `&page=${p}`);
     all = all.concat(r.tasks || []);
     if (r.last_page !== false || (r.tasks || []).length < 100) break;
   }
   return all;
 }
+// Trae TUS tareas asignadas de todo el espacio de trabajo (abiertas + cerradas en los últimos 14 días)
 async function sync(silent){
   if (!online() || syncing || inflight || D) return;
   syncing = true; setMode('Sincronizando…');
   try {
+    if (!S.cu.teams || !S.cu.lists.length || !('folder' in (S.cu.lists[0] || {}))) await loadLists();
     const prev = new Map(S.tasks.map(t => [t.id, t]));
-    const mine = S.cu.onlyMine && S.cu.me ? `&assignees[]=${S.cu.me}` : '';
-    const since = Date.now() - 14 * 864e5;
+    const since = Date.now() - 14 * 864e5, hid = hidden();
     const out = new Map();
-    await Promise.all(S.clients.filter(c => c.listId).map(async c => {
-      const [open, closed] = await Promise.all([
-        pages(`/list/${c.listId}/task?subtasks=true${mine}`),
-        pages(`/list/${c.listId}/task?subtasks=true&include_closed=true&date_done_gt=${since}${mine}`)]);
-      for (const raw of [...open, ...closed]) out.set(raw.id, fromCU(raw, c.id, prev));
-    }));
+    for (const team of S.cu.teams){
+      const base = `/team/${team}/task?subtasks=true&assignees[]=${S.cu.me}`;
+      const [open, closed] = await Promise.all([pages(base), pages(base + `&include_closed=true&date_done_gt=${since}`)]);
+      for (const raw of [...open, ...closed]){
+        const f = raw.folder || {}, l = raw.list || {};
+        const key = folderKey(f.hidden ? null : f.id, l.id);
+        if (hid.has(key)) continue;
+        ensureAgencyClient(key, f.hidden || !f.name ? l.name : f.name);
+        out.set(raw.id, fromCU(raw, key, prev));
+      }
+    }
     if (inflight || D) { modeIdle(); return; }   // hubo cambios mientras tanto: se repite en la próxima vuelta
     S.tasks = [...out.values(), ...S.tasks.filter(t => !t.cu)];
     S.cu.lastSync = Date.now(); save();
@@ -209,7 +250,7 @@ async function write(fn){
   finally { inflight--; }
 }
 async function listStatuses(listId){
-  if (!S.cu.statuses[listId]){ const l = await cu(`/list/${listId}`); S.cu.statuses[listId] = l.statuses || []; save(); }
+  if (!S.cu.statuses[listId]){ const l = await cu(`/list/${listId}`); S.cu.statuses[listId] = l.statuses || []; saveLocal(); }
   return [...S.cu.statuses[listId]].sort((a,b) => a.orderindex - b.orderindex);
 }
 async function statusName(listId, target){
@@ -230,13 +271,16 @@ const isAgency = id => { const c = client(id); return !!(c && c.group === 'agenc
 // Regla de oro: solo se sube a ClickUp lo que es de un cliente marcado como «Agencia». Lo tuyo nunca sale de la app.
 async function pushCreate(t){
   const c = client(t.client);
-  if (!online() || t.cu || !c || c.group !== 'agency' || !c.listId) return;
+  if (!online() || t.cu || !c || c.group !== 'agency') return;
+  const l = chooseList(c, t.title);
+  if (!l) return toast('Ese cliente no tiene listas en ClickUp');
   await write(async () => {
     const body = {name:t.title, priority:PRIO[t.priority], assignees: S.cu.me ? [S.cu.me] : []};
     if (t.day){ body.due_date = dueMs(t.day); body.due_date_time = false; }
-    if (t.status !== 'todo'){ const s = await statusName(c.listId, t.status); if (s) body.status = s; }
-    const res = await cu(`/list/${c.listId}/task`, {method:'POST', body});
-    t.id = res.id; t.url = res.url; t.cu = true; save(); render();
+    if (t.status !== 'todo'){ const s = await statusName(l.id, t.status); if (s) body.status = s; }
+    const res = await cu(`/list/${l.id}/task`, {method:'POST', body});
+    t.id = res.id; t.url = res.url; t.cu = true; t.listId = l.id; t.listName = l.name; save(); render();
+    toast(`Guardada en ClickUp · ${c.name} › ${l.name}`);
   });
 }
 // Llamar después de cambiar una tarea: compara con cómo estaba y manda a ClickUp solo lo que toca
@@ -252,15 +296,19 @@ async function afterChange(t, before){
   const c = client(t.client);
   if (before.client !== t.client){
     if (!c || c.group !== 'agency') return revert('Las tareas de la agencia se quedan en la agencia');
-    const from = listInfo(client(before.client)?.listId), to = listInfo(c.listId);
-    if (!to || !from || from.team !== to.team) return revert(!to ? 'Ese cliente no tiene lista de ClickUp' : 'No se puede mover entre espacios de trabajo distintos');
-    await write(() => cu(`/v3/workspaces/${to.team}/tasks/${t.id}/home_list/${to.id}`, {method:'PUT', body:{}}));
+    const from = listInfo(t.listId), to = chooseList(c, t.title, t.listName);
+    if (!to) return revert('Ese cliente no tiene listas en ClickUp');
+    if (from && from.team !== to.team) return revert('No se puede mover entre espacios de trabajo distintos');
+    await write(async () => {
+      await cu(`/v3/workspaces/${to.team}/tasks/${t.id}/home_list/${to.id}`, {method:'PUT', body:{}});
+      t.listId = to.id; t.listName = to.name; save(); render();
+    });
   }
   const body = {};
   if (before.title !== t.title) body.name = t.title;
   if (before.day !== t.day){ body.due_date = t.day ? dueMs(t.day) : null; body.due_date_time = false; }
   if (before.priority !== t.priority) body.priority = PRIO[t.priority];
-  if (before.status !== t.status || before.client !== t.client){ const s = await statusName(c.listId, t.status).catch(() => null); if (s) body.status = s; }
+  if ((before.status !== t.status || before.client !== t.client) && t.listId){ const s = await statusName(t.listId, t.status).catch(() => null); if (s) body.status = s; }
   if (Object.keys(body).length) await write(() => cu(`/task/${t.id}`, {method:'PUT', body}));
 }
 async function pushDelete(t){
@@ -269,7 +317,7 @@ async function pushDelete(t){
 }
 
 /* ---------- Clasificador de voz/texto (sin IA, sin tokens) ---------- */
-const STOP = new Set(['cliente','clientes','agencia','tienda','store','shop','interno','general','proyecto','proyectos','marketing','digital','personal','tareas','lista','grupo','studio','estudio']);
+const STOP = new Set(['agency','leadfluence','tier','onboarding','cliente','clientes','agencia','tienda','store','shop','interno','general','proyecto','proyectos','marketing','digital','personal','tareas','lista','grupo','studio','estudio']);
 function nextDow(target){ const now = new Date(); let n = (target - now.getDay() + 7) % 7; if (n === 0) n = 7; return iso(addDays(now,n)); }
 function parseOne(raw){
   let title = ' ' + raw.trim() + ' ';
@@ -344,6 +392,7 @@ function card(t, hide={}){
   const meta = [];
   if (!hide.client) meta.push(c ? `<span class="cl" style="--c:${c.color}"><i></i>${esc(c.name)}</span>` : `<span class="cl" style="--c:var(--faint)"><i></i>Sin cliente</span>`);
   if (!hide.day && t.day) meta.push(`<span class="${late?'late':''}">${late?'Atrasada · ':''}${dayLabel(t.day)}</span>`);
+  if (t.cu && t.listName) meta.push(`<span class="st">${esc(t.listName)}</span>`);
   if (t.priority === 'alta' && !done) meta.push('<span class="alta">Urgente</span>');
   if (t.priority === 'baja' && !done) meta.push('<span class="st">Sin prisa</span>');
   if (!hide.status && t.status !== 'todo' && !done) meta.push(`<span class="st">${STATUS[t.status]}</span>`);
@@ -579,6 +628,7 @@ function preview(){
     const c = client(p.client);
     return `<div class="pv"><b>${esc(p.title)}</b>
       ${c ? `<span class="tag" style="--c:${c.color}"><i></i>${esc(c.name)}</span>` : '<span class="tag miss">sin cliente</span>'}
+      ${c && c.group === 'agency' && online() ? (l => l ? `<span class="tag">ClickUp › ${esc(l.name)}</span>` : '')(chooseList(c, p.title)) : c && c.group === 'mine' ? '<span class="tag">🔒 solo app</span>' : ''}
       ${p.day ? `<span class="tag">${dayLabel(p.day)}</span>` : '<span class="tag miss">a la bandeja</span>'}
       ${p.priority==='alta' ? '<span class="tag warn">Urgente</span>' : p.priority==='baja' ? '<span class="tag">Sin prisa</span>' : ''}</div>`;
   }).join('');
@@ -614,40 +664,40 @@ $('#mic').addEventListener('click', () => {
 /* ---------- Ajustes ---------- */
 const st = $('#st'), clList = $('#clList');
 function renderClients(){
-  clList.innerHTML = S.clients.map(c => `<div class="cl-row" data-id="${c.id}">
+  const row = c => `<div class="cl-row" data-id="${c.id}">
     <input type="color" value="${c.color}" data-k="color" aria-label="Color">
     <input value="${esc(c.name)}" data-k="name" aria-label="Nombre">
-    <select data-k="group"><option value="mine" ${c.group==='mine'?'selected':''}>Mío</option><option value="agency" ${c.group==='agency'?'selected':''}>Agencia</option></select>
-    <button type="button" class="x" data-del aria-label="Borrar cliente">×</button>
-    <span></span><input class="kw" value="${esc(c.keywords||'')}" data-k="keywords" placeholder="palabras clave, separadas por comas">
-    ${!online() ? '' : c.group === 'agency'
-      ? `<span></span><select class="ls" data-k="listId">${listOptions(c.listId, '— Sin lista de ClickUp —')}</select>`
-      : `<span></span><span class="lock">🔒 Solo en la app, nunca va a ClickUp</span>`}</div>`).join('');
+    ${c.auto ? `<span class="lock" style="grid-column:auto">Agencia</span>`
+      : `<select data-k="group"><option value="mine" ${c.group==='mine'?'selected':''}>Mío</option><option value="agency" ${c.group==='agency'?'selected':''}>Agencia</option></select>`}
+    <button type="button" class="x" data-del aria-label="${c.auto ? 'Ocultar cliente' : 'Borrar cliente'}">×</button>
+    <span></span><input class="kw" value="${esc(c.keywords||'')}" data-k="keywords" placeholder="palabras clave extra, separadas por comas">
+    <span></span><span class="lock">${c.auto ? `🔗 Carpeta de ClickUp · ${clientLists(c).length} listas` : c.group === 'mine' ? '🔒 Solo en la app, nunca va a ClickUp' : 'Sin carpeta de ClickUp: sus tareas no se suben'}</span></div>`;
+  const mine = S.clients.filter(c => c.group === 'mine'), ag = S.clients.filter(c => c.group !== 'mine');
+  clList.innerHTML = `<b class="grp">Mis clientes (${mine.length})</b>` + (mine.map(row).join('') || '<span class="lock">Aún ninguno: pulsa «+ Cliente».</span>')
+    + `<b class="grp">Agencia (${ag.length})</b>` + (ag.map(row).join('') || `<span class="lock">${online() ? 'Aparecen solos cuando tienes tareas asignadas en su carpeta.' : 'Conecta ClickUp para verlos.'}</span>`);
   const add = $('#addFromList');
   add.hidden = !online();
-  if (online()) add.innerHTML = `<option value="">+ Cliente de la agencia desde ClickUp…</option>` +
-    S.cu.lists.filter(l => !S.clients.some(c => c.listId === l.id)).map(l => `<option value="${l.id}">${esc(l.name)} · ${esc(l.path)}</option>`).join('');
+  if (online()){
+    const folders = new Map();
+    for (const l of S.cu.lists){ const key = folderKey(l.folder, l.id); if (!client(key) && !folders.has(key)) folders.set(key, {key, name: l.folder ? l.folderName : l.name, path: l.path}); }
+    add.innerHTML = `<option value="">+ Cliente de la agencia…</option>` +
+      [...folders.values()].sort((a,b) => a.name.localeCompare(b.name)).map(f => `<option value="${f.key}">${esc(f.name)}</option>`).join('');
+  }
   $('#resetDemo').hidden = online();
   document.querySelectorAll('.only-on').forEach(e => e.hidden = !online());
   renderCU();
-}
-function listOptions(sel, empty){
-  const groups = {};
-  for (const l of S.cu.lists) (groups[l.path] = groups[l.path] || []).push(l);
-  return `<option value="">${empty}</option>` + Object.entries(groups).map(([p, ls]) =>
-    `<optgroup label="${esc(p)}">${ls.map(l => `<option value="${l.id}" ${l.id===sel?'selected':''}>${esc(l.name)}</option>`).join('')}</optgroup>`).join('');
 }
 function renderCU(){
   const box = $('#cuBox');
   if (!online()){
     box.innerHTML = `<b>Conectar el ClickUp de la agencia</b>
-      <div class="note" style="background:none;padding:0">Solo se conectan los clientes que marques como <b>Agencia</b>. Tus clientes (<b>Mío</b>) nunca se envían a ClickUp. El token se guarda en tu cuenta de Google (protegida), así lo tienen todos tus dispositivos.</div>
+      <div class="note" style="background:none;padding:0">Verás tus tareas asignadas de la agencia, agrupadas por cliente (cada carpeta de ClickUp). Tus clientes (<b>Mío</b>) nunca se envían a ClickUp. El token se guarda en tu cuenta de Google (protegida), así lo tienen todos tus dispositivos.</div>
       <div class="row"><label>Token de ClickUp<input type="password" id="cuToken" placeholder="pk_…" autocomplete="off"></label><button type="button" class="btn primary" id="cuConnect">Conectar</button></div>`;
     return;
   }
-  box.innerHTML = `<div><span class="ok">● Agencia conectada</span> como ${esc(S.cu.meName)} · ${S.cu.lists.length} listas</div>
-    <label class="check"><input type="checkbox" id="cuMine" ${S.cu.onlyMine?'checked':''}> Ver solo las tareas asignadas a mí</label>
-    <div class="actions" style="margin:0"><button type="button" class="btn" id="cuRefresh">Actualizar listas</button><span class="sp"></span><button type="button" class="btn danger" id="cuOff">Desconectar</button></div>`;
+  const nh = (S.cu.hidden || []).length;
+  box.innerHTML = `<div><span class="ok">● Agencia conectada</span> como ${esc(S.cu.meName)} · tus tareas asignadas</div>
+    <div class="actions" style="margin:0"><button type="button" class="btn" id="cuRefresh">Actualizar</button>${nh ? `<button type="button" class="btn" id="cuUnhide">Mostrar ${nh} oculto${nh>1?'s':''}</button>` : ''}<span class="sp"></span><button type="button" class="btn danger" id="cuOff">Desconectar</button></div>`;
 }
 $('#cuBox').addEventListener('click', async e => {
   const id = e.target.id;
@@ -657,35 +707,37 @@ $('#cuBox').addEventListener('click', async e => {
     try { await connect(tk); toast('ClickUp de la agencia conectado'); } catch(err){ toast('No se pudo conectar: ' + err.message); }
     renderClients();
   }
-  if (id === 'cuRefresh'){ e.target.textContent = 'Cargando…'; try { await loadLists(); save(); } catch(err){ toast(err.message); } renderClients(); }
+  if (id === 'cuRefresh'){ e.target.textContent = 'Cargando…'; try { await loadLists(); saveLocal(); await sync(); } catch(err){ toast(err.message); } renderClients(); }
+  if (id === 'cuUnhide'){ S.cu.hidden = []; save(); await sync(); renderClients(); }
   if (id === 'cuOff' && confirm('¿Desconectar ClickUp en todos tus dispositivos? Tus clientes y sus tareas se quedan.')){ disconnect(); renderClients(); }
 });
-$('#cuBox').addEventListener('change', e => {
-  if (e.target.id === 'cuMine'){ S.cu.onlyMine = e.target.checked; save(); sync(); }
-});
 $('#addFromList').addEventListener('change', e => {
-  const l = listInfo(e.target.value); if (!l) return;
-  S.clients.push({id:uid(), name:l.name, group:'agency', color:PALETA[S.clients.length % PALETA.length], keywords:'', listId:l.id});
+  const key = e.target.value; if (!key) return;
+  const l = S.cu.lists.find(l => folderKey(l.folder, l.id) === key);
+  S.cu.hidden = (S.cu.hidden || []).filter(h => h !== key);
+  ensureAgencyClient(key, l.folder ? l.folderName : l.name);
   save(); renderClients(); render(); sync(true);
 });
 clList.addEventListener('input', e => {
   const row = e.target.closest('.cl-row'), k = e.target.dataset.k; if (!row || !k) return;
   const c = client(row.dataset.id);
-  if (k === 'group' && e.target.value === 'mine' && c.group === 'agency'){
-    // Pasar un cliente a «Mío»: se desconecta de ClickUp y sus tareas de ClickUp dejan de verse aquí
-    delete c.listId; S.tasks = S.tasks.filter(t => !(t.cu && t.client === c.id));
-  }
   c[k] = e.target.value; save(); render(); preview();
   if (k === 'group') renderClients();
-  if (k === 'listId' || k === 'group') sync(true);
 });
 clList.addEventListener('click', e => {
   if (!e.target.closest('[data-del]')) return;
   const id = e.target.closest('.cl-row').dataset.id, c = client(id);
+  if (c.auto){
+    if (!confirm(`¿Ocultar «${c.name}» de la app? En ClickUp no se toca nada.`)) return;
+    S.cu.hidden = [...new Set([...(S.cu.hidden || []), id])];
+    S.clients = S.clients.filter(x => x.id !== id);
+    S.tasks = S.tasks.filter(t => t.client !== id || !t.cu);
+    S.tasks.forEach(t => { if (t.client === id) t.client = null; });
+    save(); renderClients(); render(); return;
+  }
   const n = S.tasks.filter(t => t.client === id && !t.cu).length;
   if (!confirm(`¿Quitar «${c.name}»?${n ? ` Sus ${n} tareas pasarán a «Sin cliente».` : ''}`)) return;
   S.clients = S.clients.filter(x => x.id !== id);
-  S.tasks = S.tasks.filter(t => !(t.cu && t.client === id));
   S.tasks.forEach(t => { if (t.client === id) t.client = null; });
   save(); renderClients(); render();
 });
