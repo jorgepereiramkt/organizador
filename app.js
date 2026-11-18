@@ -409,8 +409,8 @@ function card(t, hide={}){
 function column({title, sub='', field, value='', tasks, hide, cls='', dot, undone=false, empty='Arrastra aquí', add}){
   return `<section class="col ${cls}" data-field="${field}" data-value="${value}" ${undone?'data-undone="1"':''}>
     <header><h3>${dot?`<i style="--c:${dot}"></i>`:''}${esc(title)} ${sub?`<span class="csub">${esc(sub)}</span>`:''}</h3><span class="count">${tasks.length}</span></header>
-    <div class="list">${tasks.length ? tasks.map(t => card(t, hide)).join('') : `<div class="empty">${empty}</div>`}</div>
-    ${add !== undefined ? `<form class="qadd" data-qclient="${add}"><input placeholder="+ Añadir tarea" aria-label="Añadir tarea a ${esc(title)}" autocomplete="off"></form>` : ''}</section>`;
+    <div class="list">${tasks.length ? tasks.map(t => card(t, hide)).join('') : `<div class="empty${add !== undefined ? ' mini' : ''}">${add !== undefined ? 'Sin tareas pendientes' : empty}</div>`}</div>
+    ${add !== undefined ? `<form class="qadd" data-qclient="${add}"><input placeholder="Añadir tarea" title="Intro para añadir · entiende «mañana», «el viernes», «urgente»…" aria-label="Añadir tarea a ${esc(title)}" autocomplete="off" enterkeyhint="done"></form>` : ''}</section>`;
 }
 function setToolbar(title, sub, extra='', hint='Arrastra las tareas para moverlas'){
   toolbar.innerHTML = `<h2>${title}</h2><span class="sub">${sub}</span><span class="sp"></span>${extra}<span class="hint">${hint}</span>`;

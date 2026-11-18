@@ -6,7 +6,7 @@
 <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' https://www.gstatic.com https://apis.google.com https://accounts.google.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://accounts.google.com; font-src https://fonts.gstatic.com; connect-src https://api.clickup.com https://accounts.google.com https://firestore.googleapis.com https://identitytoolkit.googleapis.com https://securetoken.googleapis.com https://www.googleapis.com https://apis.google.com; frame-src https://organizador-jp.firebaseapp.com https://accounts.google.com; img-src 'self' data: https://lh3.googleusercontent.com; manifest-src 'self'; base-uri 'none'; form-action 'self'; object-src 'none'">
 <meta name="referrer" content="no-referrer">
 <meta name="robots" content="noindex, nofollow">
-<link rel="manifest" href="manifest.json?v=20261119003751">
+<link rel="manifest" href="manifest.json?v=20261119003943">
 <link rel="icon" href="icon-192.png">
 <link rel="apple-touch-icon" href="icon-180.png">
 <meta name="theme-color" content="#0a0a0b">
@@ -87,9 +87,17 @@ button{cursor:pointer;border:0;background:none}
 .col .count{margin-left:auto;color:var(--faint);font-size:12px}
 .col .csub{color:var(--muted);font-size:12px;font-weight:400}
 .list{display:flex;flex-direction:column;gap:8px;min-height:40px}
-.qadd{margin-top:8px}
-.qadd input{width:100%;background:transparent;border:1px dashed var(--line);border-radius:10px;padding:9px 10px;color:var(--text);outline:none;font-size:13px}
-.qadd input:focus{border-style:solid;border-color:var(--accent);background:var(--bg)}
+.qadd{position:relative;margin-top:6px}
+.qadd::before{content:"";position:absolute;left:12px;top:50%;width:14px;height:14px;transform:translateY(-50%);pointer-events:none;
+  background:linear-gradient(currentColor,currentColor) center/14px 2px no-repeat,linear-gradient(currentColor,currentColor) center/2px 14px no-repeat;color:var(--faint);transition:color .15s}
+.qadd input{-webkit-appearance:none;appearance:none;display:block;width:100%;height:40px;margin:0;background:transparent;border:1px solid transparent;border-radius:10px;
+  padding:0 12px 0 34px;color:var(--muted);font:500 13px var(--body);outline:none;box-shadow:none;transition:background .15s,border-color .15s,color .15s}
+.qadd input::placeholder{color:var(--faint);opacity:1}
+.qadd:hover input{background:var(--surface-2);color:var(--text)}
+.qadd:hover::before,.qadd:focus-within::before{color:var(--accent)}
+.qadd input:focus{background:var(--surface-2);border-color:var(--accent);color:var(--text)}
+.qadd input:focus::placeholder{color:var(--muted)}
+.col .empty.mini{padding:8px 6px;border:0;text-align:left;font-size:12px}
 .empty{color:var(--faint);font-size:12px;text-align:center;padding:14px 6px;border:1px dashed var(--line);border-radius:10px}
 .sep{flex:0 0 auto;align-self:stretch;writing-mode:vertical-rl;transform:rotate(180deg);font:600 11px var(--body);letter-spacing:.12em;text-transform:uppercase;color:var(--faint);padding:8px 0;border-left:1px solid var(--line);padding-left:4px}
 
@@ -343,10 +351,10 @@ a.btn{display:inline-flex;align-items:center;text-decoration:none;color:var(--te
 
 <div class="toast" id="toast"></div>
 
-<script src="app.js?v=20261119003751"></script>
-<script src="planner.js?v=20261119003751"></script>
-<script src="clients.js?v=20261119003751"></script>
-<script src="hours.js?v=20261119003751"></script>
-<script type="module" src="cloud.js?v=20261119003751"></script>
+<script src="app.js?v=20261119003943"></script>
+<script src="planner.js?v=20261119003943"></script>
+<script src="clients.js?v=20261119003943"></script>
+<script src="hours.js?v=20261119003943"></script>
+<script type="module" src="cloud.js?v=20261119003943"></script>
 </body>
 </html>
