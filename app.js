@@ -49,7 +49,58 @@ function load(){
   try { const d = JSON.parse(localStorage.getItem(KEY)); if (d && d.tasks && d.clients){ Object.assign(S, {tasks:d.tasks, clients:d.clients, view:d.view||'hoy', group:d.group||'all', cu:{...CU_DEFAULT(), ...(d.cu||{})}}); return; } } catch(e){}
   seed();
 }
-function save(){ try { localStorage.setItem(KEY, JSON.stringify({tasks:S.tasks, clients:S.clients, view:S.view, group:S.group, cu:S.cu})); } catch(e){} }
+function saveLocal(){ try { localStorage.setItem(KEY, JSON.stringify({tasks:S.tasks, clients:S.clients, view:S.view, group:S.group, cu:S.cu})); } catch(e){} }
+function save(){ saveLocal(); scheduleCloud(); }
+
+/* ---------- Sincronización con tu cuenta de Google (cloud.js) ---------- */
+// Se sube: tus clientes, tus tareas (no las de ClickUp, que ya viven allí) y el token de ClickUp.
+const DEMO_IDS = new Set(['mio-1','mio-2','ag-a','ag-b','ag-int']);
+let lastSent = '', cloudTimer = null;
+function cloudData(){
+  return JSON.parse(JSON.stringify({
+    clients: S.clients.map(({id,name,group,color,keywords,listId}) => ({id,name,group,color,keywords,listId})),
+    tasks: S.tasks.filter(t => !t.cu && !t.demo),
+    token: S.cu.token || '', onlyMine: S.cu.onlyMine !== false }));
+}
+function scheduleCloud(){
+  if (!window.__cloud) return;
+  clearTimeout(cloudTimer);
+  cloudTimer = setTimeout(() => {
+    const data = cloudData(), js = JSON.stringify(data);
+    if (js === lastSent || !window.__cloud) return;
+    lastSent = js;
+    window.__cloud.save(data).catch(e => { lastSent = ''; toast('No se pudo guardar en tu cuenta: ' + (e.code || e.message)); });
+  }, 700);
+}
+async function adoptToken(token){
+  S.cu = {...CU_DEFAULT(), token, onlyMine: S.cu.onlyMine};
+  setMode('Conectando…');
+  try { const {user} = await cu('/user'); S.cu.me = user.id; S.cu.meName = user.username || user.email || ''; await loadLists(); saveLocal(); await sync(); }
+  catch(e){ toast('ClickUp: ' + e.message); modeIdle(); }
+}
+function applyCloud(d){
+  if (D || (typeof ed !== 'undefined' && ed.open)) return setTimeout(() => applyCloud(d), 800);
+  S.clients = d.clients || [];
+  S.tasks = [...S.tasks.filter(t => t.cu), ...(d.tasks || [])];
+  S.cu.onlyMine = d.onlyMine !== false;
+  const tokenChanged = (d.token || '') !== (S.cu.token || '');
+  if (tokenChanged && !d.token){ S.cu = CU_DEFAULT(); S.tasks = S.tasks.filter(t => !t.cu); }
+  lastSent = JSON.stringify({...cloudData(), token: d.token || ''});
+  saveLocal(); render(); preview();
+  if (typeof st !== 'undefined' && st.open) renderClients();
+  if (tokenChanged && d.token) adoptToken(d.token);
+}
+function cloudEmpty(){
+  // Primera vez con la cuenta: quitar los ejemplos y subir lo que haya en este dispositivo
+  S.tasks = S.tasks.filter(t => !t.demo && !(DEMO_IDS.has(t.client) && !t.cu && t.demo !== false && isSeedTask(t)));
+  S.clients = S.clients.filter(c => !(DEMO_IDS.has(c.id) && !c.listId));
+  S.tasks.forEach(t => { if (t.client && !client(t.client)) t.client = null; });
+  save(); render();
+}
+const SEED_TITLES = new Set(['Editar reel colección invierno','Revisar campaña Meta Ads Black Friday','Reunión de seguimiento semanal','Auditoría de la cuenta de Google Ads','Prompts de imágenes IA nueva colección','Montar flujo de emails de bienvenida','Informe mensual de Google Ads','Actualizar plantilla de informes','Optimizar feed de Merchant Center','Nuevas creatividades para Meta','Propuesta de presupuesto Q1']);
+const isSeedTask = t => SEED_TITLES.has(t.title);
+function cloudReady(){ scheduleCloud(); modeIdle(); }
+function wipeLocal(){ try { localStorage.removeItem(KEY); } catch(e){} }
 const client = id => S.clients.find(c => c.id === id);
 const task = id => S.tasks.find(t => t.id === id);
 const maxOrder = () => S.tasks.reduce((m,t) => Math.max(m, t.order||0), 0);
@@ -72,7 +123,7 @@ async function cu(path, opt = {}){
 }
 function setMode(txt){ $('#mode').textContent = txt; }
 function modeIdle(){
-  if (!online()) return setMode('Datos de ejemplo');
+  if (!online()) return setMode(window.__cloud ? 'Sin ClickUp' : 'Datos de ejemplo');
   const d = S.cu.lastSync ? new Date(S.cu.lastSync) : null;
   setMode(d ? `ClickUp ✓ ${pad(d.getHours())}:${pad(d.getMinutes())}` : 'ClickUp');
 }
@@ -590,7 +641,7 @@ function renderCU(){
   const box = $('#cuBox');
   if (!online()){
     box.innerHTML = `<b>Conectar el ClickUp de la agencia</b>
-      <div class="note" style="background:none;padding:0">Solo se conectan los clientes que marques como <b>Agencia</b>. Tus clientes (<b>Mío</b>) se quedan solo en esta app y nunca se envían a ClickUp. El token se guarda solo en este dispositivo.</div>
+      <div class="note" style="background:none;padding:0">Solo se conectan los clientes que marques como <b>Agencia</b>. Tus clientes (<b>Mío</b>) nunca se envían a ClickUp. El token se guarda en tu cuenta de Google (protegida), así lo tienen todos tus dispositivos.</div>
       <div class="row"><label>Token de ClickUp<input type="password" id="cuToken" placeholder="pk_…" autocomplete="off"></label><button type="button" class="btn primary" id="cuConnect">Conectar</button></div>`;
     return;
   }
@@ -607,7 +658,7 @@ $('#cuBox').addEventListener('click', async e => {
     renderClients();
   }
   if (id === 'cuRefresh'){ e.target.textContent = 'Cargando…'; try { await loadLists(); save(); } catch(err){ toast(err.message); } renderClients(); }
-  if (id === 'cuOff' && confirm('¿Desconectar ClickUp en este dispositivo? Tus clientes y sus tareas se quedan.')){ disconnect(); renderClients(); }
+  if (id === 'cuOff' && confirm('¿Desconectar ClickUp en todos tus dispositivos? Tus clientes y sus tareas se quedan.')){ disconnect(); renderClients(); }
 });
 $('#cuBox').addEventListener('change', e => {
   if (e.target.id === 'cuMine'){ S.cu.onlyMine = e.target.checked; save(); sync(); }
@@ -646,28 +697,9 @@ $('#addClient').addEventListener('click', () => {
 $('#resetDemo').addEventListener('click', () => { if (confirm('¿Volver a los datos de ejemplo? Se pierden los cambios.')){ seed(); save(); renderClients(); render(); } });
 $('#settingsBtn').addEventListener('click', () => { renderClients(); st.showModal(); });
 
-// Pasar tus clientes y sus tareas a otro dispositivo (copiar aquí → pegar allí). No pasa por ningún servidor.
-$('#copyData').addEventListener('click', async () => {
-  const data = 'JPORG1:' + btoa(unescape(encodeURIComponent(JSON.stringify({
-    clients: S.clients.map(({id,name,group,color,keywords,listId}) => ({id,name,group,color,keywords,listId})),
-    tasks: S.tasks.filter(t => !t.cu && !t.demo)}))));
-  try { await navigator.clipboard.writeText(data); toast('Copiado. Pégalo en el otro dispositivo (Notas, AirDrop…)'); }
-  catch(e){ prompt('Copia este texto y pégalo en el otro dispositivo:', data); }
-});
-$('#pasteData').addEventListener('click', () => {
-  const txt = (prompt('Pega aquí los datos copiados del otro dispositivo:') || '').trim();
-  if (!txt) return;
-  try {
-    if (!txt.startsWith('JPORG1:')) throw 0;
-    const d = JSON.parse(decodeURIComponent(escape(atob(txt.slice(7)))));
-    const byId = new Map(S.clients.map(c => [c.id, c]));
-    for (const c of d.clients) byId.set(c.id, {...byId.get(c.id), ...c});
-    S.clients = [...byId.values()];
-    const ids = new Set(d.tasks.map(t => t.id));
-    S.tasks = [...S.tasks.filter(t => t.cu || (!t.demo && !ids.has(t.id))), ...d.tasks];
-    save(); renderClients(); render(); sync(true); toast(`Importado: ${d.tasks.length} tareas tuyas`);
-  } catch(e){ toast('Ese texto no es válido'); }
-});
+$('#logoutBtn').addEventListener('click', () => { if (window.__cloud && confirm('¿Cerrar sesión en este dispositivo?')) window.__cloud.logout(); });
+function renderAccount(){ $('#accountTxt').textContent = window.__cloud ? window.__cloud.email : ''; }
+$('#settingsBtn').addEventListener('click', renderAccount);
 
 /* ---------- Navegación ---------- */
 $('#tabs').addEventListener('click', e => { const b = e.target.closest('[data-view]'); if (!b) return; S.view = b.dataset.view; S._scrolled = false; save(); render(); scrollTo(0,0); });
@@ -686,5 +718,5 @@ if (online()) sync(true);
 // Mantener PC y móvil al día: cada 60 s con la app abierta y al volver a ella
 setInterval(() => { if (document.visibilityState === 'visible') sync(true); }, 60000);
 document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') sync(true); });
-window.__org = {S, parse};
+window.__org = {S, parse, applyCloud, cloudEmpty, cloudReady, wipeLocal, toast};
 })();

@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; connect-src https://api.clickup.com; img-src 'self' data:; manifest-src 'self'; base-uri 'none'; form-action 'self'; object-src 'none'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' https://www.gstatic.com https://apis.google.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; connect-src https://api.clickup.com https://firestore.googleapis.com https://identitytoolkit.googleapis.com https://securetoken.googleapis.com https://www.googleapis.com https://apis.google.com; frame-src https://organizador-jp.firebaseapp.com https://accounts.google.com; img-src 'self' data: https://lh3.googleusercontent.com; manifest-src 'self'; base-uri 'none'; form-action 'self'; object-src 'none'">
 <meta name="referrer" content="no-referrer">
 <meta name="robots" content="noindex, nofollow">
 <link rel="manifest" href="manifest.json">
@@ -128,6 +128,13 @@ dialog::backdrop{background:rgba(0,0,0,.6)}
 .cl-row .kw{grid-column:2/4;font-size:12px;padding:7px 10px}
 .cl-list{display:flex;flex-direction:column;gap:12px;max-height:46vh;overflow:auto;padding-right:4px}
 .note{font-size:12px;color:var(--muted);background:var(--surface-2);border-radius:10px;padding:10px 12px}
+.gate{position:fixed;inset:0;z-index:100;display:grid;place-items:center;background:var(--bg);padding:24px}
+.gate-box{max-width:340px;text-align:center;display:flex;flex-direction:column;align-items:center;gap:12px}
+.gate h1{margin:0;font:700 26px var(--head)}
+.gate p{margin:0;color:var(--muted)}
+.logo.big{width:64px;height:64px;font-size:26px;border-radius:18px}
+.gbtn{height:48px;padding:0 22px;margin-top:8px}
+.gate-msg{min-height:20px;font-size:13px;color:var(--accent)!important}
 .x{color:var(--faint);font-size:18px}.x:hover{color:var(--danger)}
 a.btn{display:inline-flex;align-items:center;text-decoration:none;color:var(--text)}
 [hidden]{display:none!important}
@@ -170,6 +177,15 @@ a.btn{display:inline-flex;align-items:center;text-decoration:none;color:var(--te
 </style>
 </head>
 <body>
+<div class="gate" id="gate">
+  <div class="gate-box">
+    <span class="logo big">JP</span>
+    <h1>Organizador</h1>
+    <p>Entra con tu cuenta de Google para ver tus tareas en todos tus dispositivos.</p>
+    <button class="btn primary gbtn" id="gateBtn" type="button">Entrar con Google</button>
+    <p class="gate-msg" id="gateMsg"></p>
+  </div>
+</div>
 <div class="app">
   <header class="top">
     <div class="brand"><span class="logo">JP</span><span class="txt">Organizador</span><span class="pill" id="mode">Datos de ejemplo</span></div>
@@ -219,13 +235,13 @@ a.btn{display:inline-flex;align-items:center;text-decoration:none;color:var(--te
   <div class="note">Cada cliente tiene <b>palabras clave</b>: si las dices al dictar, la tarea va a ese cliente. Separa las palabras con comas.<span class="only-on"> A los de la <b>Agencia</b> elígeles su lista de ClickUp. Los tuyos (<b>Mío</b>) no se conectan nunca.</span></div>
   <div class="cl-list" id="clList"></div>
   <div class="actions"><button class="btn" type="button" id="addClient">+ Cliente</button><select class="btn" id="addFromList" hidden></select><span class="sp"></span><button class="btn" type="button" id="resetDemo">Restablecer ejemplo</button><button class="btn primary" value="ok">Listo</button></div>
-  <h3 class="h3">Pasar tus clientes al móvil (o al revés)</h3>
-  <div class="note">Tus clientes y sus tareas solo viven en este dispositivo. Para tenerlos también en el otro: <b>Copiar</b> aquí y <b>Pegar</b> allí (por Notas, AirDrop…). Lo de la agencia ya se sincroniza solo por ClickUp.</div>
-  <div class="actions" style="margin:0"><button class="btn" type="button" id="copyData">Copiar mis datos</button><button class="btn" type="button" id="pasteData">Pegar datos</button></div>
+  <h3 class="h3">Tu cuenta</h3>
+  <div class="actions" style="margin:0"><span class="note" style="flex:1">Sesión iniciada con <b id="accountTxt"></b>. Tus clientes y tareas se sincronizan solos en todos tus dispositivos.</span><button class="btn" type="button" id="logoutBtn">Cerrar sesión</button></div>
 </form></dialog>
 
 <div class="toast" id="toast"></div>
 
 <script src="app.js"></script>
+<script type="module" src="cloud.js"></script>
 </body>
 </html>
