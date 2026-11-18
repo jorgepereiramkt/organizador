@@ -88,7 +88,7 @@ function draw(){
   sugeridos.splice(14);
   form.innerHTML = `
     <h2><span class="dot" style="background:${c.color}"></span> ${esc(c.name)} <span class="badge">${ag ? 'Agencia' : '🔒 Mío'}</span></h2>
-    ${ag ? `<label>Horas al mes con este cliente<input type="number" min="0" step="0.5" data-f="hours" value="${c.hours || ''}" placeholder="p. ej. 10"></label>` : ''}
+    ${ag ? `<label>Horas al mes con este cliente<input type="number" min="0" step="0.5" data-f="hours" value="${c.hours || ''}" placeholder="normalmente entre 8 y 20"></label>` : ''}
     <label>Notas (contacto, objetivos, cosas a recordar)<textarea rows="2" data-f="notes">${esc(c.notes || '')}</textarea></label>
     <h3 class="h3">Servicios</h3>
     <div class="svs">${c.services.map((s, i) => `<div class="sv" data-i="${i}">

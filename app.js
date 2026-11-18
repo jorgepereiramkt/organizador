@@ -384,9 +384,11 @@ function dayLabel(s){
 /* ---------- Render ---------- */
 const main = $('#main'), toolbar = $('#toolbar');
 function visibleClients(){ return S.clients.filter(c => S.group === 'all' || c.group === S.group); }
+// «⭐ Tarea Principal ⭐» de ClickUp: solo sirven para registrar horas, no salen en los paneles de tareas
+const isRegTask = t => !!(t.cu && /tarea principal/i.test(t.title || ''));
 function visibleTasks(){
   const ids = new Set(visibleClients().map(c => c.id));
-  return S.tasks.filter(t => t.client && client(t.client) ? ids.has(t.client) : S.group === 'all');
+  return S.tasks.filter(t => !isRegTask(t) && (t.client && client(t.client) ? ids.has(t.client) : S.group === 'all'));
 }
 const byOrder = (a,b) => (a.order||0) - (b.order||0);
 
@@ -778,5 +780,5 @@ if (online()) sync(true);
 // Mantener PC y móvil al día: cada 60 s con la app abierta y al volver a ella
 setInterval(() => { if (document.visibilityState === 'visible') sync(true); }, 60000);
 document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') sync(true); });
-window.__org = {S, parse, clientLists, online, PALETA, cu, listInfo, norm, applyCloud, cloudEmpty, cloudReady, wipeLocal, toast, views, render, save, card, setToolbar, visibleTasks, client, task, esc, iso, fromIso, addDays, today, dayLabel, DIAS_L, MESES, pad, byOrder};
+window.__org = {S, parse, clientLists, online, PALETA, cu, listInfo, norm, isRegTask, applyCloud, cloudEmpty, cloudReady, wipeLocal, toast, views, render, save, card, setToolbar, visibleTasks, client, task, esc, iso, fromIso, addDays, today, dayLabel, DIAS_L, MESES, pad, byOrder};
 })();

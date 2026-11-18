@@ -17,7 +17,7 @@ function workDays(month){
   for (let d = new Date(y, m - 1, 1); d.getMonth() === m - 1; d.setDate(d.getDate() + 1)) if (isWork(d)) out.push(iso(d));
   return out;
 }
-const conHoras = () => S.clients.filter(c => (c.hours || 0) > 0);
+const conHoras = () => S.clients.filter(c => c.group !== 'mine' && (c.hours || 0) > 0);
 function logged(cid, month, beforeDay){
   let t = 0;
   for (const [day, row] of Object.entries(H().log)) if (monthOf(day) === month && (!beforeDay || day < beforeDay)) t += row[cid] || 0;
@@ -83,7 +83,7 @@ O.views.clientes = function(){
   const month = monthOf(O.today()), d0 = fromIso(month + '-01');
   const wd = workDays(month), quedan = wd.filter(d => d >= O.today()).length;
   O.setToolbar('Horas', `${O.MESES[d0.getMonth()]} ${d0.getFullYear()} · ${quedan} de ${wd.length} días laborables por delante`, '', 'Las horas se ponen en la ficha de cada cliente');
-  const cs = S.clients.filter(c => c.group !== 'mine' || c.hours);
+  const cs = S.clients.filter(c => c.group !== 'mine');
   const hoy = H().log[O.today()] || proposal(O.today());
   let totG = 0, totL = 0;
   const rows = cs.map(c => {
@@ -94,12 +94,13 @@ O.views.clientes = function(){
       <span>${c.hours ? `${c.hours} h/mes` : '<em>sin horas</em>'}</span>
       <div class="bar"><span style="width:${pct}%"></span></div>
       <span class="num">${fmt(l)} / ${g ? fmt(g) : '—'}</span>
-      <span class="num hoy">${hoy[c.id] ? 'hoy ' + fmt(hoy[c.id]) : ''}</span></div>`;
+      <span class="num hoy">${hoy[c.id] ? 'hoy ' + fmt(hoy[c.id]) : ''}</span>
+      <span class="reg">${(t => t ? `⏱ <a href="${esc(t.url || '#')}" target="_blank" rel="noopener">${esc(t.title)}</a>` : (O.online() ? '⚠️ sin «⭐ Tarea Principal ⭐»' : ''))(taskFor(c))}</span></div>`;
   }).join('');
   return `<div class="hbox">
     <div class="hhead"><label>Margen de planificación <input type="number" id="hMargin" min="0" max="50" value="${H().margin}"> %</label>
       <span>Mes: <b>${fmt(totL)}</b> de ${fmt(totG)}</span></div>
-    ${rows || '<div class="empty">Pon las horas al mes en la ficha de cada cliente (Clientes → Fichas).</div>'}
+    ${rows ? '<h3 class="rama">Registro de horas <span>las «⭐ Tarea Principal ⭐» de cada cliente: aquí se apunta el tiempo, no salen en los paneles de tareas</span></h3>' + rows : '<div class="empty">Conecta ClickUp para ver los clientes de la agencia.</div>'}
   </div>`;
 };
 O.views.clientes.after = () => {
@@ -131,9 +132,10 @@ function openClose(day){
   for (const k of Object.keys(draft)) if (k.startsWith('_')) delete draft[k];
   draw(!!prev); dlg.showModal();
 }
+const regTasks = c => S.tasks.filter(t => t.client === c.id && O.isRegTask(t));
 function taskFor(c){
-  const ts = S.tasks.filter(t => t.cu && t.client === c.id);
-  return (c.timeTask && ts.find(t => t.id === c.timeTask)) || ts.find(t => /tarea principal/i.test(t.title)) || ts[0] || null;
+  const rs = regTasks(c);
+  return (c.timeTask && rs.find(t => t.id === c.timeTask)) || rs[0] || null;
 }
 function draw(ya){
   const d = fromIso(dDay), total = Object.values(draft).reduce((a, b) => a + b, 0);
@@ -145,9 +147,9 @@ function draw(ya){
       return `<div class="crow" data-cid="${c.id}" style="--c:${c.color}">
         <b><i></i>${esc(c.name)}</b>
         <div class="stepper"><button type="button" data-step="-15">−</button><input type="number" min="0" step="5" value="${m}" data-min> <span>min</span><button type="button" data-step="15">+</button></div>
-        ${c.group !== 'mine' && O.online() ? `<select data-task title="Tarea de ClickUp donde se registra">${
-          S.tasks.filter(x => x.cu && x.client === c.id).map(x => `<option value="${x.id}" ${t && t.id === x.id ? 'selected' : ''}>${esc(x.title.slice(0, 40))}</option>`).join('')
-          || '<option value="">(sin tarea: sin tarea asociada)</option>'}</select>` : '<span class="lock">solo en la app</span>'}
+        ${!O.online() ? '' : regTasks(c).length > 1
+          ? `<select data-task title="Tarea de ClickUp donde se registra">${regTasks(c).map(x => `<option value="${x.id}" ${t && t.id === x.id ? 'selected' : ''}>${esc(x.title)}</option>`).join('')}</select>`
+          : `<span class="lock">${t ? '⏱ se registra en ' + esc(t.title) : '⚠️ No encuentro su «⭐ Tarea Principal ⭐» asignada a ti: no se registrará en ClickUp'}</span>`}
       </div>`; }).join('')}</div>
     <div class="ctot">Total: <b>${fmt(total)}</b></div>
     ${O.online() ? `<label class="check"><input type="checkbox" id="toCU" checked> Registrar también en ClickUp (clientes de la agencia)</label>` : ''}
