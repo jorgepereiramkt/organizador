@@ -326,7 +326,7 @@ O.views.dia = function(){
   const wDone = upto(wU), cDone = upto(cU), done = wDone + cDone;
   const jorn = tot ? Math.round(done / tot * 100) : 0;
   const pw = tot ? wDone / tot * 100 : 0, pc = tot ? cDone / tot * 100 : 0;
-  const split = `<span class="jsplit"><i class="jw"></i>Bloques ${dur(wDone)} / ${dur(wTot)}<i class="jc"></i>Reuniones ${dur(cDone)} / ${dur(cTot)}</span>`;
+  const split = `<span class="jsplit"><em><i class="jw"></i>Bloques ${dur(wDone)} / ${dur(wTot)}</em><em><i class="jc"></i>Reuniones ${dur(cDone)} / ${dur(cTot)}</em></span>`;
   const jornTxt = !tot ? 'Aún no tienes bloques de trabajo hoy'
     : !isToday ? `${dur(tot)} de trabajo planificado ${split}`
     : !done ? `${dur(tot)} de trabajo hoy · empiezas a las ${toHM(Math.min(...[...wU, ...cU].map(x => x[0])))} ${split}`
