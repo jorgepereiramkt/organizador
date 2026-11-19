@@ -6,7 +6,7 @@
 <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' https://www.gstatic.com https://apis.google.com https://accounts.google.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://accounts.google.com; font-src https://fonts.gstatic.com; connect-src https://api.clickup.com https://accounts.google.com https://firestore.googleapis.com https://identitytoolkit.googleapis.com https://securetoken.googleapis.com https://www.googleapis.com https://apis.google.com; frame-src https://organizador-jp.firebaseapp.com https://accounts.google.com; img-src 'self' data: https://lh3.googleusercontent.com https://www.google.com; manifest-src 'self'; base-uri 'none'; form-action 'self'; object-src 'none'">
 <meta name="referrer" content="no-referrer">
 <meta name="robots" content="noindex, nofollow">
-<link rel="manifest" href="manifest.json?v=20261119022351">
+<link rel="manifest" href="manifest.json?v=20261119023028">
 <link rel="icon" href="icon-192.png">
 <link rel="apple-touch-icon" href="icon-180.png">
 <meta name="theme-color" content="#0a0a0b">
@@ -638,6 +638,69 @@ dialog::backdrop{background:rgba(0,0,0,.45);-webkit-backdrop-filter:blur(4px);ba
 @media (hover:none){ .card:hover,.ficha:hover,.proj:hover{border-color:transparent} }
 @media (prefers-reduced-motion:reduce){ dialog[open]{animation:none} .btn:active,.chip:active,.card:active{transform:none} }
 @media (prefers-reduced-transparency:reduce){ .top,.tabs,dialog,.toast{background:#1c1c1e;-webkit-backdrop-filter:none;backdrop-filter:none} }
+
+/* ================= Tarjetas: color del cliente claro ================= */
+.card{background:var(--card,var(--surface-2))!important;border-left:6px solid var(--c)!important}
+.card:hover{background:var(--card-h,var(--surface-3))!important}
+.clp{background:var(--c);color:#111;font:700 11.5px var(--body);padding:3px 9px;border-radius:99px;letter-spacing:.01em;white-space:nowrap}
+.clp.none{background:var(--surface-3);color:var(--muted)}
+.gb2{font:600 11px var(--body);color:var(--muted)}
+.gb2.g-ag::first-letter,.gb2.g-mine::first-letter{font-size:11px}
+.col h3 i{width:12px!important;height:12px!important}
+.board.grid .col header h3{gap:9px}
+/* ================= Modo claro estilo Apple ================= */
+html[data-theme=light]{
+  --bg:#f5f5f7; --surface:#ffffff; --surface-2:#ffffff; --surface-3:#ececf0; --card:#ffffff; --card-h:#fafafa;
+  --line:rgba(0,0,0,.08); --text:#1d1d1f; --muted:#6e6e73; --faint:#a1a1a6;
+  --shadow:0 1px 2px rgba(0,0,0,.05),0 6px 20px rgba(0,0,0,.06);
+  --accent-soft:rgba(255,107,61,.12);
+  color-scheme:light;
+}
+html[data-theme=light] body{background:var(--bg);color:var(--text)}
+html[data-theme=light] .top{background:rgba(245,245,247,.75);border-bottom:1px solid rgba(0,0,0,.06)}
+html[data-theme=light] .tabs,html[data-theme=light] .modes{background:rgba(118,118,128,.12)}
+html[data-theme=light] .tabs button[aria-current=true],html[data-theme=light] .modes .chip[aria-pressed=true]{background:#fff;color:#1d1d1f;box-shadow:0 3px 8px rgba(0,0,0,.12),0 0 0 .5px rgba(0,0,0,.04)}
+html[data-theme=light] .chip,html[data-theme=light] .icon,html[data-theme=light] .btn{background:rgba(118,118,128,.12);color:#1d1d1f}
+html[data-theme=light] .chip[aria-pressed=true]{background:#1d1d1f;color:#fff}
+html[data-theme=light] .btn.primary{background:#1d1d1f;color:#fff}
+html[data-theme=light] .hello{background:radial-gradient(120% 160% at 0% 0%,rgba(255,107,61,.16),transparent 55%),radial-gradient(90% 120% at 100% 100%,rgba(79,140,255,.12),transparent 60%),#fff}
+html[data-theme=light] .dayhead,html[data-theme=light] .col,html[data-theme=light] .hbox,html[data-theme=light] .proj,html[data-theme=light] .ficha,html[data-theme=light] .blk.work,html[data-theme=light] .side{background:#fff}
+html[data-theme=light] .card{box-shadow:0 1px 2px rgba(0,0,0,.06),0 0 0 .5px rgba(0,0,0,.05)}
+html[data-theme=light] .card .tt{color:#1d1d1f}
+html[data-theme=light] .clp{color:#0b0b0c}
+html[data-theme=light] .empty{border-color:rgba(0,0,0,.08);color:var(--faint)}
+html[data-theme=light] .ring{background:radial-gradient(closest-side,#fff 76%,transparent 78%),conic-gradient(var(--ok) calc(var(--r)*1%),#ececf0 0)}
+html[data-theme=light] .jbar,html[data-theme=light] .bar,html[data-theme=light] .rail::before{background:#e8e8ed}
+html[data-theme=light] .blk.event.call{background:repeating-linear-gradient(135deg,rgba(167,139,250,.16) 0 12px,rgba(167,139,250,.10) 12px 24px)}
+html[data-theme=light] .blk.call b{color:#1d1d1f}
+html[data-theme=light] .blk.cal-blk{background:#fff}
+html[data-theme=light] .blk.routine{color:#1d1d1f}
+html[data-theme=light] .blk.morning{background:linear-gradient(135deg,rgba(255,201,61,.20),rgba(255,107,61,.08));border-color:rgba(230,160,0,.4)}
+html[data-theme=light] .mchk.on{color:#000}
+html[data-theme=light] .board.grid .sep b{color:#1d1d1f}
+html[data-theme=light] .iarev{background:rgba(167,139,250,.10)}
+html[data-theme=light] .side .urg.u-ia h4,html[data-theme=light] .iagrp{color:#6d4aff}
+html[data-theme=light] dialog{background:rgba(255,255,255,.88);color:#1d1d1f;border-color:rgba(0,0,0,.06);box-shadow:0 30px 80px rgba(0,0,0,.18)}
+html[data-theme=light] dialog::backdrop{background:rgba(0,0,0,.18)}
+html[data-theme=light] .sheet input,html[data-theme=light] .sheet select,html[data-theme=light] .sheet textarea{background:rgba(118,118,128,.10);color:#1d1d1f}
+html[data-theme=light] .note{background:#f2f2f5}
+html[data-theme=light] .toast{background:rgba(29,29,31,.92);color:#fff}
+html[data-theme=light] .gate{background:#f5f5f7}
+html[data-theme=light] .gate h1{color:#1d1d1f}
+html[data-theme=light] .col.over,html[data-theme=light] .blk.over,html[data-theme=light] .side .urg.over{background:#fff4ee}
+html[data-theme=light] .qidea input,html[data-theme=light] .qadd input{color:#1d1d1f}
+html[data-theme=light] .hin input{background:#fff;color:#1d1d1f;border-color:rgba(0,0,0,.1)}
+html[data-theme=light] .pick.on{color:#000}
+html[data-theme=light] .tcol b{color:#1d1d1f}
+@media (max-width:760px){ html[data-theme=light] .tabs{background:rgba(249,249,251,.82);border-top:1px solid rgba(0,0,0,.08)} html[data-theme=light] .top{background:var(--bg)} }
+/* Títulos grandes tipo iOS */
+.toolbar h2{font:700 30px/1.1 var(--head);letter-spacing:-.028em}
+.hello h2{font-size:28px}
+@media (max-width:760px){ .toolbar h2{font-size:28px} }
+
+/* Columna de cliente: su color arriba y su nombre en una etiqueta de su color */
+.board.grid .col.cg-mine,.board.grid .col.cg-ag{border-top:5px solid var(--cc)!important}
+.colname{background:var(--cc);color:#111;padding:4px 12px;border-radius:99px;font:700 14px var(--head);letter-spacing:-.01em}
 </style>
 </head>
 <body>
@@ -709,18 +772,20 @@ dialog::backdrop{background:rgba(0,0,0,.45);-webkit-backdrop-filter:blur(4px);ba
   <div class="note">Cada cliente tiene <b>palabras clave</b>: si las dices al dictar, la tarea va a ese cliente. Separa las palabras con comas.<span class="only-on"> A los de la <b>Agencia</b> elígeles su lista de ClickUp. Los tuyos (<b>Mío</b>) no se conectan nunca.</span></div>
   <div class="cl-list" id="clList"></div>
   <div class="actions"><button class="btn" type="button" id="addClient">+ Cliente</button><select class="btn" id="addFromList" hidden></select><span class="sp"></span><button class="btn" type="button" id="resetDemo">Restablecer ejemplo</button><button class="btn primary" value="ok">Listo</button></div>
+  <h3 class="h3">Apariencia</h3>
+  <div class="modes" style="width:max-content"><button type="button" class="chip" data-themebtn="light">☀️ Claro</button><button type="button" class="chip" data-themebtn="dark">🌙 Oscuro</button><button type="button" class="chip" data-themebtn="auto">Automático</button></div>
   <h3 class="h3">Tu cuenta</h3>
   <div class="actions" style="margin:0"><span class="note" style="flex:1">Sesión iniciada con <b id="accountTxt"></b>. Tus clientes y tareas se sincronizan solos en todos tus dispositivos.</span><button class="btn" type="button" id="logoutBtn">Cerrar sesión</button></div>
 </form></dialog>
 
 <div class="toast" id="toast"></div>
 
-<script src="app.js?v=20261119022351"></script>
-<script src="planner.js?v=20261119022351"></script>
-<script src="clients.js?v=20261119022351"></script>
-<script src="quick.js?v=20261119022351"></script>
-<script src="ia.js?v=20261119022351"></script>
-<script src="hours.js?v=20261119022351"></script>
-<script type="module" src="cloud.js?v=20261119022351"></script>
+<script src="app.js?v=20261119023028"></script>
+<script src="planner.js?v=20261119023028"></script>
+<script src="clients.js?v=20261119023028"></script>
+<script src="quick.js?v=20261119023028"></script>
+<script src="ia.js?v=20261119023028"></script>
+<script src="hours.js?v=20261119023028"></script>
+<script type="module" src="cloud.js?v=20261119023028"></script>
 </body>
 </html>

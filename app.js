@@ -424,8 +424,8 @@ function card(t, hide={}){
   const c = client(t.client), done = t.status === 'done', late = !done && t.day && t.day < today();
   const g = groupOf(c);
   const meta = [];
-  if (g.label && !hide.group) meta.push(`<span class="gb" style="--g:${g.color}">${g.label}</span>`);
-  if (!hide.client) meta.push(c ? `<span class="cl">${esc(c.name)}</span>` : `<span class="cl">Sin cliente</span>`);
+  if (!hide.client) meta.push(c ? `<span class="clp">${esc(c.name)}</span>` : `<span class="clp none">Sin cliente</span>`);
+  if (g.label && !hide.group) meta.push(`<span class="gb2 ${g.cls}">${g.label === 'Mío' ? '🔒 Mío' : '🏢 Agencia'}</span>`);
   if (!hide.day && t.day) meta.push(`<span class="${late?'late':''}">${late?'Atrasada · ':''}${dayLabel(t.day)}</span>`);
   if (t.cu && t.listName) meta.push(`<span class="st">${esc(t.listName)}</span>`);
   if (!done && !hide.urg){ const u = URG[t.priority] ? t.priority : 'normal'; meta.unshift(`<span class="ub u-${u}">${URG[u].icon} ${URG[u].label}</span>`); }
@@ -442,8 +442,8 @@ function column({title, sub='', field, value='', tasks, hide, cls='', dot, undon
     const ts = tasks.filter(t => (URG[t.priority] ? t.priority : 'normal') === k);
     return ts.length ? `<div class="ugrp u-${k}"><div class="uh">${u.icon} ${u.label} <span>${ts.length}</span></div>${ts.map(t => card(t, hide)).join('')}</div>` : '';
   }).join('');
-  return `<section class="col ${cls}" data-field="${field}" data-value="${value}" ${undone?'data-undone="1"':''}>
-    <header><h3>${dot?`<i style="--c:${dot}"></i>`:''}${esc(title)} ${sub?`<span class="csub">${esc(sub)}</span>`:''}</h3><span class="count">${tasks.length}</span></header>
+  return `<section class="col ${cls}" data-field="${field}" data-value="${value}" ${undone?'data-undone="1"':''} ${dot?`style="--cc:${dot}"`:''}>
+    <header><h3>${dot?`<span class="colname">${esc(title)}</span>`:esc(title)} ${sub?`<span class="csub">${esc(sub)}</span>`:''}</h3><span class="count">${tasks.length}</span></header>
     <div class="list">${tasks.length ? listHtml : `<div class="empty${add !== undefined ? ' mini' : ''}">${add !== undefined ? 'Sin tareas pendientes' : empty}</div>`}</div>
     ${add !== undefined ? `<form class="qadd" data-qclient="${add}"><input placeholder="Añadir tarea" title="Intro para añadir · entiende «mañana», «el viernes», «urgente»…" aria-label="Añadir tarea a ${esc(title)}" autocomplete="off" enterkeyhint="done"></form>` : ''}</section>`;
 }
@@ -890,6 +890,17 @@ function toast(msg){ const el = $('#toast'); el.textContent = msg; el.classList.
   try { if (localStorage.getItem('jp-session') === '1') g.hidden = true; } catch(e){}
 })();
 load();
+// Apariencia (Claro por defecto, como las apps de Apple). Se guarda solo en este dispositivo.
+function applyTheme(){
+  let m = 'light'; try { m = localStorage.getItem('jp-theme') || 'light'; } catch(e){}
+  const dark = m === 'dark' || (m === 'auto' && matchMedia('(prefers-color-scheme: dark)').matches);
+  document.documentElement.dataset.theme = dark ? 'dark' : 'light';
+  const mc = document.querySelector('meta[name=theme-color]'); if (mc) mc.content = dark ? '#000000' : '#f5f5f7';
+  document.querySelectorAll('[data-themebtn]').forEach(b => b.setAttribute('aria-pressed', b.dataset.themebtn === m));
+}
+applyTheme();
+matchMedia('(prefers-color-scheme: dark)').addEventListener('change', applyTheme);
+document.addEventListener('click', e => { const b = e.target.closest('[data-themebtn]'); if (!b) return; try { localStorage.setItem('jp-theme', b.dataset.themebtn); } catch(err){} applyTheme(); });
 S.view = 'clientes'; S.clientMode = 'tareas';   // cada mañana se empieza revisando los clientes
 render(); modeIdle();
 $('#mode').classList.add('mode-btn');
