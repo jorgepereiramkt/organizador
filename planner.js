@@ -33,7 +33,28 @@ const dur = m => m >= 60 ? `${Math.floor(m/60)} h${m%60 ? ' ' + (m%60) + ' min' 
 const tokens = {};
 try { Object.assign(tokens, JSON.parse(sessionStorage.getItem('jp-gcal-tokens') || '{}')); } catch(e){}
 const saveTokens = () => { try { sessionStorage.setItem('jp-gcal-tokens', JSON.stringify(tokens)); } catch(e){} };
-const tokenOk = email => tokens[email] && tokens[email].exp > Date.now() + 60e3;
+const tokenOk = email => email === 'puente' ? !!(S.plan && S.plan.bridge) : !!(tokens[email] && tokens[email].exp > Date.now() + 60e3);
+/* ---------- Puente de Google (Apps Script en tu cuenta): lee calendarios y buzón sin pedir permisos cada hora ---------- */
+async function bridge(params){
+  const url = P().bridge; if (!url) throw new Error('sin puente');
+  const r = await fetch(url + (url.includes('?') ? '&' : '?') + new URLSearchParams(params), {redirect: 'follow'});
+  if (!r.ok) throw new Error('puente ' + r.status);
+  const j = await r.json(); if (j.error) throw new Error(j.error); return j;
+}
+async function connectBridge(url){
+  url = url.trim().replace(/\?.*$/, '');
+  if (!/^https:\/\/script\.google\.com\/macros\/s\/[\w-]+\/exec$/.test(url)) throw new Error('la dirección debe acabar en /exec');
+  P().bridge = url;
+  try {
+    const r = await bridge({a: 'calendars'});
+    const plan = P(), prev = plan.accounts.find(a => a.email === 'puente');
+    const prevOn = new Map((prev ? prev.cals : []).map(c => [c.id, c.on]));
+    const cals = (r.calendars || []).map(c => ({id: c.id, name: c.name, color: c.color || '#8E8E93', on: prevOn.has(c.id) ? prevOn.get(c.id) : /jorgepereiramktdigital|leadfluence/i.test(c.id)}));
+    plan.accounts = [{email: 'puente', bridge: true, cals}, ...plan.accounts.filter(a => a.email !== 'puente')];
+    O.save(); clearCache();
+  } catch(e){ P().bridge = null; throw e; }
+}
+O.bridge = bridge;
 const evCache = {};     // `${email}|${day}` -> eventos
 let gisReady = null;
 function loadGis(){
@@ -121,8 +142,22 @@ async function fetchEvents(day){
     const key = acc.email + '|' + day;
     if (evCache[key]) return out.push(...evCache[key]);
     if (!tokenOk(acc.email)) return;
+    // si hay puente, las demás cuentas solo se usan para calendarios que el puente no ve
+    if (!acc.bridge && P().bridge){ const seenIds = new Set(((P().accounts.find(a => a.bridge) || {}).cals || []).map(c => c.id)); if (acc.cals.filter(c => c.on).every(c => seenIds.has(c.id))) return; }
+    if (acc.bridge){
+      const ids = acc.cals.filter(c => c.on).map(c => c.id); if (!ids.length) return;
+      const r = await bridge({a: 'events', day, cals: ids.join(',')});
+      const evs = (r.events || []).map(e => {
+        const tt = O.norm(e.title || '');
+        const isCall = e.guests > 0 || !!e.meet || /<>|\breu\b|reunion|llamada|\bcall\b|meet|zoom|entrevista|☎|📞/.test(tt + (e.title || ''));
+        return {title: e.title || '(sin título)', allDay: e.allDay, color: e.color, cal: e.cal, free: !!e.free, isCall,
+          start: e.allDay ? 0 : Math.max(0, minutesOfDay(new Date(e.start), day)), end: e.allDay ? 0 : Math.min(24 * 60, minutesOfDay(new Date(e.end), day))};
+      });
+      evCache[key] = evs; out.push(...evs); return;
+    }
     const evs = [];
-    await Promise.all(acc.cals.filter(c => c.on && !(P().inbox && P().inbox.calId === c.id)).map(async c => {
+    const viaPuente = new Set(((P().accounts.find(a => a.bridge) || {}).cals || []).map(c => c.id));
+    await Promise.all(acc.cals.filter(c => c.on && !viaPuente.has(c.id) && !(P().inbox && P().inbox.calId === c.id)).map(async c => {
       const u = `https://www.googleapis.com/calendar/v3/calendars/${encodeURIComponent(c.id)}/events?singleEvents=true&orderBy=startTime`
         + `&timeMin=${encodeURIComponent(start.toISOString())}&timeMax=${encodeURIComponent(end.toISOString())}&maxResults=100`;
       const r = await gapi(u, tokens[acc.email].token);
@@ -153,9 +188,11 @@ const dayBlocks = day => ((P().dayBlocks = P().dayBlocks || {})[day]);
 function buildDay(day, events, auto){
   const plan = P(), dow = O.fromIso(day).getDay();
   const items = [];
-  for (const e of events.filter(e => !e.allDay)) items.push({kind: e.free ? 'free' : 'event', ...e});
-  for (const r of plan.routines.filter(r => r.on && r.days.includes(dow)))
-    items.push({kind:'routine', title:`${r.icon || ''} ${r.name}`.trim(), start:toMin(r.start), end:toMin(r.end), id:r.id});
+  const mv = (plan.moved || {})[day] || {};
+  const place = (key, start, end) => mv[key] ? {start: mv[key].start, end: mv[key].end, moved: true} : {start, end};
+  for (const e of events.filter(e => !e.allDay)){ const key = `e:${e.title}|${e.start}`; items.push({kind: e.free ? 'free' : 'event', ...e, mkey: key, ...(e.isCall ? {} : place(key, e.start, e.end))}); }
+  for (const r of plan.routines.filter(r => r.on && r.days.includes(dow))){ const key = 'r:' + r.id;
+    items.push({kind:'routine', title:`${r.icon || ''} ${r.name}`.trim(), id:r.id, mkey: key, ...place(key, toMin(r.start), toMin(r.end))}); }
   // Ocupado = reuniones (no las marcadas como «libre») + bloques fijos
   const busy = items.filter(i => i.kind !== 'free').map(i => [i.start, i.end]).sort((a,b) => a[0]-b[0]);
   const ws = toMin(plan.workStart), we = toMin(plan.workEnd);
@@ -191,7 +228,7 @@ function calStatus(){
   if (!GCAL_CLIENT_ID) return '';
   if (!accs.length) return `<button class="chip" data-gcal="add">📅 Conectar Google Calendar</button>`;
   const short = e => { const [u, d] = e.split('@'); return d === 'gmail.com' ? u : d.split('.')[0]; };
-  return accs.map(a => tokenOk(a.email)
+  return accs.map(a => a.bridge ? `<span class="chip on" title="Calendarios por el puente: sin permisos cada hora">🔗 Google</span>` : tokenOk(a.email)
     ? `<span class="chip on" title="${esc(a.email)}">📅 ${esc(short(a.email))}</span>`
     : `<button class="chip warn" data-gcal="${esc(a.email)}" title="Google pide confirmar cada hora">↻ ${esc(short(a.email))}</button>`).join('')
     + `<button class="chip" data-gcal="add" title="Conectar otra cuenta de Google">+ Calendario</button>`;
@@ -250,7 +287,7 @@ O.views.dia = function(){
       body = `<div class="blk event call${it.kind === 'free' ? ' free' : ''}" style="--c:${color}"><span class="ico">📞</span><b>${esc(it.title.replace(/^[\u2600-\u27BF\u{1F300}-\u{1FAFF}\s]+/u, ''))}</b>
         <span class="cal">${dur(it.end - it.start)}</span></div>`;
     }
-    tl += `<div class="trow ${st}" style="--c:${color};--p:${pct}%">
+    tl += `<div class="trow ${st}" style="--c:${color};--p:${pct}%;--h:${Math.round(34 + (it.end - it.start) * 1.0)}px">
       <div class="tcol${it.isCall ? ' tcall' : ''}">${it.isCall ? '<span class="tphone">📞</span>' : ''}<b>${toHM(it.start)}</b><small>${toHM(it.end)}</small></div>
       <div class="rail"><span></span>${st === 'now' ? '<i class="nowdot"></i>' : ''}</div>
       <div class="tbody">${body}</div></div>`;
@@ -300,7 +337,7 @@ O.views.dia.after = () => {
 // Entran en «Por revisar (IA)» para que las revises antes de colocarlas (y antes de subir nada a ClickUp).
 let importing = false;
 async function importInbox(){
-  const ib = P().inbox; if (!ib || importing) return;
+  const ib = P().inbox || (P().bridge ? {type: 'drive'} : null); if (!ib || importing) return;
   if (ib.type === 'drive') return importDrive(ib);
   if (!ib.calId || !tokenOk(ib.email)) return;
   importing = true;
@@ -345,6 +382,21 @@ function parseInbox(title, desc){
     iaNote: get('nota'), src: call ? 'call' : 'voz', meeting: call ? get('reunion') || get('reunión') : ''};
 }
 async function importDrive(ib){
+  if (P().bridge){
+    importing = true;
+    try {
+      const seen = (P().inboxSeen = P().inboxSeen || {});
+      const r = await bridge({a: 'inbox'});
+      let n = 0;
+      for (const f of (r.files || []).sort((a, b) => a.created - b.created)){
+        if (seen[f.id]) continue; seen[f.id] = Date.now();
+        const title = (f.name || '').replace(/\.(txt|md)$/i, '').replace(/^[📥\s]+/u, '').trim(); if (!title) continue;
+        S.tasks.push(parseInbox(title, f.text || '')); n++;
+      }
+      O.save(); if (n){ O.render(); O.toast(`🤖 ${n} tarea${n > 1 ? 's' : ''} nueva${n > 1 ? 's' : ''} por revisar`); }
+    } catch(e){}
+    importing = false; return;
+  }
   const tk = tokens[ib.email + '|drive'];
   if (!tk || tk.exp < Date.now() + 60e3) return;
   importing = true;
@@ -402,7 +454,11 @@ function drawGrid(){
   const fixed = buildDay(bDay, evs).filter(i => i.kind !== 'work' && i.kind !== 'free');
   let h = '';
   for (let m = G0; m <= G1; m += 60) h += `<div class="bhour" style="top:${(m - G0) * PX}px"><span>${toHM(m)}</span></div>`;
-  for (const f of fixed) h += `<div class="bfix${f.isCall ? ' call' : ''}" style="top:${(f.start - G0) * PX}px;height:${(f.end - f.start) * PX}px"><b>${esc(f.title)}</b><small>${toHM(f.start)}–${toHM(f.end)}</small></div>`;
+  for (const f of fixed){
+    const movable = !f.isCall && f.mkey;
+    h += `<div class="bfix${f.isCall ? ' call' : ''}${movable ? ' bmov' : ''}${f.moved ? ' moved' : ''}" ${movable ? `data-mkey="${esc(f.mkey)}" data-s="${f.start}" data-e="${f.end}"` : ''} style="top:${(f.start - G0) * PX}px;height:${(f.end - f.start) * PX}px">
+      <b>${f.isCall ? '📞 ' : ''}${esc(f.title)}</b><small>${toHM(f.start)}–${toHM(f.end)}${f.moved ? ' · movido' : ''}</small>${movable ? '<i class="bres" data-bres></i>' : ''}</div>`;
+  }
   for (const b of dayBlocks(bDay)) h += `<div class="bblk" data-bid="${b.id}" style="top:${(b.start - G0) * PX}px;height:${(b.end - b.start) * PX}px">
       <b>Trabajo</b><small>${toHM(b.start)}–${toHM(b.end)} · ${dur(b.end - b.start)}</small>
       <button type="button" class="bdel" data-bdel aria-label="Quitar bloque">×</button><i class="bres" data-bres></i></div>`;
@@ -428,6 +484,29 @@ function firstFree(len){
 }
 const yToMin = y => G0 + (y - bgrid.getBoundingClientRect().top) / PX;
 // Mover y estirar bloques
+// Mover/estirar comida, cena, deporte y tus bloques del calendario (solo cambia en la app, para ese día)
+bgrid.addEventListener('pointerdown', e => {
+  const el = e.target.closest('.bmov'); if (!el) return;
+  e.preventDefault();
+  const resize = !!e.target.closest('[data-bres]'), y0 = e.clientY, s0 = +el.dataset.s, e0 = +el.dataset.e;
+  el.setPointerCapture(e.pointerId); el.classList.add('drag');
+  let ns = s0, ne = e0;
+  const mv = ev => {
+    const dm = (ev.clientY - y0) / PX;
+    if (resize) ne = Math.max(s0 + SNAP, Math.min(G1, snap(e0 + dm)));
+    else { [ns, ne] = clampB(snap(s0 + dm), snap(s0 + dm) + (e0 - s0)); }
+    el.style.top = (ns - G0) * PX + 'px'; el.style.height = (ne - ns) * PX + 'px';
+    el.querySelector('small').textContent = `${toHM(ns)}–${toHM(ne)}`;
+  };
+  const up = () => {
+    el.removeEventListener('pointermove', mv); el.removeEventListener('pointerup', up); el.removeEventListener('pointercancel', up);
+    const plan = P(); plan.moved = plan.moved || {}; const d = (plan.moved[bDay] = plan.moved[bDay] || {});
+    d[el.dataset.mkey] = {start: ns, end: ne};
+    for (const k of Object.keys(plan.moved)) if (k < O.iso(O.addDays(new Date(), -7))) delete plan.moved[k];
+    O.save(); drawGrid();
+  };
+  el.addEventListener('pointermove', mv); el.addEventListener('pointerup', up); el.addEventListener('pointercancel', up);
+});
 bgrid.addEventListener('pointerdown', e => {
   if (e.target.closest('[data-bdel]')) return;
   const el = e.target.closest('.bblk'); if (!el) return;
@@ -472,7 +551,7 @@ bdlg.querySelector('.bpal').addEventListener('pointerdown', e => {
 });
 bdlg.addEventListener('click', e => {
   if (e.target.closest('[data-bdel]')){ const id = e.target.closest('.bblk').dataset.bid; P().dayBlocks[bDay] = dayBlocks(bDay).filter(b => b.id !== id); O.save(); drawGrid(); }
-  if (e.target.closest('[data-bclear]') && confirm('¿Quitar todos los bloques de este día?')){ P().dayBlocks[bDay] = []; O.save(); drawGrid(); }
+  if (e.target.closest('[data-bclear]') && confirm('¿Quitar todos los bloques de este día y devolver comida y eventos a su hora?')){ P().dayBlocks[bDay] = []; if (P().moved) delete P().moved[bDay]; O.save(); drawGrid(); }
   if (e.target.closest('[data-bauto]')){
     P().dayBlocks[bDay] = buildDay(bDay, planDay === bDay ? lastEvents : [], true).filter(i => i.kind === 'work').map(i => ({id: Math.random().toString(36).slice(2, 8), start: i.start, end: i.end}));
     O.save(); drawGrid();
@@ -484,7 +563,7 @@ document.addEventListener('click', e => { if (e.target.closest('[data-buildday]'
 // Bloques de trabajo de hoy (para colocar tareas desde el editor, sin arrastrar)
 O.todayBlocks = () => buildDay(O.today(), planDay === O.today() ? lastEvents : []).filter(i => i.kind === 'work').map(b => ({at: b.at, label: `${toHM(b.start)} – ${toHM(b.end)}`}));
 O.connectDriveInbox = connectDriveInbox;
-O.inboxStatus = () => { const ib = P().inbox; if (!ib || ib.type !== 'drive') return null; const tk = tokens[ib.email + '|drive']; return {email: ib.email, ok: !!(tk && tk.exp > Date.now() + 60e3)}; };
+O.inboxStatus = () => { const ib = P().inbox; if (P().bridge) return {email: 'puente', ok: true}; if (!ib || ib.type !== 'drive') return null; const tk = tokens[ib.email + '|drive']; return {email: ib.email, ok: !!(tk && tk.exp > Date.now() + 60e3)}; };
 async function refresh(){
   importInbox();
   loading = true; calError = '';
@@ -543,6 +622,10 @@ function renderPlanSettings(){
         <button type="button" class="btn danger" data-accdel="${ai}">Quitar cuenta</button></div>`).join('')
       + `<div class="actions" style="margin:0"><button type="button" class="btn" id="accAdd">+ Conectar cuenta de Google</button></div>
          <div class="note">Solo lectura. Puedes conectar tu cuenta personal y la de la agencia y elegir qué calendarios cuentan. Los eventos no se guardan en la nube.</div>
+         <div class="acc bridgebox"><b>🔗 Puente de Google (sin pedir permisos cada hora)</b>
+           <span class="lock">${plan.bridge ? 'Conectado: calendarios y buzón se leen solos en todos tus dispositivos.' : 'Pega aquí la dirección de tu Apps Script (acaba en /exec).'}</span>
+           <div class="row"><input id="bridgeUrl" placeholder="https://script.google.com/macros/s/…/exec" value="${esc(plan.bridge || '')}" autocomplete="off">
+           <button type="button" class="btn primary" id="bridgeSave">${plan.bridge ? 'Actualizar' : 'Conectar'}</button></div></div>
          <div class="acc"><b>📥 Buzón de tareas por voz (Drive)</b>
            <span class="lock">${plan.inbox && plan.inbox.type === 'drive' ? `Conectado: ${esc(plan.inbox.email)} · carpeta «${INBOX_FOLDER}»` : 'Sin conectar'}</span>
            <button type="button" class="btn" id="driveInbox">${plan.inbox && plan.inbox.type === 'drive' ? 'Volver a conectar' : 'Conectar buzón'}</button></div>`}`;
@@ -556,6 +639,11 @@ document.addEventListener('click', async e => {
   if (e.target.closest('[data-rdel]')){ plan.routines.splice(+e.target.closest('.rt').dataset.i, 1); return done(); }
   if (e.target.id === 'rtAdd'){ plan.routines.push({id:Math.random().toString(36).slice(2,8), name:'Nuevo', icon:'⏱️', start:'17:00', end:'17:30', days:[1,2,3,4,5], on:true}); return done(); }
   if (e.target.dataset.accdel){ plan.accounts.splice(+e.target.dataset.accdel, 1); clearCache(); lastEvents = []; return done(); }
+  if (e.target.id === 'bridgeSave'){
+    try { await connectBridge(document.getElementById('bridgeUrl').value); O.toast('Puente conectado ✓'); lastEvents = []; refresh(); importInbox(); }
+    catch(err){ O.toast('Puente: ' + err.message); }
+    return done();
+  }
   if (e.target.id === 'driveInbox'){
     try { const em = await connectDriveInbox(''); O.toast('Buzón conectado: ' + em); importInbox(); } catch(err){ O.toast('Buzón: ' + err.message); }
     return done();
