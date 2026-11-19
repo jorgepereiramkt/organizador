@@ -16,9 +16,11 @@ const PLAN_DEFAULT = () => ({
     {id:'cena',    name:'Cena',    icon:'🌙', start:'21:00', end:'22:00', days:[1,2,3,4,5,6,0], on:true},
   ],
   accounts: [],          // [{email, cals:[{id, name, color, on}]}]
+  morning: MORNING_DEFAULT(),
 });
+function MORNING_DEFAULT(){ return ['Revisar todos los clientes (uno a uno)', 'Revisar métricas y estadísticas', 'Revisar pagos y saldo de anuncios', 'Revisar mensajes (WhatsApp, email, Slack)', 'Organizar el día: colocar tareas en bloques']; }
 if (!S.plan) S.plan = PLAN_DEFAULT();
-const P = () => (S.plan = S.plan || PLAN_DEFAULT());
+const P = () => { S.plan = S.plan || PLAN_DEFAULT(); if (!S.plan.morning) S.plan.morning = MORNING_DEFAULT(); S.plan.morningDone = S.plan.morningDone || {}; return S.plan; };
 
 let planDay = O.today();
 O.planDay = () => planDay;
@@ -174,6 +176,12 @@ O.views.dia = function(){
   // Color de cada reunión: el del cliente si su nombre aparece en el título
   const evClient = title => { const t = O.norm(title); return S.clients.find(c => O.norm(c.name).split(/\s+/).some(w => w.length >= 4 && t.includes(w))); };
   const ROUT = {comida:'#FFC93D', cena:'#C77DFF', deporte:'#3DDC97'};
+  const mDone = new Set(P().morningDone[planDay] || []), mItems = P().morning;
+  const morningRow = () => !mItems.length ? '' : `<div class="trow mrow ${mDone.size >= mItems.length ? 'past' : ''}" style="--c:#FFC93D;--p:${Math.round(mDone.size / mItems.length * 100)}%">
+      <div class="tcol"><b>☀️</b><small>cada día</small></div><div class="rail"><span></span></div>
+      <div class="tbody"><div class="blk morning"><header><b>Arranque del día · revisión de clientes + organizar</b><span class="count">${mDone.size}/${mItems.length}</span></header>
+        <ul>${mItems.map((m, i) => `<li><button type="button" class="mchk${mDone.has(i) ? ' on' : ''}" data-morning="${i}" aria-label="Marcar">${mDone.has(i) ? '✓' : ''}</button><span>${esc(m)}</span></li>`).join('')}</ul></div></div></div>`;
+  let mPut = false;
   let tl = allDay.length ? `<div class="allday">${allDay.map(e => `<span class="tag" style="--c:${e.color}"><i></i>${esc(e.title)}</span>`).join('')}</div>` : '';
   for (const it of items){
     const st = !isToday ? 'future' : nowMin >= it.end ? 'past' : nowMin >= it.start ? 'now' : 'future';
@@ -199,7 +207,9 @@ O.views.dia = function(){
       <div class="tcol"><b>${toHM(it.start)}</b><small>${toHM(it.end)}</small></div>
       <div class="rail"><span></span>${st === 'now' ? '<i class="nowdot"></i>' : ''}</div>
       <div class="tbody">${body}</div></div>`;
+    if (!mPut && /bloque\s*0/i.test(it.title || '')){ tl += morningRow(); mPut = true; }
   }
+  if (!mPut) tl = morningRow() + tl;
   // Cabecera del día: reloj, jornada y contador de tareas
   const plan = P(), ws = toMin(plan.workStart), we = Math.max(toMin(plan.workEnd), ...items.map(i => i.end).filter(e => e <= 24 * 60));
   const jorn = isToday ? Math.max(0, Math.min(100, Math.round((nowMin - ws) / (we - ws) * 100))) : 0;
@@ -248,6 +258,16 @@ function setDay(n){
   const accs = P().accounts.filter(a => tokenOk(a.email));
   if (accs.length) refresh();
 }
+document.addEventListener('click', e => {
+  const b = e.target.closest('[data-morning]'); if (!b) return;
+  const plan = P(), i = +b.dataset.morning, set = new Set(plan.morningDone[planDay] || []);
+  set.has(i) ? set.delete(i) : set.add(i);
+  plan.morningDone[planDay] = [...set];
+  // guardar solo las últimas 2 semanas
+  for (const d of Object.keys(plan.morningDone)) if (d < O.iso(O.addDays(new Date(), -14))) delete plan.morningDone[d];
+  O.save(); O.render();
+  if (set.size === plan.morning.length) O.toast('¡Arranque hecho! A por el primer bloque 💪');
+});
 $('#toolbar').addEventListener('click', async e => {
   const d = e.target.closest('[data-pday]'); if (d) return setDay(+d.dataset.pday);
   const g = e.target.closest('[data-gcal]'); if (!g) return;
@@ -272,6 +292,7 @@ function renderPlanSettings(){
       <span class="days">${DAYN.map((n, d) => `<button type="button" class="dchip" data-day="${d}" aria-pressed="${r.days.includes(d)}">${n}</button>`).join('')}</span>
       <button type="button" class="x" data-rdel aria-label="Quitar">×</button></div>`).join('')}</div>
     <div class="actions" style="margin:0"><button type="button" class="btn" id="rtAdd">+ Bloque fijo</button></div>
+    <label>Arranque del día (una cosa por línea)<textarea rows="5" data-morningtxt>${esc(plan.morning.join('\n'))}</textarea></label>
     <h3 class="h3">Calendarios de Google</h3>
     ${!GCAL_CLIENT_ID ? '<div class="note">Pendiente de activar Google Calendar en el proyecto.</div>' :
       plan.accounts.map((a, ai) => `<div class="acc"><b>${esc(a.email)}</b>
@@ -298,6 +319,7 @@ document.addEventListener('change', e => {
   const box = e.target.closest('#planBox'); if (!box) return;
   const plan = P(), t = e.target;
   if (t.dataset.pk) plan[t.dataset.pk] = t.value;
+  if (t.dataset.morningtxt !== undefined) plan.morning = t.value.split('\n').map(x => x.trim()).filter(Boolean);
   if (t.dataset.rk){ const r = plan.routines[+t.closest('.rt').dataset.i]; r[t.dataset.rk] = t.type === 'checkbox' ? t.checked : t.value; }
   if (t.dataset.cal){ const [ai, ci] = t.dataset.cal.split(':').map(Number); plan.accounts[ai].cals[ci].on = t.checked; clearCache(); lastEvents = []; }
   O.save(); if (S.view === 'dia'){ O.render(); refresh(); }
