@@ -17,7 +17,7 @@ const PALETA = ['#FF6B3D','#4F8CFF','#3DDC97','#C77DFF','#FFC93D','#FF5C8A','#3D
 /* ---------- Estado ---------- */
 const KEY = 'jp-organizador-v1';
 const CU_DEFAULT = () => ({token:'', me:null, meName:'', lists:[], teams:[], hidden:[], statuses:{}, lastSync:0});
-const S = { tasks:[], clients:[], view:'hoy', group:'all', weekOffset:0, cu:CU_DEFAULT(), plan:null, slots:{}, hours:null };
+const S = { tasks:[], clients:[], view:'hoy', group:'all', weekOffset:0, cu:CU_DEFAULT(), plan:null, slots:{}, hours:null, ai:null };
 
 function seed(){
   S.clients = [
@@ -46,10 +46,10 @@ function seed(){
   ];
 }
 function load(){
-  try { const d = JSON.parse(localStorage.getItem(KEY)); if (d && d.tasks && d.clients){ Object.assign(S, {tasks:d.tasks, clients:d.clients, view:d.view||'hoy', group:d.group||'all', cu:{...CU_DEFAULT(), ...(d.cu||{})}, plan:d.plan||null, slots:d.slots||{}, hours:d.hours||null}); return; } } catch(e){}
+  try { const d = JSON.parse(localStorage.getItem(KEY)); if (d && d.tasks && d.clients){ Object.assign(S, {tasks:d.tasks, clients:d.clients, view:d.view||'hoy', group:d.group||'all', cu:{...CU_DEFAULT(), ...(d.cu||{})}, plan:d.plan||null, slots:d.slots||{}, hours:d.hours||null, ai:d.ai||null}); return; } } catch(e){}
   seed();
 }
-function saveLocal(){ try { localStorage.setItem(KEY, JSON.stringify({tasks:S.tasks, clients:S.clients, view:S.view, group:S.group, cu:S.cu, plan:S.plan, slots:S.slots, hours:S.hours})); } catch(e){} }
+function saveLocal(){ try { localStorage.setItem(KEY, JSON.stringify({tasks:S.tasks, clients:S.clients, view:S.view, group:S.group, cu:S.cu, plan:S.plan, slots:S.slots, hours:S.hours, ai:S.ai})); } catch(e){} }
 function save(){ saveLocal(); scheduleCloud(); }
 
 /* ---------- Sincronización con tu cuenta de Google (cloud.js) ---------- */
@@ -60,7 +60,7 @@ function cloudData(){
   return JSON.parse(JSON.stringify({
     clients: S.clients.map(({id,name,group,color,keywords,listId,auto,services,hours,notes}) => ({id,name,group,color,keywords,listId,auto,services,hours,notes})),
     tasks: S.tasks.filter(t => !t.cu && !t.demo),
-    token: S.cu.token || '', hidden: S.cu.hidden || [], plan: S.plan || null, slots: S.slots || {}, hours: S.hours || null }));
+    token: S.cu.token || '', hidden: S.cu.hidden || [], plan: S.plan || null, slots: S.slots || {}, hours: S.hours || null, ai: S.ai || null }));
 }
 function scheduleCloud(){
   if (!window.__cloud) return;
@@ -86,6 +86,7 @@ function applyCloud(d){
   if (d.plan) S.plan = d.plan;
   S.slots = d.slots || {};
   if (d.hours) S.hours = d.hours;
+  if (d.ai) S.ai = d.ai;
   const tokenChanged = (d.token || '') !== (S.cu.token || '');
   if (tokenChanged && !d.token){ S.cu = CU_DEFAULT(); S.tasks = S.tasks.filter(t => !t.cu); }
   lastSent = JSON.stringify({...cloudData(), token: d.token || ''});
@@ -406,13 +407,14 @@ const byOrder = (a,b) => (a.order||0) - (b.order||0);
 const GROUP = {agency:{color:'#4F8CFF', label:'Agencia', cls:'g-ag'}, mine:{color:'#3DDC97', label:'Mío', cls:'g-mine'}, none:{color:'#8A8A94', label:'', cls:'g-none'}};
 const groupOf = c => c ? (c.group === 'mine' ? GROUP.mine : GROUP.agency) : GROUP.none;
 // Cada cliente tiene su tono dentro de la familia de su grupo: verdes/amarillos para los míos, azules/turquesas para la agencia
+// Cada cliente tiene un color bien distinto, dentro de su familia: cálidos/verdes los míos, fríos/azules la agencia
+const PAL_MINE = ['#22C55E','#FACC15','#F97316','#A3E635','#14B8A6','#FB7185','#EAB308','#10B981','#F59E0B','#84CC16','#FDBA74','#2DD4BF'];
+const PAL_AG   = ['#3B82F6','#06B6D4','#6366F1','#38BDF8','#0EA5E9','#818CF8','#22D3EE','#60A5FA','#4F46E5','#67E8F9','#1D4ED8','#93C5FD'];
 function clientColor(c){
   if (!c) return GROUP.none.color;
   const fam = S.clients.filter(x => (x.group === 'mine') === (c.group === 'mine')).sort((a, b) => a.name.localeCompare(b.name));
-  const i = Math.max(0, fam.findIndex(x => x.id === c.id)), n = Math.max(fam.length, 2);
-  const [h0, h1] = c.group === 'mine' ? [62, 165] : [178, 238];
-  const h = Math.round(h0 + (h1 - h0) * i / (n - 1)), l = i % 2 ? 66 : 54, sat = i % 3 === 2 ? 62 : 78;
-  return `hsl(${h} ${sat}% ${l}%)`;
+  const i = Math.max(0, fam.findIndex(x => x.id === c.id)), pal = c.group === 'mine' ? PAL_MINE : PAL_AG;
+  return pal[i % pal.length];
 }
 function card(t, hide={}){
   const c = client(t.client), done = t.status === 'done', late = !done && t.day && t.day < today();
@@ -524,7 +526,7 @@ const views = {
 function render(){
   const sx = main.querySelector('.board')?.scrollLeft || 0;
   // Solo quedan las vistas Día y Clientes
-  if (!['dia','clientes'].includes(S.view)) S.view = 'dia';
+  if (!['dia','clientes','ia'].includes(S.view)) S.view = 'dia';
   const vw = S.view;
   if (!views[vw]) return;   // la vista Día la añade planner.js, que se carga después
   main.innerHTML = views[vw]();

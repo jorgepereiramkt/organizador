@@ -132,7 +132,10 @@ async function fetchEvents(day){
         if (meDeclined) continue;
         const allDay = !!(e.start && e.start.date);
         const s = allDay ? null : new Date(e.start.dateTime), en = allDay ? null : new Date(e.end.dateTime);
-        evs.push({title: e.summary || '(sin título)', allDay, color: c.color, cal: c.name, free: e.transparency === 'transparent',
+        const others = (e.attendees || []).filter(a => !a.self && !a.resource).length;
+        const tt = O.norm(e.summary || '');
+        const isCall = others > 0 || !!e.hangoutLink || !!e.conferenceData || /<>|\breu\b|reunion|llamada|\bcall\b|meet|zoom|entrevista|☎|📞/.test(tt + (e.summary || ''));
+        evs.push({title: e.summary || '(sin título)', allDay, color: c.color, cal: c.name, free: e.transparency === 'transparent', isCall,
           start: s ? Math.max(0, minutesOfDay(s, day)) : 0, end: en ? Math.min(24*60, minutesOfDay(en, day)) : 0, link: e.htmlLink});
       }
     }));
@@ -228,6 +231,10 @@ O.views.dia = function(){
     } else if (it.kind === 'routine'){
       color = ROUT[it.id] || '#A3A3AD';
       body = `<div class="blk routine" style="--c:${color}"><b>${esc(it.title)}</b><span class="rg">${dur(it.end - it.start)}</span></div>`;
+    } else if (!it.isCall){
+      // Bloques propios del calendario (Bloque 0, comida, cena, fin de trabajo…): no son llamadas
+      color = '#A3A3AD';
+      body = `<div class="blk routine cal-blk" style="--c:${color}"><b>${esc(it.title)}</b><span class="rg">${dur(it.end - it.start)}</span></div>`;
     } else {
       // Llamadas y reuniones: todas iguales, en morado y con 📞
       color = '#A78BFA';
@@ -235,7 +242,7 @@ O.views.dia = function(){
         <span class="cal">${dur(it.end - it.start)}</span></div>`;
     }
     tl += `<div class="trow ${st}" style="--c:${color};--p:${pct}%">
-      <div class="tcol"><b>${toHM(it.start)}</b><small>${toHM(it.end)}</small></div>
+      <div class="tcol${it.isCall ? ' tcall' : ''}">${it.isCall ? '<span class="tphone">📞</span>' : ''}<b>${toHM(it.start)}</b><small>${toHM(it.end)}</small></div>
       <div class="rail"><span></span>${st === 'now' ? '<i class="nowdot"></i>' : ''}</div>
       <div class="tbody">${body}</div></div>`;
     if (!mPut && /bloque\s*0/i.test(it.title || '')){ tl += morningRow(); mPut = true; }
