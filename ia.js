@@ -10,7 +10,9 @@ const uid = () => Math.random().toString(36).slice(2, 10);
 // Enlaces cortos: en vez de la URL entera, «🔗 miro.com»
 const URL_RE = /https?:\/\/[^\s<>"']*[^\s<>"'.,;:!?)\]]/g;
 const host = u => { try { return new URL(u).hostname.replace(/^www\./, ''); } catch(e){ return 'enlace'; } };
-const linky = t => { let o = '', i = 0; for (const m of String(t || '').matchAll(URL_RE)){ o += esc(t.slice(i, m.index)) + `<a class="ilink" href="${esc(m[0])}" target="_blank" rel="noopener" title="${esc(m[0])}">🔗 ${esc(host(m[0]))}</a>`; i = m.index + m[0].length; } return o + esc(String(t || '').slice(i)); };
+const PATH_RE = /(?:^|(?<=\s))(?:\/Users|~)\/\S+/g;
+const shortPaths = h => h.replace(PATH_RE, p => `<span class="apath" title="${p}">📁 ${p.split('/').filter(Boolean).pop()}</span>`);
+const linky = t => { t = String(t || ''); let o = '', i = 0; for (const m of t.matchAll(URL_RE)){ o += shortPaths(esc(t.slice(i, m.index))) + `<a class="ilink" href="${esc(m[0])}" target="_blank" rel="noopener" title="${esc(m[0])}">🔗 ${esc(host(m[0]))}</a>`; i = m.index + m[0].length; } return o + shortPaths(esc(t.slice(i))); };
 
 /* ---------- Dos apartados: En mente | Implementadas ---------- */
 S.iaMode = S.iaMode || 'mente';
@@ -33,7 +35,7 @@ O.views.ia.after = () => {
     <button class="chip" data-iamode="hechas" aria-pressed="${S.iaMode === 'hechas'}">⚙️ Implementadas</button>`;
   tb.insertBefore(sw, tb.querySelector('.sp'));
 };
-$('#toolbar').addEventListener('click', e => { const b = e.target.closest('[data-iamode]'); if (!b) return; S.iaMode = b.dataset.iamode; O.render(); });
+document.addEventListener('click', e => { const b = e.target.closest('[data-iamode]'); if (!b) return; S.iaMode = b.dataset.iamode; O.render(); });
 
 /* ---------- Implementadas: qué automatizaciones tiene cada cliente, de qué servicio y dónde están ---------- */
 const AU = () => (A().autos = A().autos || []);
