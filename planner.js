@@ -328,7 +328,7 @@ O.views.dia = function(){
   const calls = items.filter(i => i.kind === 'event' && i.isCall).sort((a,b) => a.start - b.start);
   const mtgRow = `<div class="mtgs">${calls.length ? calls.map(c => {
       const s = !isToday ? '' : nowMin >= c.end ? 'past' : nowMin >= c.start ? 'now' : '';
-      return `<span class="mtg ${s}" title="${esc(c.title)} · ${toHM(c.start)}–${toHM(c.end)}"><b>📞 ${toHM(c.start)}</b>${esc(c.title)}</span>`;
+      return `<span class="mtg ${s}" title="${esc(c.title)} · ${toHM(c.start)}–${toHM(c.end)}"><b>📞 ${toHM(c.start)}</b><span>${esc(c.title)}</span></span>`;
     }).join('') : '<span class="mtg none">Sin reuniones hoy</span>'}</div>`;
   const hoyTs = T.filter(t => slotted(t));
   const hechasHoy = hoyTs.filter(t => t.status === 'done').length;
