@@ -906,7 +906,7 @@ applyTheme();
 matchMedia('(prefers-color-scheme: dark)').addEventListener('change', applyTheme);
 document.getElementById('themeBtn').addEventListener('click', () => { const dark = document.documentElement.dataset.theme === 'dark'; try { localStorage.setItem('jp-theme', dark ? 'light' : 'dark'); } catch(err){} applyTheme(); });
 document.addEventListener('click', e => { const b = e.target.closest('[data-themebtn]'); if (!b) return; try { localStorage.setItem('jp-theme', b.dataset.themebtn); } catch(err){} applyTheme(); });
-S.view = 'clientes'; S.clientMode = 'tareas';   // cada mañana se empieza revisando los clientes
+S.view = 'dia'; S.clientMode = 'tareas';   // al abrir la app se empieza en el Día
 render(); modeIdle();
 $('#mode').classList.add('mode-btn');
 $('#mode').addEventListener('click', () => online() ? sync() : ($('#settingsBtn').click()));
