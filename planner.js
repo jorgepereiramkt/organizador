@@ -354,7 +354,7 @@ O.views.dia = function(){
   const timer = !isToday || (!curC && !nextC) ? '' : `<div class="cdbox${curC ? ' in' : ''}">${curC
       ? `<small>En reunión · termina en</small><b data-cdto="${base + curC.end * 60e3}"></b><span>${esc(curC.title)}</span>`
       : `<small>Siguiente reunión en</small><b data-cdto="${base + nextC.start * 60e3}" data-mtg="${esc(nextC.title)}"></b><span>${toHM(nextC.start)} · ${esc(nextC.title)}</span>`}
-      <button type="button" class="cdbell${bellOn() ? ' on' : ''}" data-bell title="${bellOn() ? 'Aviso con sonido 5 min antes: activado' : 'Activar aviso con sonido 5 min antes'}">${bellOn() ? '🔔' : '🔕'}</button></div>`;
+      <button type="button" class="cdbell${bellOn() ? ' on' : ''}" data-bell title="${bellOn() ? 'Aviso con sonido 5 min y 1 min antes: activado' : 'Activar aviso con sonido 5 min y 1 min antes'}">${bellOn() ? '🔔' : '🔕'}</button></div>`;
   // Reuniones del día en una fila
   const mtgRow = `<div class="mtgs">${calls.length ? calls.map(c => {
       const s = !isToday ? '' : nowMin >= c.end ? 'past' : nowMin >= c.start ? 'now' : '';
@@ -753,22 +753,25 @@ function chime(){
 // el navegador solo deja sonar después de un toque: se «desbloquea» con el primer clic
 document.addEventListener('pointerdown', () => { if (!actx && bellOn()) try { actx = new (window.AudioContext || window.webkitAudioContext)(); actx.resume(); } catch(e){} }, {once: true});
 const avisadas = (() => { try { return JSON.parse(localStorage.getItem('jp-avisos') || '{}'); } catch(e){ return {}; } })();
-function avisar(key, title){
-  avisadas[key] = 1; try { localStorage.setItem('jp-avisos', JSON.stringify(Object.fromEntries(Object.entries(avisadas).filter(([k]) => +k > Date.now() - 864e5)))); } catch(e){}
+function avisar(key, title, min = 5){
+  avisadas[key] = 1; try { localStorage.setItem('jp-avisos', JSON.stringify(Object.fromEntries(Object.entries(avisadas).filter(([k]) => parseInt(k) > Date.now() - 864e5)))); } catch(e){}
   if (!bellOn()) return;
-  chime(); O.toast(`📞 En 5 min: ${title}`);
-  try { if ('Notification' in window && Notification.permission === 'granted') new Notification('Reunión en 5 minutos', {body: title, icon: 'logo-claro.png', tag: 'reu-' + key}); } catch(e){}
+  chime(); if (min === 1) setTimeout(chime, 1200); O.toast(min === 1 ? `📞 ¡En 1 minuto!: ${title}` : `📞 En 5 min: ${title}`);
+  try { if ('Notification' in window && Notification.permission === 'granted') new Notification(min === 1 ? 'Reunión en 1 minuto' : 'Reunión en 5 minutos', {body: title, icon: 'logo-claro.png', tag: 'reu-' + key}); } catch(e){}
 }
 document.addEventListener('click', e => {
   if (!e.target.closest('[data-bell]')) return;
   const on = !bellOn(); try { localStorage.setItem('jp-bell', on ? 'on' : 'off'); } catch(err){}
-  if (on){ chime(); O.toast('🔔 Te avisaré con un sonido 5 min antes de cada reunión'); try { if ('Notification' in window && Notification.permission === 'default') Notification.requestPermission(); } catch(err){} }
+  if (on){ chime(); O.toast('🔔 Te avisaré con un sonido 5 min y 1 min antes de cada reunión'); try { if ('Notification' in window && Notification.permission === 'default') Notification.requestPermission(); } catch(err){} }
   else O.toast('🔕 Aviso de reuniones desactivado en este dispositivo');
   O.render();
 });
 // Temporizador de la siguiente reunión: se actualiza cada segundo
 function tickCd(){ for (const el of document.querySelectorAll('[data-cdto]')){ const ms = +el.dataset.cdto - Date.now(), s = Math.max(0, Math.round(ms / 1000));
-  if (el.dataset.mtg !== undefined && s > 0 && s <= 300 && !avisadas[el.dataset.cdto]) avisar(el.dataset.cdto, el.dataset.mtg);
+  if (el.dataset.mtg !== undefined && s > 0){
+    if (s <= 60 && !avisadas[el.dataset.cdto + ':1']){ avisadas[el.dataset.cdto] = 1; avisar(el.dataset.cdto + ':1', el.dataset.mtg, 1); }
+    else if (s > 60 && s <= 300 && !avisadas[el.dataset.cdto]) avisar(el.dataset.cdto, el.dataset.mtg, 5);
+  }
   const h = Math.floor(s / 3600), m = Math.floor(s % 3600 / 60), ss = s % 60;
   el.textContent = h ? `${h} h ${O.pad(m)} min` : `${O.pad(m)}:${O.pad(ss)}`; el.closest('.cdbox')?.classList.toggle('soon', s < 600); } }
 setInterval(tickCd, 1000);
