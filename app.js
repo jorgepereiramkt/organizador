@@ -60,7 +60,8 @@ function cloudData(){
   return JSON.parse(JSON.stringify({
     clients: S.clients.map(({id,name,group,color,keywords,listId,auto,services,hours,notes}) => ({id,name,group,color,keywords,listId,auto,services,hours,notes})),
     tasks: S.tasks.filter(t => !t.cu && !t.demo),
-    token: S.cu.token || '', hidden: S.cu.hidden || [], plan: S.plan || null, slots: S.slots || {}, hours: S.hours || null, ai: S.ai || null }));
+    token: S.cu.token || '', hidden: S.cu.hidden || [], plan: S.plan || null, slots: S.slots || {}, hours: S.hours || null, ai: S.ai || null,
+    picks: Object.fromEntries(S.tasks.filter(t => t.cu && t.today && t.today >= today()).map(t => [t.id, t.today])) }));
 }
 function scheduleCloud(){
   if (!window.__cloud) return;
@@ -87,6 +88,8 @@ function applyCloud(d){
   S.slots = d.slots || {};
   if (d.hours) S.hours = d.hours;
   if (d.ai) S.ai = d.ai;
+  S.picks = d.picks || {};
+  S.tasks.forEach(t => { if (t.cu && S.picks[t.id]) t.today = S.picks[t.id]; });
   const tokenChanged = (d.token || '') !== (S.cu.token || '');
   if (tokenChanged && !d.token){ S.cu = CU_DEFAULT(); S.tasks = S.tasks.filter(t => !t.cu); }
   lastSent = JSON.stringify({...cloudData(), token: d.token || ''});
@@ -208,7 +211,8 @@ function fromCU(raw, clientId, prev){
     status, priority: p === 1 ? 'super' : p === 2 ? 'alta' : p === 4 ? 'baja' : 'normal',
     order: old ? old.order : +raw.date_created / 1e6,
     doneAt: status === 'done' ? iso(new Date(+(raw.date_done || raw.date_closed || Date.now()))) : null,
-    url: raw.url, cu: true, listId: raw.list && raw.list.id, listName: raw.list && raw.list.name};
+    url: raw.url, cu: true, listId: raw.list && raw.list.id, listName: raw.list && raw.list.name,
+    today: old ? (old.today || null) : ((S.picks || {})[raw.id] || null)};   // si ya la teníamos, manda lo de la app
 }
 async function pages(path){
   let all = [];
