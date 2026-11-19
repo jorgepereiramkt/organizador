@@ -7,16 +7,16 @@ let urg = 'baja', cid = '';
 // Botón junto a «Añadir»
 const btn = document.createElement('button');
 btn.className = 'btn qbtn'; btn.id = 'quickBtn'; btn.type = 'button';
-btn.innerHTML = '<span>+</span> Rápida';
+btn.innerHTML = '<span>+</span> Añadir tarea';
 btn.title = 'Añadir tarea rápida';
-$('#addBtn').after(btn);
+$('#helloAct').appendChild(btn);
 
 const dlg = document.createElement('dialog');
 dlg.id = 'quickDlg';
 dlg.innerHTML = `<form method="dialog" class="sheet" id="quickForm">
   <h2>Añadir tarea</h2>
   <div class="qrow"><input id="qText" autocomplete="off" placeholder="¿Qué tienes que hacer?" enterkeyhint="done">
-    <button type="button" class="mic sm" id="qMic" aria-label="Dictar"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0 0 14 0M12 18v3"/></svg></button></div>
+</div>
   <div><div class="qlbl">Cliente</div><div class="qchips" id="qClients"></div></div>
   <div><div class="qlbl">Urgencia</div><div class="qseg" id="qUrg"></div></div>
   <div class="actions"><button class="btn" value="cancel" formnovalidate>Cancelar</button><span class="sp"></span>
@@ -75,17 +75,49 @@ dlg.addEventListener('close', () => {
   if (dlg.returnValue === 'more'){ if (add()) { txt.value = ''; urg = 'baja'; drawUrg(); dlg.showModal(); setTimeout(() => txt.focus(), 50); } }
 });
 
-// Dictado dentro de la ventanita
-const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
-let rec = null;
-$('#qMic').addEventListener('click', () => {
-  const mic = $('#qMic');
-  if (!SR){ O.toast('Usa el micro del teclado para dictar'); txt.focus(); return; }
-  if (rec){ rec.stop(); return; }
-  rec = new SR(); rec.lang = 'es-ES'; rec.interimResults = true; rec.continuous = false;
-  rec.onresult = e => { let s = ''; for (const r of e.results) s += r[0].transcript; txt.value = s; txt.dispatchEvent(new Event('input')); };
-  rec.onend = () => { rec = null; mic.classList.remove('rec'); };
-  rec.onerror = e => O.toast('Micro: ' + e.error);
-  try { rec.start(); mic.classList.add('rec'); } catch(e){ rec = null; }
-});
+
+/* ---------- Saludo y frase del día ---------- */
+const FRASES = [
+  'Hoy no hace falta hacerlo todo: hace falta hacer lo importante.',
+  'Empieza por la que más pereza te da. El resto va rodado.',
+  'Una tarea terminada vale más que diez empezadas.',
+  'Tus clientes confían en ti porque cumples. Hoy, otra vez.',
+  'Menos pestañas abiertas, más cosas cerradas.',
+  'El día lo ganas en el primer bloque. A por él.',
+  'No necesitas motivación, necesitas empezar. La motivación llega después.',
+  'Pequeños avances cada día hacen cuentas enormes a final de mes.',
+  'Lo urgente grita; lo importante construye. Haz hueco a lo segundo.',
+  'Hoy eres el Jorge que dentro de un año te dará las gracias.',
+  'Una cosa cada vez. Bien hecha. Y a la siguiente.',
+  'Si cabe en dos minutos, hazla ya.',
+  'Disciplina es elegir lo que quieres de verdad frente a lo que te apetece ahora.',
+  'Cada campaña que mejoras es un negocio que crece gracias a ti.',
+  'Organiza la mañana y la tarde se organiza sola.',
+  'No compitas con nadie: supera al Jorge de ayer.',
+  'Foco: el móvil boca abajo y el bloque en marcha.',
+  'Lo difícil de hoy es lo fácil de mañana.',
+  'Hecho es mejor que perfecto. Luego se mejora.',
+  'Cierra el día sabiendo que has movido lo que importaba.',
+  'Tu energía es limitada: gástala en lo que mueve la aguja.',
+  'Un buen sistema vale más que mil ganas.',
+  'Hoy toca sembrar. Los resultados llegan.',
+  'Respira, ordena y ataca la primera.',
+  'Constancia > intensidad.',
+  'Cada "sí" a algo es un "no" a otra cosa. Elige bien.',
+  'El trabajo profundo se hace en bloques, no en ratos.',
+  'Celebra lo que tachas: estás avanzando.',
+  'Ser bueno es fácil un día. Ser constante es lo que te hace distinto.',
+  'Hoy, mejor que ayer. Mañana, mejor que hoy.',
+];
+function saludo(){
+  const h = new Date().getHours();
+  const s = h < 6 ? 'Buenas noches' : h < 14 ? 'Buenos días' : h < 21 ? 'Buenas tardes' : 'Buenas noches';
+  const icon = h < 6 ? '🌙' : h < 14 ? '☀️' : h < 21 ? '🌤️' : '🌙';
+  $('#helloTxt').textContent = `${s}, Jorge ${icon}`;
+}
+let fi = Math.floor((Date.now() - new Date(new Date().getFullYear(), 0, 0)) / 864e5) % FRASES.length;
+const frase = () => { $('#motivo').textContent = FRASES[fi % FRASES.length]; };
+$('#motivo').addEventListener('click', () => { fi++; frase(); });
+saludo(); frase();
+setInterval(saludo, 10 * 60e3);
 })();
