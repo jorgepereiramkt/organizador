@@ -863,7 +863,16 @@ $('#addFromList').addEventListener('change', e => {
 clList.addEventListener('input', e => {
   const row = e.target.closest('.cl-row'), k = e.target.dataset.k; if (!row || !k) return;
   const c = client(row.dataset.id);
-  c[k] = e.target.value; save(); render(); preview();
+  c[k] = e.target.value;
+  // Un cliente «Mío» nunca puede quedarse con el id de una carpeta/lista de ClickUp de la agencia:
+  // pasa a ser un cliente propio nuevo (con sus tareas de la app) y la carpeta vuelve a ser de la agencia al sincronizar.
+  if (k === 'group' && c.group === 'mine' && /^[fl]:/.test(c.id)){
+    const nid = uid(), old = c.id;
+    for (const t of S.tasks) if (t.client === old && !t.cu) t.client = nid;
+    c.id = nid; delete c.auto;
+    toast('Separado de ClickUp: ahora es solo tuyo'); setTimeout(() => sync(true), 300);
+  }
+  save(); render(); preview();
   if (k === 'group') renderClients();
 });
 clList.addEventListener('click', e => {
