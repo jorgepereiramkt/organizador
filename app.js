@@ -490,6 +490,8 @@ const views = {
     const nHoy = all.filter(t => !t.ia && t.status !== 'done' && t.today === today()).length;
     setToolbar('Clientes', hoyMode ? `${nHoy} tarea${nHoy === 1 ? '' : 's'} para hoy` : 'marca con «Hoy» lo que vas a hacer hoy', '', hoyMode ? 'Luego colócalas en Día' : 'Arrastra para cambiar de cliente');
     let html = '';
+    const ibs = window.__org && window.__org.inboxStatus ? window.__org.inboxStatus() : null;
+    if (ibs && !ibs.ok && !hoyMode) html += `<div class="ibx">📥 Buzón de tareas por voz: <button class="btn" data-ibx>Mirar si hay tareas nuevas</button><span>Google pide confirmarlo cada hora</span></div>`;
     if (iaT.length && !hoyMode){
       html += `<div class="iarev"><div class="iarev-h"><b>🤖 Revisa las tareas que ha detectado la IA</b><span>${iaT.length}</span>
         <button class="btn" data-iaall>Aprobar todas</button></div>
@@ -641,6 +643,11 @@ main.addEventListener('click', e => {
     if (!t.today) delete S.slots[t.id];
     save(); S._keepScroll = true; render();
     toast(t.today ? 'Para hoy ✓' : 'Quitada de hoy');
+    return;
+  }
+  if (e.target.closest('[data-ibx]')){
+    const ib = S.plan && S.plan.inbox;
+    window.__org.connectDriveInbox(ib && ib.email).then(() => window.__org.importInbox()).then(() => render()).catch(err => toast('Buzón: ' + err.message));
     return;
   }
   if (e.target.closest('[data-iaall]')){

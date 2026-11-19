@@ -67,6 +67,36 @@ async function authorize(hint){
     tc.requestAccessToken();
   });
 }
+const DRIVE_SCOPE = 'https://www.googleapis.com/auth/drive.readonly';
+const INBOX_FOLDER = '📥 Tareas Organizador';
+async function authorizeDrive(hint){
+  await loadGis();
+  return new Promise((res, rej) => {
+    const tc = google.accounts.oauth2.initTokenClient({
+      client_id: GCAL_CLIENT_ID, scope: DRIVE_SCOPE, hint: hint || undefined, prompt: hint ? '' : 'select_account',
+      callback: async r => {
+        if (r.error) return rej(new Error(r.error));
+        try {
+          const me = await gapi('https://www.googleapis.com/drive/v3/about?fields=user', r.access_token);
+          const email = me.user.emailAddress;
+          tokens[email + '|drive'] = {token: r.access_token, exp: Date.now() + (r.expires_in || 3600) * 1000}; saveTokens();
+          res(email);
+        } catch(e){ rej(e); }
+      },
+      error_callback: e => rej(new Error(e.type || 'cancelado')),
+    });
+    tc.requestAccessToken();
+  });
+}
+async function connectDriveInbox(hint){
+  const email = await authorizeDrive(hint);
+  const q = encodeURIComponent(`name = '${INBOX_FOLDER}' and mimeType = 'application/vnd.google-apps.folder' and trashed = false`);
+  const r = await gapi(`https://www.googleapis.com/drive/v3/files?q=${q}&fields=files(id,name)`, tokens[email + '|drive'].token);
+  const f = (r.files || [])[0];
+  if (!f) throw new Error(`no encuentro la carpeta «${INBOX_FOLDER}» en ${email}`);
+  P().inbox = {type: 'drive', email, folderId: f.id};
+  O.save(); return email;
+}
 async function gapi(url, token){
   const r = await fetch(url, {headers:{Authorization:'Bearer ' + token}});
   if (!r.ok) throw new Error('Google ' + r.status);
@@ -252,7 +282,9 @@ O.views.dia.after = () => {
 // Entran en «Por revisar (IA)» para que las revises antes de colocarlas (y antes de subir nada a ClickUp).
 let importing = false;
 async function importInbox(){
-  const ib = P().inbox; if (!ib || !ib.calId || importing || !tokenOk(ib.email)) return;
+  const ib = P().inbox; if (!ib || importing) return;
+  if (ib.type === 'drive') return importDrive(ib);
+  if (!ib.calId || !tokenOk(ib.email)) return;
   importing = true;
   try {
     const now = new Date(), seen = (P().inboxSeen = P().inboxSeen || {});
@@ -281,7 +313,47 @@ async function importInbox(){
   } catch(e){ /* sin conexión o permiso caducado: se reintenta luego */ }
   importing = false;
 }
+// Buzón de Drive: cada archivo de la carpeta = una tarea. Nombre = la tarea. Contenido: «cliente: …», «urgencia: …», «nota: …».
+function parseInbox(title, desc){
+  const get = k => { const m = desc.match(new RegExp('^\\s*' + k + '\\s*:\\s*(.*)$', 'im')); return m ? m[1].trim() : ''; };
+  const cName = O.norm(get('cliente'));
+  let cl = cName ? S.clients.find(c => O.norm(c.name) === cName) || S.clients.find(c => O.norm(c.name).includes(cName) || cName.includes(O.norm(c.name).split(' ')[0])) : null;
+  if (!cl){ const p = O.parse(title)[0]; cl = p && p.client ? O.client(p.client) : null; }
+  const ur = O.norm(get('urgencia'));
+  const priority = /super|urgentisim|critic/.test(ur) ? 'super' : /urgent/.test(ur) ? 'alta' : /media|normal/.test(ur) ? 'normal' : 'baja';
+  return {id: O.uid(), title, client: cl ? cl.id : null, day: null, status: 'todo', priority, order: O.maxOrder() + 1, doneAt: null, ia: true, iaNote: get('nota')};
+}
+async function importDrive(ib){
+  const tk = tokens[ib.email + '|drive'];
+  if (!tk || tk.exp < Date.now() + 60e3) return;
+  importing = true;
+  try {
+    const seen = (P().inboxSeen = P().inboxSeen || {});
+    const since = O.addDays(new Date(), -30).toISOString();
+    const q = encodeURIComponent(`'${ib.folderId}' in parents and trashed = false and createdTime > '${since}'`);
+    const r = await gapi(`https://www.googleapis.com/drive/v3/files?q=${q}&fields=files(id,name,mimeType,createdTime)&orderBy=createdTime&pageSize=100`, tk.token);
+    let n = 0;
+    for (const f of r.files || []){
+      if (seen[f.id]) continue;
+      const url = f.mimeType === 'application/vnd.google-apps.document'
+        ? `https://www.googleapis.com/drive/v3/files/${f.id}/export?mimeType=text/plain`
+        : `https://www.googleapis.com/drive/v3/files/${f.id}?alt=media`;
+      const res = await fetch(url, {headers: {Authorization: 'Bearer ' + tk.token}});
+      const txt = res.ok ? await res.text() : '';
+      seen[f.id] = Date.now();
+      const title = f.name.replace(/\.(txt|md)$/i, '').replace(/^[📥\s]+/u, '').trim();
+      if (!title) continue;
+      S.tasks.push(parseInbox(title, txt)); n++;
+    }
+    for (const [k, t] of Object.entries(seen)) if (t < Date.now() - 60 * 864e5) delete seen[k];
+    O.save();
+    if (n){ O.render(); O.toast(`🤖 ${n} tarea${n > 1 ? 's' : ''} nueva${n > 1 ? 's' : ''} por revisar`); }
+  } catch(e){ /* sin conexión o permiso caducado */ }
+  importing = false;
+}
 O.importInbox = importInbox;
+O.connectDriveInbox = connectDriveInbox;
+O.inboxStatus = () => { const ib = P().inbox; if (!ib || ib.type !== 'drive') return null; const tk = tokens[ib.email + '|drive']; return {email: ib.email, ok: !!(tk && tk.exp > Date.now() + 60e3)}; };
 async function refresh(){
   importInbox();
   loading = true; calError = '';
@@ -340,10 +412,9 @@ function renderPlanSettings(){
         <button type="button" class="btn danger" data-accdel="${ai}">Quitar cuenta</button></div>`).join('')
       + `<div class="actions" style="margin:0"><button type="button" class="btn" id="accAdd">+ Conectar cuenta de Google</button></div>
          <div class="note">Solo lectura. Puedes conectar tu cuenta personal y la de la agencia y elegir qué calendarios cuentan. Los eventos no se guardan en la nube.</div>
-         <label>📥 Calendario buzón (tareas que te deja Claude)<select data-inbox>
-           <option value="">— Ninguno —</option>${plan.accounts.map(a => `<optgroup label="${esc(a.email)}">${a.cals.map(c =>
-             `<option value="${esc(a.email)}|${esc(c.id)}" ${plan.inbox && plan.inbox.calId === c.id ? 'selected' : ''}>${esc(c.name)}</option>`).join('')}</optgroup>`).join('')}
-         </select></label>`}`;
+         <div class="acc"><b>📥 Buzón de tareas por voz (Drive)</b>
+           <span class="lock">${plan.inbox && plan.inbox.type === 'drive' ? `Conectado: ${esc(plan.inbox.email)} · carpeta «${INBOX_FOLDER}»` : 'Sin conectar'}</span>
+           <button type="button" class="btn" id="driveInbox">${plan.inbox && plan.inbox.type === 'drive' ? 'Volver a conectar' : 'Conectar buzón'}</button></div>`}`;
 }
 document.addEventListener('click', async e => {
   const box = e.target.closest('#planBox'); if (!box) return;
@@ -354,6 +425,10 @@ document.addEventListener('click', async e => {
   if (e.target.closest('[data-rdel]')){ plan.routines.splice(+e.target.closest('.rt').dataset.i, 1); return done(); }
   if (e.target.id === 'rtAdd'){ plan.routines.push({id:Math.random().toString(36).slice(2,8), name:'Nuevo', icon:'⏱️', start:'17:00', end:'17:30', days:[1,2,3,4,5], on:true}); return done(); }
   if (e.target.dataset.accdel){ plan.accounts.splice(+e.target.dataset.accdel, 1); clearCache(); lastEvents = []; return done(); }
+  if (e.target.id === 'driveInbox'){
+    try { const em = await connectDriveInbox(''); O.toast('Buzón conectado: ' + em); importInbox(); } catch(err){ O.toast('Buzón: ' + err.message); }
+    return done();
+  }
   if (e.target.id === 'accAdd'){
     try { await connectAccount(''); O.toast('Cuenta conectada: elige sus calendarios'); } catch(err){ O.toast('Google Calendar: ' + err.message); }
     return done();
@@ -377,4 +452,7 @@ setInterval(() => { if (S.view === 'dia' && !document.querySelector('.ghost') &&
 // Refresco suave: la marca de «ahora» y el calendario cada 5 min
 setInterval(() => { if (S.view === 'dia' && !document.querySelector('.ghost')){ clearCache(); refresh(); } }, 5 * 60e3);
 if (S.view === 'dia') O.render();
+// Buzón: al abrir la app y cada 5 minutos
+setTimeout(importInbox, 2500);
+setInterval(importInbox, 5 * 60e3);
 })();
