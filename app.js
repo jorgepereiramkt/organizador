@@ -619,7 +619,11 @@ function endDrag(){
   if (f === 'status') setStatus(t, v);
   if (f === 'client') t.client = v || null;
   // Planificador: meter/sacar la tarea de un bloque del día (no toca la fecha ni ClickUp)
-  if (f === 'slot'){ S.slots[t.id] = {day: zone.dataset.day, at: v}; t.today = zone.dataset.day; }
+  if (f === 'slot'){
+    let tier = zone.dataset.tier || null;
+    if (tier === 'top' && list.length >= 3){ tier = 'extra'; toast('El Top 3 ya está lleno: va a «Échale huevos»'); }
+    S.slots[t.id] = {day: zone.dataset.day, at: v, ...(tier ? {tier} : {})}; t.today = zone.dataset.day;
+  }
   // «En proceso»: ya empezada pero ahora depende de otros; sale del bloque y queda apartada a la vista
   const proc = S.plan && (S.plan.proc = S.plan.proc || {});
   if (proc){ if (f === 'unslot' && zone.dataset.proc !== undefined){ delete S.slots[t.id]; proc[t.id] = proc[t.id] || today(); } else if (f === 'slot' || f === 'unslot') delete proc[t.id]; }

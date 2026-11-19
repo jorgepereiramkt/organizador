@@ -287,9 +287,18 @@ O.views.dia = function(){
       const ts = T.filter(t => slotted(t) === it.at).sort(O.byOrder);
       const hechas = ts.filter(t => t.status === 'done').length;
       color = 'var(--accent)';
-      body = `<section class="blk work" data-field="slot" data-value="${it.at}" data-day="${planDay}">
+      // Dos apartados: Top 3 (sí o sí) y «Échale huevos» (si da tiempo). Las que no tienen apartado llenan el Top 3 por orden.
+      const top = ts.filter(t => S.slots[t.id].tier === 'top');
+      for (const t of ts) if (!S.slots[t.id].tier && top.length < 3) top.push(t);
+      top.sort(O.byOrder);
+      const extra = ts.filter(t => !top.includes(t));
+      const zone = (tier, list, title, emptyTxt) => `<div class="wzone z-${tier}" data-field="slot" data-value="${it.at}" data-day="${planDay}" data-tier="${tier}">
+          <h5>${title}<span>${list.filter(t => t.status === 'done').length}/${list.length}</span></h5>
+          <div class="list">${list.map(t => O.card(t)).join('') || `<div class="empty">${emptyTxt}</div>`}</div></div>`;
+      body = `<section class="blk work">
         <header><b>Trabajo</b><span class="rg">${dur(it.end - it.start)}</span>${ts.length ? `<span class="count">${hechas}/${ts.length} ✓</span>` : ''}</header>
-        <div class="list">${ts.map(t => O.card(t)).join('') || '<div class="empty">Suelta tareas aquí</div>'}</div></section>`;
+        ${zone('top', top, '🎯 Top 3 · sí o sí', 'Lo que tienes que sacar sí o sí (máx. 3)')}
+        ${zone('extra', extra, '💪 Échale huevos · saca también estas', 'Si te da tiempo, también estas')}</section>`;
     } else if (it.kind === 'routine'){
       color = ROUT[it.id] || '#A3A3AD';
       body = `<div class="blk routine" style="--c:${color}"><b>${esc(it.title)}</b><span class="rg">${dur(it.end - it.start)}</span></div>`;
