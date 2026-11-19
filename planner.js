@@ -314,18 +314,31 @@ O.views.dia = function(){
     tl = `<div class="build-empty"><b>🧱 Monta tus bloques de hoy</b><span>Arrastra bloques de trabajo a las horas que quieras y estíralos. Luego colocas tus tareas dentro.</span><button class="btn primary" data-buildday>Montar bloques</button></div>` + tl;
   // Cabecera del día: reloj, jornada y contador de tareas
   const plan = P(), ws = toMin(plan.workStart), we = Math.max(toMin(plan.workEnd), ...items.map(i => i.end).filter(e => e <= 24 * 60));
-  // Barra: tiempo de los bloques de trabajo (total, consumido y lo que queda)
-  const wTot = works.reduce((s, w) => s + (w.end - w.start), 0);
-  const wDone = isToday ? works.reduce((s, w) => s + Math.max(0, Math.min(nowMin, w.end) - w.start), 0) : 0;
-  const jorn = wTot ? Math.round(wDone / wTot * 100) : 0;
-  const nextW = works.find(w => w.end > nowMin);
-  const jornTxt = !wTot ? 'Aún no tienes bloques de trabajo hoy'
-    : !isToday ? `${dur(wTot)} de trabajo planificado`
-    : !wDone ? `${dur(wTot)} de trabajo hoy · empiezas a las ${toHM(works[0].start)}`
-    : wDone >= wTot ? `Bloques de trabajo terminados · ${dur(wTot)} hechas 💪`
-    : `<b>${dur(wDone)}</b> de ${dur(wTot)} de trabajo · ${jorn}% · te quedan ${dur(wTot - wDone)}${nextW && nextW.start > nowMin ? ` · siguiente bloque a las ${toHM(nextW.start)}` : ''}`;
-  // Reuniones del día en una fila
+  // Barra: trabajo = bloques de trabajo + reuniones (contados por separado, sin contar dos veces lo que se solapa)
   const calls = items.filter(i => i.kind === 'event' && i.isCall).sort((a,b) => a.start - b.start);
+  const union = iv => iv.map(x => [x.start, x.end]).sort((a,b) => a[0]-b[0]).reduce((o, [a, b]) => { const l = o[o.length-1]; if (l && a <= l[1]) l[1] = Math.max(l[1], b); else o.push([a, b]); return o; }, []);
+  const cU = union(calls);
+  const minus = ([a, b]) => cU.reduce((segs, [ca, cb]) => segs.flatMap(([x, y]) => cb <= x || ca >= y ? [[x, y]] : [[x, Math.min(y, ca)], [Math.max(x, cb), y]].filter(([p, q]) => q > p)), [[a, b]]);
+  const wU = union(works).flatMap(minus);
+  const len = iv => iv.reduce((s, [a, b]) => s + (b - a), 0);
+  const upto = iv => isToday ? iv.reduce((s, [a, b]) => s + Math.max(0, Math.min(nowMin, b) - a), 0) : 0;
+  const wTot = len(wU), cTot = len(cU), tot = wTot + cTot;
+  const wDone = upto(wU), cDone = upto(cU), done = wDone + cDone;
+  const jorn = tot ? Math.round(done / tot * 100) : 0;
+  const pw = tot ? wDone / tot * 100 : 0, pc = tot ? cDone / tot * 100 : 0;
+  const split = `<span class="jsplit"><i class="jw"></i>Bloques ${dur(wDone)} / ${dur(wTot)}<i class="jc"></i>Reuniones ${dur(cDone)} / ${dur(cTot)}</span>`;
+  const jornTxt = !tot ? 'Aún no tienes bloques de trabajo hoy'
+    : !isToday ? `${dur(tot)} de trabajo planificado ${split}`
+    : !done ? `${dur(tot)} de trabajo hoy · empiezas a las ${toHM(Math.min(...[...wU, ...cU].map(x => x[0])))} ${split}`
+    : done >= tot ? `Trabajo del día terminado · ${dur(tot)} 💪 ${split}`
+    : `<b>${dur(done)}</b> de ${dur(tot)} de trabajo · ${jorn}% · te quedan ${dur(tot - done)} ${split}`;
+  // Temporizador hasta la siguiente reunión (o fin de la actual)
+  const base = O.fromIso(planDay).getTime();
+  const curC = isToday && calls.find(c => nowMin >= c.start && nowMin < c.end), nextC = isToday && calls.find(c => c.start > nowMin);
+  const timer = !isToday || (!curC && !nextC) ? '' : `<div class="cdbox${curC ? ' in' : ''}">${curC
+      ? `<small>En reunión · termina en</small><b data-cdto="${base + curC.end * 60e3}"></b><span>${esc(curC.title)}</span>`
+      : `<small>Siguiente reunión en</small><b data-cdto="${base + nextC.start * 60e3}"></b><span>${toHM(nextC.start)} · ${esc(nextC.title)}</span>`}</div>`;
+  // Reuniones del día en una fila
   const mtgRow = `<div class="mtgs">${calls.length ? calls.map(c => {
       const s = !isToday ? '' : nowMin >= c.end ? 'past' : nowMin >= c.start ? 'now' : '';
       return `<span class="mtg ${s}" title="${esc(c.title)} · ${toHM(c.start)}–${toHM(c.end)}"><b>📞 ${toHM(c.start)}</b><span>${esc(c.title)}</span></span>`;
@@ -336,11 +349,11 @@ O.views.dia = function(){
   const ring = hoyTs.length ? Math.round(hechasHoy / hoyTs.length * 100) : 0;
   const head = `<div class="dayhead">
     <div class="clock">${isToday ? `${O.pad(now.getHours())}:${O.pad(now.getMinutes())}` : `${d.getDate()} ${O.MESES[d.getMonth()]}`}</div>
-    <div class="jorn"><div class="jbar"><span style="width:${jorn}%"></span></div>
+    <div class="jorn"><div class="jbar"><span style="width:${pw}%"></span><span class="jc" style="left:${pw}%;width:${pc}%"></span></div>
       <small>${jornTxt}</small></div>
     <div class="legend"><span style="--c:${O.GROUP.agency.color}">Agencia</span><span style="--c:${O.GROUP.mine.color}">Mis clientes</span><span style="--c:#A78BFA">Llamadas</span></div>
     <div class="ring" style="--r:${ring}"><b>${hechasHoy}/${hoyTs.length}</b><small>hechas</small></div>
-    ${mtgRow}
+    ${timer}${mtgRow}
   </div>`;
   // «Por colocar»: solo las tareas marcadas para este día (las eliges en Clientes → Tareas) que aún no están en un bloque
   const procMap = P().proc || {}, inProc = t => !!procMap[t.id];
@@ -362,6 +375,7 @@ O.views.dia = function(){
         <div class="list">${ts.map(t => O.card(t)).join('') || '<div class="empty">Arrastra aquí</div>'}</div></div>`;
     }).join('') + '</section>';
   const msg = calError ? `<div class="note warnbox">${esc(calError)}</div>` : loading ? '<div class="note">Cargando calendario…</div>' : '';
+  setTimeout(tickCd);
   return `${msg}${head}<div class="planner"><div class="timeline">${tl}</div>${side}</div>`;
 };
 O.views.dia.after = () => {
@@ -705,6 +719,11 @@ function done(){ O.save(); renderPlanSettings(); if (S.view === 'dia') { O.rende
 $('#settingsBtn').addEventListener('click', renderPlanSettings);
 
 // Cada minuto: reloj y barra del día
+// Temporizador de la siguiente reunión: se actualiza cada segundo
+function tickCd(){ for (const el of document.querySelectorAll('[data-cdto]')){ const ms = +el.dataset.cdto - Date.now(), s = Math.max(0, Math.round(ms / 1000));
+  const h = Math.floor(s / 3600), m = Math.floor(s % 3600 / 60), ss = s % 60;
+  el.textContent = h ? `${h} h ${O.pad(m)} min` : `${O.pad(m)}:${O.pad(ss)}`; el.closest('.cdbox')?.classList.toggle('soon', s < 600); } }
+setInterval(tickCd, 1000);
 setInterval(() => { if (S.view === 'dia' && !document.querySelector('.ghost') && !document.querySelector('dialog[open]') && !document.activeElement?.matches('input,textarea')) O.render(); }, 60e3);
 // Refresco suave: la marca de «ahora» y el calendario cada 5 min
 setInterval(() => { if (S.view === 'dia' && !document.querySelector('.ghost')){ clearCache(); refresh(); } }, 5 * 60e3);
