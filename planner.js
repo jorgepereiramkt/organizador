@@ -327,12 +327,16 @@ O.views.dia = function(){
     <div class="ring" style="--r:${ring}"><b>${hechasHoy}/${hoyTs.length}</b><small>hechas</small></div>
   </div>`;
   // «Por colocar»: solo las tareas marcadas para este día (las eliges en Clientes → Tareas) que aún no están en un bloque
-  const pend = T.filter(t => t.status !== 'done' && !t.ia && !slotted(t)).sort(O.byOrder);
+  const procMap = P().proc || {}, inProc = t => !!procMap[t.id];
+  const procTs = T.filter(t => t.status !== 'done' && inProc(t)).sort((a,b) => procMap[a.id].localeCompare(procMap[b.id]) || O.byOrder(a,b));
+  const pend = T.filter(t => t.status !== 'done' && !t.ia && !slotted(t) && !inProc(t)).sort(O.byOrder);
   const isLeft = t => { const sl = S.slots[t.id]; return !!((sl && sl.day < planDay) || (t.today && t.today < planDay)); };
   const left = pend.filter(isLeft).sort((a,b) => O.urgRank(a) - O.urgRank(b) || O.byOrder(a,b));
   const rest = pend.filter(t => !isLeft(t) && t.today === planDay);
   const nCol = left.length + rest.length;
   const side = `<section class="col side"><header><h3>Por colocar hoy</h3><span class="count">${nCol}</span></header>`
+    + `<div class="urg u-proc" data-field="unslot" data-proc><h4>⏳ En proceso<span>${procTs.length}</span></h4>
+        <div class="list">${procTs.map(t => O.card(t)).join('') || '<div class="empty">Arrastra aquí lo que ya empezaste y ahora espera a otros</div>'}</div></div>`
     + (!nCol ? '<div class="empty">Elige en <b>Clientes → Tareas</b> lo que vas a hacer hoy (botón «Hoy»).</div>' : '')
     + (left.length ? `<div class="urg u-left" data-field="unslot"><h4>⏪ Pendientes de días anteriores<span>${left.length}</span></h4>
         <div class="list">${left.map(t => O.card(t)).join('')}</div></div>` : '')

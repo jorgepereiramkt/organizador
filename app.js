@@ -609,6 +609,9 @@ function endDrag(){
   if (f === 'client') t.client = v || null;
   // Planificador: meter/sacar la tarea de un bloque del día (no toca la fecha ni ClickUp)
   if (f === 'slot'){ S.slots[t.id] = {day: zone.dataset.day, at: v}; t.today = zone.dataset.day; }
+  // «En proceso»: ya empezada pero ahora depende de otros; sale del bloque y queda apartada a la vista
+  const proc = S.plan && (S.plan.proc = S.plan.proc || {});
+  if (proc){ if (f === 'unslot' && zone.dataset.proc !== undefined){ delete S.slots[t.id]; proc[t.id] = proc[t.id] || today(); } else if (f === 'slot' || f === 'unslot') delete proc[t.id]; }
   if (f === 'unslot' && zone.dataset.urg){ delete S.slots[t.id]; t.priority = zone.dataset.urg; if (!t.today || t.today < today()) t.today = today(); }   // a una urgencia: sale del bloque
   const revisada = t.ia && !zone.dataset.ia;
   if (revisada) t.ia = false;
