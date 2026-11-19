@@ -88,10 +88,11 @@ document.addEventListener('click', e => {
 });
 const adlg = document.createElement('dialog'); adlg.id = 'autoDlg';
 adlg.innerHTML = '<form method="dialog" class="sheet" id="autoForm"></form>'; document.body.appendChild(adlg);
-const aform = adlg.querySelector('form'); let acur = null, anew = false;
-function openAuto(id, isNew){ acur = AU().find(a => a.id === id); if (!acur) return; anew = !!isNew; adraw(); adlg.showModal(); if (anew) aform.querySelector('[data-af=name]').focus(); }
+const aform = adlg.querySelector('form'); let acurId = null, anew = false;
+const AC = () => AU().find(a => a.id === acurId);
+function openAuto(id, isNew){ acurId = id; if (!AC()) return; anew = !!isNew; adraw(); adlg.showModal(); if (anew) aform.querySelector('[data-af=name]').focus(); }
 function adraw(){
-  const a = acur, c = O.client(a.client), sv = c ? (c.services || []) : [];
+  const a = AC() || {}, c = O.client(a.client), sv = c ? (c.services || []) : [];
   const opts = (g, l) => `<optgroup label="${l}">` + S.clients.filter(x => (g === 'mine') === (x.group === 'mine')).map(x => `<option value="${x.id}" ${x.id === a.client ? 'selected' : ''}>${esc(x.name)}</option>`).join('') + '</optgroup>';
   aform.innerHTML = `<h2>${anew ? 'Nueva automatización' : esc(a.name || 'Automatización')}</h2>
     <label>Nombre<input data-af="name" value="${esc(a.name)}" placeholder="Ej.: Informe semanal de Meta a Slack"></label>
@@ -105,12 +106,13 @@ function adraw(){
     <label>Qué hace y cómo funciona<textarea rows="4" data-af="what" placeholder="Qué dispara, qué hace, a quién avisa, qué revisar si falla…">${esc(a.what)}</textarea></label>
     <div class="actions"><button type="button" class="btn danger" data-adel>Borrar</button><span class="sp"></span><button class="btn primary" value="ok">Listo</button></div>`;
 }
-aform.addEventListener('input', e => { const k = e.target.dataset.af; if (!k) return; acur[k] = e.target.value; acur.at = Date.now(); O.save(); });
-aform.addEventListener('change', e => { if (e.target.dataset.af === 'client'){ acur.service = ''; adraw(); } if (e.target.dataset.af === 'where') adraw(); });
-aform.addEventListener('click', e => { if (e.target.closest('[data-adel]') && confirm('¿Borrar esta automatización?')){ A().autos = AU().filter(a => a !== acur); O.save(); adlg.close('del'); } });
+aform.addEventListener('input', e => { const k = e.target.dataset.af, a = AC(); if (!k || !a) return; a[k] = e.target.value; a.at = Date.now(); O.save(); });
+aform.addEventListener('change', e => { if (e.target.dataset.af === 'client' && AC()){ AC().service = ''; adraw(); } if (e.target.dataset.af === 'where') adraw(); });
+aform.addEventListener('click', e => { if (e.target.closest('[data-adel]') && confirm('¿Borrar esta automatización?')){ A().autos = AU().filter(a => a.id !== acurId); O.save(); adlg.close('del'); } });
 adlg.addEventListener('close', () => {
   // una automatización nueva sin nombre ni nada se descarta
-  if (acur && !acur.name.trim() && !acur.where && !acur.what){ A().autos = AU().filter(a => a !== acur); }
+  // y de paso se limpian las vacías que hayan quedado
+  A().autos = AU().filter(a => (a.name || '').trim() || a.where || a.what);
   O.save(); if (S.view === 'ia') O.render();
 });
 adlg.addEventListener('click', e => { if (e.target === adlg) adlg.close(); });
@@ -155,10 +157,11 @@ dlg.id = 'projDlg';
 dlg.innerHTML = '<form method="dialog" class="sheet" id="projForm"></form>';
 document.body.appendChild(dlg);
 const form = dlg.querySelector('form');
-let cur = null;
-function openProj(id){ cur = A().projects.find(p => p.id === id); if (!cur) return; draw(); dlg.showModal(); }
+let curId = null;
+const curP = () => A().projects.find(p => p.id === curId);
+function openProj(id){ curId = id; if (!curP()) return; draw(); dlg.showModal(); }
 function draw(){
-  const p = cur;
+  const p = curP(); if (!p) return;
   form.innerHTML = `<h2>${esc(p.name)}</h2>
     <div class="row"><label>Nombre<input data-pf="name" value="${esc(p.name)}"></label>
       <label>Estado<select data-pf="status">${Object.entries(ST).map(([k, v]) => `<option value="${k}" ${p.status === k ? 'selected' : ''}>${v}</option>`).join('')}</select></label>
@@ -173,11 +176,12 @@ function draw(){
     <div class="actions"><button type="button" class="btn danger" data-pdel>Borrar proyecto</button><span class="sp"></span><button type="button" class="btn" data-pimpl>⚙️ Ya está implementada</button><button class="btn primary" value="ok">Listo</button></div>`;
 }
 form.addEventListener('input', e => {
-  const t = e.target;
+  const t = e.target, cur = curP(); if (!cur) return;
   if (t.dataset.pf){ cur[t.dataset.pf] = t.value; cur.at = Date.now(); O.save(); }
   if (t.dataset.itext !== undefined){ cur.ideas[+t.closest('.idea').dataset.i].text = t.value; O.save(); }
 });
 form.addEventListener('keydown', e => {
+  const cur = curP(); if (!cur) return;
   if (e.target.id === 'ideaNew' && e.key === 'Enter'){
     e.preventDefault(); const v = e.target.value.trim(); if (!v) return;
     cur.ideas = cur.ideas || []; cur.ideas.unshift({id: uid(), text: v, done: false, at: Date.now()}); cur.at = Date.now();
@@ -185,7 +189,7 @@ form.addEventListener('keydown', e => {
   }
 });
 form.addEventListener('click', e => {
-  const row = e.target.closest('.idea');
+  const row = e.target.closest('.idea'), cur = curP(); if (!cur) return;
   if (e.target.closest('[data-idone]')){ const i = cur.ideas[+row.dataset.i]; i.done = !i.done; O.save(); draw(); }
   if (e.target.closest('[data-idel]')){ cur.ideas.splice(+row.dataset.i, 1); O.save(); draw(); }
   if (e.target.closest('[data-pimpl]')){
@@ -195,7 +199,7 @@ form.addEventListener('click', e => {
     AU().push(a); cur.status = 'hecho'; O.save(); dlg.close('ok'); S.iaMode = 'hechas'; O.render(); openAuto(a.id, true); return;
   }
   if (e.target.closest('[data-pdel]') && confirm(`¿Borrar el proyecto «${cur.name}» y sus ideas?`)){
-    A().projects = A().projects.filter(p => p !== cur); O.save(); dlg.close('del');
+    A().projects = A().projects.filter(p => p.id !== curId); O.save(); dlg.close('del');
   }
 });
 dlg.addEventListener('close', () => { if (S.view === 'ia') O.render(); });
