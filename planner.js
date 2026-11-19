@@ -134,6 +134,16 @@ async function connectAccount(hint){
   if (acc) acc.cals = cals; else plan.accounts.push(acc = {email, cals});
   O.save(); clearCache(); return email;
 }
+// Última versión de cada calendario: si Google pide permiso otra vez, se sigue viendo lo último que se leyó
+const snapGet = (email, day) => { const s = ((P().evSnap || {})[email] || {})[day]; return s ? s.evs : []; };
+const snapAt = email => { const d = (P().evSnap || {})[email]; return d ? Math.max(0, ...Object.values(d).map(x => x.at || 0)) : 0; };
+function snapPut(email, day, evs){
+  const all = P().evSnap = P().evSnap || {}, mine = all[email] = all[email] || {};
+  const old = mine[day]; if (old && JSON.stringify(old.evs) === JSON.stringify(evs)) { old.at = Date.now(); return; }
+  mine[day] = {at: Date.now(), evs};
+  const min = O.iso(O.addDays(new Date(), -3)); for (const d in mine) if (d < min) delete mine[d];
+  O.save();
+}
 const clearCache = () => { for (const k in evCache) delete evCache[k]; };
 async function fetchEvents(day){
   const start = O.fromIso(day), end = O.addDays(start, 1);
@@ -141,7 +151,7 @@ async function fetchEvents(day){
   await Promise.all(P().accounts.map(async acc => {
     const key = acc.email + '|' + day;
     if (evCache[key]) return out.push(...evCache[key]);
-    if (!tokenOk(acc.email)) return;
+    if (!tokenOk(acc.email)) return out.push(...snapGet(acc.email, day));
     // si hay puente, las demás cuentas solo se usan para calendarios que el puente no ve
     if (!acc.bridge && P().bridge){ const seenIds = new Set(((P().accounts.find(a => a.bridge) || {}).cals || []).map(c => c.id)); if (acc.cals.filter(c => c.on).every(c => seenIds.has(c.id))) return; }
     if (acc.bridge){
@@ -156,6 +166,7 @@ async function fetchEvents(day){
       evCache[key] = evs; out.push(...evs); return;
     }
     const evs = [];
+    try {
     const viaPuente = new Set(((P().accounts.find(a => a.bridge) || {}).cals || []).map(c => c.id));
     await Promise.all(acc.cals.filter(c => c.on && !viaPuente.has(c.id) && !(P().inbox && P().inbox.calId === c.id)).map(async c => {
       const u = `https://www.googleapis.com/calendar/v3/calendars/${encodeURIComponent(c.id)}/events?singleEvents=true&orderBy=startTime`
@@ -174,7 +185,8 @@ async function fetchEvents(day){
           start: s ? Math.max(0, minutesOfDay(s, day)) : 0, end: en ? Math.min(24*60, minutesOfDay(en, day)) : 0, link: e.htmlLink});
       }
     }));
-    evCache[key] = evs; out.push(...evs);
+    } catch(err){ console.warn('calendario', acc.email, err); return out.push(...snapGet(acc.email, day)); }
+    evCache[key] = evs; snapPut(acc.email, day, evs); out.push(...evs);
   }));
   return out;
 }
@@ -232,7 +244,9 @@ function calStatus(){
   const cubierta = a => !a.bridge && P().bridge && (a.cals || []).filter(c => c.on).every(c => viaP.has(c.id));
   return accs.filter(a => !cubierta(a)).map(a => a.bridge ? `<span class="chip on" title="Calendarios por el puente: sin permisos cada hora">🔗 Google</span>` : tokenOk(a.email)
     ? `<span class="chip on" title="${esc(a.email)}">📅 ${esc(short(a.email))}</span>`
-    : `<button class="chip warn" data-gcal="${esc(a.email)}" title="Google pide confirmar cada hora">↻ ${esc(short(a.email))}</button>`).join('')
+    : snapAt(a.email)
+      ? `<button class="chip" data-gcal="${esc(a.email)}" title="Mostrando la última versión guardada. Toca para actualizar">↻ ${esc(short(a.email))} · ${new Date(snapAt(a.email)).toTimeString().slice(0,5)}</button>`
+      : `<button class="chip warn" data-gcal="${esc(a.email)}" title="Google pide confirmar cada hora">↻ ${esc(short(a.email))}</button>`).join('')
     + `<button class="chip" data-gcal="add" title="Conectar otra cuenta de Google">+ Calendario</button>`;
 }
 O.views.dia = function(){
