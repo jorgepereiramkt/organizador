@@ -24,7 +24,7 @@ const DEVICE = Math.random().toString(36).slice(2, 10);
 const gate = document.getElementById('gate');
 const gateMsg = document.getElementById('gateMsg');
 const gateBtn = document.getElementById('gateBtn');
-const showGate = msg => { gate.hidden = false; gateMsg.textContent = msg || ''; gateBtn.disabled = false; };
+const showGate = msg => { try { localStorage.removeItem('jp-session'); } catch(e){} gate.classList.remove('loading'); gate.hidden = false; gateMsg.textContent = msg || ''; gateBtn.disabled = false; };
 
 gateBtn.addEventListener('click', async () => {
   gateBtn.disabled = true; gateMsg.textContent = 'Abriendo Google…';
@@ -47,7 +47,8 @@ onAuthStateChanged(auth, user => {
   if ((user.email || '').toLowerCase() !== ALLOWED || !user.emailVerified) {
     signOut(auth); showGate('Esta cuenta de Google no tiene acceso.'); return;
   }
-  gate.hidden = true;
+  gate.hidden = true; gate.classList.remove('loading');
+  try { localStorage.setItem('jp-session', '1'); } catch(e){}
   const ref = doc(db, 'users', user.uid);
   window.__cloud = {
     email: user.email,

@@ -805,6 +805,13 @@ setInterval(() => { if (today() !== lastDay){ lastDay = today(); render(); } }, 
 let tt;
 function toast(msg){ const el = $('#toast'); el.textContent = msg; el.classList.add('on'); clearTimeout(tt); tt = setTimeout(() => el.classList.remove('on'), 2200); }
 
+// Al recargar: si ya habías entrado en este dispositivo, la app sale al momento (Google lo confirma por detrás).
+// Si no, se ve la pantalla de carga hasta saber si hay sesión.
+(() => {
+  const g = $('#gate'), h = new Date().getHours();
+  $('#gateHello').textContent = (h < 6 ? 'Buenas noches' : h < 14 ? 'Buenos días' : h < 21 ? 'Buenas tardes' : 'Buenas noches') + ', Jorge';
+  try { if (localStorage.getItem('jp-session') === '1') g.hidden = true; } catch(e){}
+})();
 load();
 S.view = 'clientes'; S.clientMode = 'tareas';   // cada mañana se empieza revisando los clientes
 render(); modeIdle();

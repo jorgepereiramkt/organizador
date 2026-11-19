@@ -6,7 +6,7 @@
 <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' https://www.gstatic.com https://apis.google.com https://accounts.google.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://accounts.google.com; font-src https://fonts.gstatic.com; connect-src https://api.clickup.com https://accounts.google.com https://firestore.googleapis.com https://identitytoolkit.googleapis.com https://securetoken.googleapis.com https://www.googleapis.com https://apis.google.com; frame-src https://organizador-jp.firebaseapp.com https://accounts.google.com; img-src 'self' data: https://lh3.googleusercontent.com https://www.google.com; manifest-src 'self'; base-uri 'none'; form-action 'self'; object-src 'none'">
 <meta name="referrer" content="no-referrer">
 <meta name="robots" content="noindex, nofollow">
-<link rel="manifest" href="manifest.json?v=20261119005752">
+<link rel="manifest" href="manifest.json?v=20261119010030">
 <link rel="icon" href="icon-192.png">
 <link rel="apple-touch-icon" href="icon-180.png">
 <meta name="theme-color" content="#0a0a0b">
@@ -348,6 +348,22 @@ a.btn{display:inline-flex;align-items:center;text-decoration:none;color:var(--te
 .blk.work header b{font-size:13px;color:var(--muted);text-transform:uppercase;letter-spacing:.06em}
 .blk.work .count{color:var(--ok)!important;font-weight:600}
 @media (max-width:760px){ .dayhead{grid-template-columns:auto 1fr;gap:12px} .dayhead .ring{grid-column:2;justify-self:end;margin-top:-8px} .clock{font-size:32px} .trow{grid-template-columns:42px 12px minmax(0,1fr);gap:0 6px} }
+
+/* Pantalla de carga */
+.gate{overflow:hidden}
+.gate .glow{position:absolute;inset:-30%;background:radial-gradient(circle at 50% 45%,rgba(255,107,61,.22),transparent 45%),radial-gradient(circle at 30% 70%,rgba(255,201,61,.10),transparent 40%);animation:drift 8s ease-in-out infinite alternate;pointer-events:none}
+@keyframes drift{to{transform:translate(4%,-3%) scale(1.08)}}
+.gate-box{position:relative}
+.gate .logo.big{width:84px;height:84px;font-size:32px;border-radius:24px;box-shadow:0 20px 60px rgba(255,107,61,.35);animation:pop .7s cubic-bezier(.2,1.4,.4,1) both}
+@keyframes pop{from{transform:scale(.6);opacity:0}}
+.gate h1{font-size:30px;animation:rise .6s .15s both}
+@keyframes rise{from{transform:translateY(10px);opacity:0}}
+.g-bar{width:180px;height:4px;border-radius:9px;background:var(--surface-3);overflow:hidden;margin-top:6px}
+.g-bar span{display:block;width:40%;height:100%;border-radius:9px;background:linear-gradient(90deg,#FFC93D,var(--accent));animation:slide 1.1s ease-in-out infinite}
+@keyframes slide{from{transform:translateX(-110%)}to{transform:translateX(260%)}}
+.gate.loading .g-login{display:none}
+.gate:not(.loading) .g-load,.gate:not(.loading) .g-bar{display:none}
+.gate .g-load{animation:rise .6s .3s both}
 @media (max-width:760px){
   :root{--nav-h:64px}
   .app{padding:10px 12px calc(20px + var(--nav-h) + env(safe-area-inset-bottom))}
@@ -374,12 +390,15 @@ a.btn{display:inline-flex;align-items:center;text-decoration:none;color:var(--te
 </style>
 </head>
 <body>
-<div class="gate" id="gate">
+<div class="gate loading" id="gate">
+  <div class="glow"></div>
   <div class="gate-box">
     <span class="logo big">JP</span>
-    <h1>Organizador</h1>
-    <p>Entra con tu cuenta de Google para ver tus tareas en todos tus dispositivos.</p>
-    <button class="btn primary gbtn" id="gateBtn" type="button">Entrar con Google</button>
+    <h1 id="gateHello">Organizador</h1>
+    <p class="g-load">Preparando tu día…</p>
+    <div class="g-bar"><span></span></div>
+    <p class="g-login">Entra con tu cuenta de Google para ver tus tareas en todos tus dispositivos.</p>
+    <button class="btn primary gbtn g-login" id="gateBtn" type="button">Entrar con Google</button>
     <p class="gate-msg" id="gateMsg"></p>
   </div>
 </div>
@@ -438,11 +457,11 @@ a.btn{display:inline-flex;align-items:center;text-decoration:none;color:var(--te
 
 <div class="toast" id="toast"></div>
 
-<script src="app.js?v=20261119005752"></script>
-<script src="planner.js?v=20261119005752"></script>
-<script src="clients.js?v=20261119005752"></script>
-<script src="quick.js?v=20261119005752"></script>
-<script src="hours.js?v=20261119005752"></script>
-<script type="module" src="cloud.js?v=20261119005752"></script>
+<script src="app.js?v=20261119010030"></script>
+<script src="planner.js?v=20261119010030"></script>
+<script src="clients.js?v=20261119010030"></script>
+<script src="quick.js?v=20261119010030"></script>
+<script src="hours.js?v=20261119010030"></script>
+<script type="module" src="cloud.js?v=20261119010030"></script>
 </body>
 </html>
