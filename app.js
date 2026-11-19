@@ -402,10 +402,15 @@ function visibleTasks(){
 }
 const byOrder = (a,b) => (a.order||0) - (b.order||0);
 
+// Colores por tipo (no por cliente): agencia, mis clientes y sin cliente. Las llamadas tienen el suyo en el Día.
+const GROUP = {agency:{color:'#4F8CFF', label:'Agencia', cls:'g-ag'}, mine:{color:'#3DDC97', label:'Mío', cls:'g-mine'}, none:{color:'#8A8A94', label:'', cls:'g-none'}};
+const groupOf = c => c ? (c.group === 'mine' ? GROUP.mine : GROUP.agency) : GROUP.none;
 function card(t, hide={}){
   const c = client(t.client), done = t.status === 'done', late = !done && t.day && t.day < today();
+  const g = groupOf(c);
   const meta = [];
-  if (!hide.client) meta.push(c ? `<span class="cl" style="--c:${c.color}"><i></i>${esc(c.name)}</span>` : `<span class="cl" style="--c:var(--faint)"><i></i>Sin cliente</span>`);
+  if (g.label) meta.push(`<span class="gb">${g.label}</span>`);
+  if (!hide.client) meta.push(c ? `<span class="cl">${esc(c.name)}</span>` : `<span class="cl">Sin cliente</span>`);
   if (!hide.day && t.day) meta.push(`<span class="${late?'late':''}">${late?'Atrasada · ':''}${dayLabel(t.day)}</span>`);
   if (t.cu && t.listName) meta.push(`<span class="st">${esc(t.listName)}</span>`);
   if (t.priority === 'super' && !done) meta.push('<span class="alta">🔥 Súper urgente</span>');
@@ -413,7 +418,7 @@ function card(t, hide={}){
   if (t.priority === 'baja' && !done) meta.push('<span class="st">Cuando pueda</span>');
   if (!hide.status && t.status !== 'todo' && !done) meta.push(`<span class="st">${STATUS[t.status]}</span>`);
   if (online() && !t.cu && isAgency(t.client)) meta.push('<span class="st">Sin subir a ClickUp</span>');
-  return `<article class="card ${done?'done':''}" data-id="${t.id}" style="--c:${c?c.color:'var(--faint)'}" tabindex="0">
+  return `<article class="card ${g.cls} ${done?'done':''}" data-id="${t.id}" style="--c:${g.color}" tabindex="0">
     <button class="chk" aria-label="${done?'Marcar como pendiente':'Completar'}"></button>
     <div class="body"><p class="tt">${esc(t.title)}</p>${meta.length?`<div class="meta">${meta.join('')}</div>`:''}</div></article>`;
 }
@@ -821,5 +826,5 @@ if (online()) sync(true);
 // Mantener PC y móvil al día: cada 60 s con la app abierta y al volver a ella
 setInterval(() => { if (document.visibilityState === 'visible') sync(true); }, 60000);
 document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') sync(true); });
-window.__org = {S, URG, urgRank, parse, pushCreate, uid, maxOrder, clientLists, online, PALETA, cu, listInfo, norm, isRegTask, applyCloud, cloudEmpty, cloudReady, wipeLocal, toast, views, render, save, card, setToolbar, visibleTasks, client, task, esc, iso, fromIso, addDays, today, dayLabel, DIAS_L, MESES, pad, byOrder};
+window.__org = {S, GROUP, URG, urgRank, parse, pushCreate, uid, maxOrder, clientLists, online, PALETA, cu, listInfo, norm, isRegTask, applyCloud, cloudEmpty, cloudReady, wipeLocal, toast, views, render, save, card, setToolbar, visibleTasks, client, task, esc, iso, fromIso, addDays, today, dayLabel, DIAS_L, MESES, pad, byOrder};
 })();

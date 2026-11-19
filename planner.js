@@ -190,9 +190,10 @@ O.views.dia = function(){
       color = ROUT[it.id] || '#A3A3AD';
       body = `<div class="blk routine" style="--c:${color}"><b>${esc(it.title)}</b><span class="rg">${dur(it.end - it.start)}</span></div>`;
     } else {
-      const c = evClient(it.title); color = c ? c.color : (it.color || '#8B8BFF');
-      body = `<div class="blk event${it.kind === 'free' ? ' free' : ''}" style="--c:${color}"><b>${esc(it.title)}</b>
-        <span class="cal">${c ? esc(c.name) : esc(it.cal || '')} · ${dur(it.end - it.start)}</span></div>`;
+      // Llamadas y reuniones: todas iguales, en morado y con 📞
+      color = '#A78BFA';
+      body = `<div class="blk event call${it.kind === 'free' ? ' free' : ''}" style="--c:${color}"><span class="ico">📞</span><b>${esc(it.title.replace(/^[\u2600-\u27BF\u{1F300}-\u{1FAFF}\s]+/u, ''))}</b>
+        <span class="cal">${dur(it.end - it.start)}</span></div>`;
     }
     tl += `<div class="trow ${st}" style="--c:${color};--p:${pct}%">
       <div class="tcol"><b>${toHM(it.start)}</b><small>${toHM(it.end)}</small></div>
@@ -210,6 +211,7 @@ O.views.dia = function(){
     <div class="clock">${isToday ? `${O.pad(now.getHours())}:${O.pad(now.getMinutes())}` : `${d.getDate()} ${O.MESES[d.getMonth()]}`}</div>
     <div class="jorn"><div class="jbar"><span style="width:${jorn}%"></span></div>
       <small>${isToday ? (nowMin < ws ? `Tu día empieza a las ${plan.workStart}` : quedan ? `${jorn}% del día · quedan ${dur(quedan)}` : 'Día terminado') : 'Planificando otro día'}</small></div>
+    <div class="legend"><span style="--c:${O.GROUP.agency.color}">Agencia</span><span style="--c:${O.GROUP.mine.color}">Mis clientes</span><span style="--c:#A78BFA">Llamadas</span></div>
     <div class="ring" style="--r:${ring}"><b>${hechasHoy}/${hoyTs.length}</b><small>hechas</small></div>
   </div>`;
   // «Por colocar»: TODAS las tareas pendientes que no estén en un bloque de este día, agrupadas por urgencia

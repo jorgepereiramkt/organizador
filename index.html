@@ -6,7 +6,7 @@
 <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' https://www.gstatic.com https://apis.google.com https://accounts.google.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://accounts.google.com; font-src https://fonts.gstatic.com; connect-src https://api.clickup.com https://accounts.google.com https://firestore.googleapis.com https://identitytoolkit.googleapis.com https://securetoken.googleapis.com https://www.googleapis.com https://apis.google.com; frame-src https://organizador-jp.firebaseapp.com https://accounts.google.com; img-src 'self' data: https://lh3.googleusercontent.com https://www.google.com; manifest-src 'self'; base-uri 'none'; form-action 'self'; object-src 'none'">
 <meta name="referrer" content="no-referrer">
 <meta name="robots" content="noindex, nofollow">
-<link rel="manifest" href="manifest.json?v=20261119010030">
+<link rel="manifest" href="manifest.json?v=20261119010211">
 <link rel="icon" href="icon-192.png">
 <link rel="apple-touch-icon" href="icon-180.png">
 <meta name="theme-color" content="#0a0a0b">
@@ -364,6 +364,20 @@ a.btn{display:inline-flex;align-items:center;text-decoration:none;color:var(--te
 .gate.loading .g-login{display:none}
 .gate:not(.loading) .g-load,.gate:not(.loading) .g-bar{display:none}
 .gate .g-load{animation:rise .6s .3s both}
+
+/* Tipos: agencia / mis clientes / llamadas */
+.card{background:color-mix(in srgb,var(--c) 16%,var(--surface-2))}
+.meta .gb{font:700 10px var(--body);letter-spacing:.06em;text-transform:uppercase;color:#0a0a0b;background:var(--c);padding:2px 7px;border-radius:99px}
+.card .meta .cl{color:color-mix(in srgb,var(--c) 55%,#fff);font-weight:600}
+.blk.call{background:repeating-linear-gradient(135deg,color-mix(in srgb,var(--c) 22%,var(--surface)) 0 12px,color-mix(in srgb,var(--c) 16%,var(--surface)) 12px 24px);border:1px solid color-mix(in srgb,var(--c) 55%,transparent);border-left:5px solid var(--c);border-radius:999px;padding:9px 16px}
+.blk.call .ico{font-size:15px}
+.blk.call b{color:#fff}
+.blk.call .cal{color:color-mix(in srgb,var(--c) 70%,#fff)!important}
+.dayhead{grid-template-columns:auto 1fr auto auto}
+.legend{display:flex;flex-direction:column;gap:5px;font-size:12px;color:var(--muted)}
+.legend span{display:flex;align-items:center;gap:7px}
+.legend span::before{content:"";width:12px;height:12px;border-radius:4px;background:var(--c)}
+@media (max-width:760px){ .dayhead{grid-template-columns:auto 1fr} .legend{grid-column:1/-1;flex-direction:row;flex-wrap:wrap;gap:12px} }
 @media (max-width:760px){
   :root{--nav-h:64px}
   .app{padding:10px 12px calc(20px + var(--nav-h) + env(safe-area-inset-bottom))}
@@ -457,11 +471,11 @@ a.btn{display:inline-flex;align-items:center;text-decoration:none;color:var(--te
 
 <div class="toast" id="toast"></div>
 
-<script src="app.js?v=20261119010030"></script>
-<script src="planner.js?v=20261119010030"></script>
-<script src="clients.js?v=20261119010030"></script>
-<script src="quick.js?v=20261119010030"></script>
-<script src="hours.js?v=20261119010030"></script>
-<script type="module" src="cloud.js?v=20261119010030"></script>
+<script src="app.js?v=20261119010211"></script>
+<script src="planner.js?v=20261119010211"></script>
+<script src="clients.js?v=20261119010211"></script>
+<script src="quick.js?v=20261119010211"></script>
+<script src="hours.js?v=20261119010211"></script>
+<script type="module" src="cloud.js?v=20261119010211"></script>
 </body>
 </html>
