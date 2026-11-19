@@ -288,15 +288,17 @@ O.views.dia = function(){
       const hechas = ts.filter(t => t.status === 'done').length;
       color = 'var(--accent)';
       // Dos apartados: Top 3 (sí o sí) y «Échale huevos» (si da tiempo). Las que no tienen apartado llenan el Top 3 por orden.
+      const quick = ts.filter(t => S.slots[t.id].tier === 'quick');
       const top = ts.filter(t => S.slots[t.id].tier === 'top');
       for (const t of ts) if (!S.slots[t.id].tier && top.length < 3) top.push(t);
       top.sort(O.byOrder);
-      const extra = ts.filter(t => !top.includes(t));
+      const extra = ts.filter(t => !top.includes(t) && !quick.includes(t));
       const zone = (tier, list, title, emptyTxt) => `<div class="wzone z-${tier}" data-field="slot" data-value="${it.at}" data-day="${planDay}" data-tier="${tier}">
           <h5>${title}<span>${list.filter(t => t.status === 'done').length}/${list.length}</span></h5>
           <div class="list">${list.map(t => O.card(t)).join('') || `<div class="empty">${emptyTxt}</div>`}</div></div>`;
       body = `<section class="blk work">
         <header><b>Trabajo</b><span class="rg">${dur(it.end - it.start)}</span>${ts.length ? `<span class="count">${hechas}/${ts.length} ✓</span>` : ''}</header>
+        ${zone('quick', quick, '⚡ Rápidas · menos de 5 min', 'Quítate primero lo que se hace en menos de 5 min')}
         ${zone('top', top, '🎯 Top 3 · sí o sí', 'Lo que tienes que sacar sí o sí (máx. 3)')}
         ${zone('extra', extra, '💪 Échale huevos · saca también estas', 'Si te da tiempo, también estas')}</section>`;
     } else if (it.kind === 'routine'){
