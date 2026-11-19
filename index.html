@@ -6,7 +6,7 @@
 <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' https://www.gstatic.com https://apis.google.com https://accounts.google.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://accounts.google.com; font-src https://fonts.gstatic.com; connect-src https://api.clickup.com https://accounts.google.com https://firestore.googleapis.com https://identitytoolkit.googleapis.com https://securetoken.googleapis.com https://www.googleapis.com https://apis.google.com; frame-src https://organizador-jp.firebaseapp.com https://accounts.google.com; img-src 'self' data: https://lh3.googleusercontent.com https://www.google.com; manifest-src 'self'; base-uri 'none'; form-action 'self'; object-src 'none'">
 <meta name="referrer" content="no-referrer">
 <meta name="robots" content="noindex, nofollow">
-<link rel="manifest" href="manifest.json?v=20261119015819">
+<link rel="manifest" href="manifest.json?v=20261119020953">
 <link rel="icon" href="icon-192.png">
 <link rel="apple-touch-icon" href="icon-180.png">
 <meta name="theme-color" content="#0a0a0b">
@@ -490,6 +490,67 @@ a.btn{display:inline-flex;align-items:center;text-decoration:none;color:var(--te
 .idea{display:flex;gap:8px;align-items:flex-start;background:var(--surface-2);border-radius:10px;padding:8px 10px}
 .idea textarea{flex:1;background:transparent;border:0;resize:vertical;min-height:22px;padding:0;font-size:13.5px}
 .idea .mchk{margin-top:2px}
+
+/* Horas por mes */
+.hhead .check{flex:1;min-width:240px;color:var(--text)}
+.hhead .btn{height:32px;font-size:12.5px}
+.hrow2{display:grid;grid-template-columns:minmax(130px,1.2fr) 108px 108px minmax(120px,2fr) 80px;gap:10px;align-items:center;padding:10px 6px;border-bottom:1px solid var(--line)}
+.hrow2 .hn{display:flex;align-items:center;gap:8px;font-weight:600}
+.hrow2 .hn i{width:10px;height:10px;border-radius:50%;background:var(--c);flex:none}
+.hin{display:flex;align-items:center;gap:5px;font-size:11.5px;color:var(--muted)}
+.hin input{width:54px;background:var(--bg);border:1px solid var(--line);border-radius:8px;padding:6px;color:var(--text);font-size:14px;text-align:center}
+.hin input:focus{border-color:var(--accent);outline:none}
+.hreg .bar{height:8px;border-radius:9px;background:var(--surface-3);overflow:hidden}
+.hreg .bar span{display:block;height:100%;background:var(--c)}
+.hreg small{font-size:11.5px;color:var(--muted)}
+.hrow2 .hoy{color:var(--accent);font-variant-numeric:tabular-nums;text-align:right;font-size:13px}
+.hrow2 .reg{grid-column:1/-1;font-size:12px;color:var(--muted);margin-top:-4px}
+.hrow2 .reg a{color:var(--muted)}
+/* Propuestas de videollamadas */
+.iagrp{margin:4px 0 6px;font:700 12px var(--body);text-transform:uppercase;letter-spacing:.06em;color:#C4B5FD}
+.callb{font:700 10.5px var(--body);padding:2px 8px;border-radius:99px;background:#ff5a5a;color:#fff}
+/* ---------- Móvil ---------- */
+@media (max-width:760px){
+  .app{padding:8px 10px calc(16px + var(--nav-h) + env(safe-area-inset-bottom))}
+  .top{gap:6px}
+  .top .pill{display:none}
+  .filters{gap:5px}
+  .filters .chip{padding:6px 11px;font-size:13px}
+  .hello{margin:8px 0 10px;padding:14px}
+  .hello h2{font-size:20px}
+  .hello p{font-size:13.5px}
+  .hello .qbtn{height:50px;font-size:16px}
+  .toolbar{gap:8px;margin:6px 0 10px}
+  .toolbar h2{font-size:18px}
+  .toolbar .sub{flex-basis:100%;order:3;font-size:12.5px}
+  .modes{width:100%;overflow-x:auto}
+  .modes .chip{flex:none}
+  .board.grid{gap:14px}
+  .board.grid .col{padding:14px 12px 10px}
+  .card{padding:12px 10px}
+  .card .tt{font-size:15px}
+  .pick{height:36px;padding:0 14px;font-size:13px}
+  .chk{width:24px;height:24px}
+  .iarev{padding:12px}
+  .iarev-l{grid-template-columns:1fr}
+  .iarev .card{flex-wrap:wrap}
+  .iaact{width:100%;justify-content:flex-end;margin:6px 0 0}
+  .iaact .btn{height:38px}
+  .dayhead{padding:12px}
+  .legend{display:none}
+  .blk.morning ul{grid-template-columns:1fr}
+  .blk.morning header{flex-wrap:wrap}
+  .blk.call{border-radius:14px}
+  .hrow2{grid-template-columns:1fr 1fr;gap:8px}
+  .hrow2 .hn,.hrow2 .hreg{grid-column:1/-1}
+  .hrow2 .hoy{text-align:left}
+  .ia-grid{grid-template-columns:1fr}
+  .sheet .row{flex-wrap:wrap}
+  .sheet .row label{min-width:140px}
+  dialog{max-height:calc(100dvh - 20px)}
+  .sheet{padding:16px}
+  .tabs button{font-size:11.5px}
+}
 @media (max-width:760px){
   :root{--nav-h:64px}
   .app{padding:10px 12px calc(20px + var(--nav-h) + env(safe-area-inset-bottom))}
@@ -566,6 +627,8 @@ a.btn{display:inline-flex;align-items:center;text-decoration:none;color:var(--te
   <h2>Tarea</h2>
   <label>Título<textarea name="title" rows="2" required></textarea></label>
   <div class="row"><label>Cliente<select name="client"></select></label><label>Día<input type="date" name="day"></label></div>
+  <div class="row"><label class="check"><input type="checkbox" name="today"> Para hoy</label>
+    <label>Colocar hoy en el bloque<select name="slot"></select></label></div>
   <div class="row">
     <label>Estado<select name="status"><option value="todo">Por hacer</option><option value="doing">En curso</option><option value="review">En revisión</option><option value="done">Hecho</option></select></label>
     <label>Urgencia<select name="priority"><option value="super">🔥 Súper urgente</option><option value="alta">🔴 Urgente</option><option value="normal">🟡 Media</option><option value="baja">🟢 Cuando pueda</option></select></label>
@@ -588,12 +651,12 @@ a.btn{display:inline-flex;align-items:center;text-decoration:none;color:var(--te
 
 <div class="toast" id="toast"></div>
 
-<script src="app.js?v=20261119015819"></script>
-<script src="planner.js?v=20261119015819"></script>
-<script src="clients.js?v=20261119015819"></script>
-<script src="quick.js?v=20261119015819"></script>
-<script src="ia.js?v=20261119015819"></script>
-<script src="hours.js?v=20261119015819"></script>
-<script type="module" src="cloud.js?v=20261119015819"></script>
+<script src="app.js?v=20261119020953"></script>
+<script src="planner.js?v=20261119020953"></script>
+<script src="clients.js?v=20261119020953"></script>
+<script src="quick.js?v=20261119020953"></script>
+<script src="ia.js?v=20261119020953"></script>
+<script src="hours.js?v=20261119020953"></script>
+<script type="module" src="cloud.js?v=20261119020953"></script>
 </body>
 </html>

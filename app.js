@@ -427,7 +427,7 @@ function card(t, hide={}){
   if (!done && !hide.urg){ const u = URG[t.priority] ? t.priority : 'normal'; meta.unshift(`<span class="ub u-${u}">${URG[u].icon} ${URG[u].label}</span>`); }
   if (!hide.status && t.status !== 'todo' && !done) meta.push(`<span class="st">${STATUS[t.status]}</span>`);
   if (online() && !t.cu && isAgency(t.client)) meta.push('<span class="st">Sin subir a ClickUp</span>');
-  if (t.ia) meta.unshift('<span class="iab">🤖 IA · revisa</span>');
+  if (t.ia) meta.unshift(t.src === 'call' ? `<span class="callb">📞 ${esc(t.meeting || 'Videollamada')}</span>` : '<span class="iab">🤖 IA · revisa</span>');
   return `<article class="card ${g.cls} ${done?'done':''} ${t.ia?'ia':''}" data-id="${t.id}" style="--c:${clientColor(c)};--g:${g.color}" tabindex="0">
     <button class="chk" aria-label="${done?'Marcar como pendiente':'Completar'}"></button>
     <div class="body"><p class="tt">${esc(t.title)}</p>${meta.length?`<div class="meta">${meta.join('')}</div>`:''}</div>
@@ -497,7 +497,10 @@ const views = {
     if (iaT.length && !hoyMode){
       html += `<div class="iarev"><div class="iarev-h"><b>🤖 Revisa las tareas que ha detectado la IA</b><span>${iaT.length}</span>
         <button class="btn" data-iaall>Aprobar todas</button></div>
-        <div class="iarev-l">${iaT.map(t => card(t, {}).replace('</article>', `<div class="iaact"><button class="btn primary" data-iaok>✓ Aprobar</button><button class="btn" data-iano title="Descartar">✕</button></div></article>`)).join('')}</div>
+        ${[['call', '📞 Propuestas de tus videollamadas'], ['voz', '🎙️ Lo que me has mandado']].map(([k, lbl]) => {
+          const ts = iaT.filter(t => (t.src === 'call') === (k === 'call'));
+          return ts.length ? `<div class="iagrp">${lbl} · ${ts.length}</div><div class="iarev-l">${ts.map(t => card(t, {}).replace('</article>', `<div class="iaact"><button class="btn primary" data-iaok>✓ Aprobar</button><button class="btn" data-iano title="Descartar">✕</button></div></article>`)).join('')}</div>` : '';
+        }).join('')}
         <p class="iahint">Toca una tarea para corregir el texto, el cliente o la urgencia antes de aprobarla.</p></div>`;
     }
     if (hoyMode && !nHoy) html += '<div class="empty big">Aún no has elegido nada para hoy. En «Tareas», pulsa <b>Hoy</b> en las que vayas a hacer.</div>';
@@ -692,6 +695,11 @@ function openEditor(id){
   edForm.title.value = t.title; edForm.client.innerHTML = clientOptions(t.client);
   edForm.day.value = t.day || ''; edForm.status.value = t.status; edForm.priority.value = t.priority;
   const link = $('#edLink'); link.hidden = !t.url; if (t.url) link.href = t.url;
+  // Para hoy + colocar en un bloque de hoy (sin arrastrar, cómodo en el móvil)
+  edForm.today.checked = t.today === today();
+  const blocks = window.__org.todayBlocks ? window.__org.todayBlocks() : [];
+  const sl = S.slots[t.id];
+  edForm.slot.innerHTML = '<option value="">— Sin colocar —</option>' + blocks.map(b => `<option value="${b.at}" ${sl && sl.day === today() && sl.at === b.at ? 'selected' : ''}>${b.label}</option>`).join('');
   ed.showModal();
 }
 ed.addEventListener('close', () => {
@@ -705,6 +713,8 @@ ed.addEventListener('close', () => {
   t.title = edForm.title.value.trim() || t.title; t.client = edForm.client.value || null;
   t.day = edForm.day.value || null; t.priority = edForm.priority.value;
   if (edForm.status.value !== t.status) setStatus(t, edForm.status.value);
+  if (edForm.slot.value){ S.slots[t.id] = {day: today(), at: edForm.slot.value}; t.today = today(); }
+  else { if (S.slots[t.id] && S.slots[t.id].day === today()) delete S.slots[t.id]; t.today = edForm.today.checked ? today() : (t.today === today() ? null : t.today); }
   const revisada = !!t.ia; t.ia = false;
   save(); render();
   if (revisada) pushCreate(t); else afterChange(t, was);

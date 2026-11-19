@@ -328,7 +328,10 @@ function parseInbox(title, desc){
   if (!cl){ const p = O.parse(title)[0]; cl = p && p.client ? O.client(p.client) : null; }
   const ur = O.norm(get('urgencia'));
   const priority = /super|urgentisim|critic/.test(ur) ? 'super' : /urgent/.test(ur) ? 'alta' : /media|normal/.test(ur) ? 'normal' : 'baja';
-  return {id: O.uid(), title, client: cl ? cl.id : null, day: null, status: 'todo', priority, order: O.maxOrder() + 1, doneAt: null, ia: true, iaNote: get('nota')};
+  const origen = O.norm(get('origen'));
+  const call = /fathom|reunion|videollamada|llamada|clickup/.test(origen);
+  return {id: O.uid(), title, client: cl ? cl.id : null, day: null, status: 'todo', priority, order: O.maxOrder() + 1, doneAt: null, ia: true,
+    iaNote: get('nota'), src: call ? 'call' : 'voz', meeting: call ? get('reunion') || get('reunión') : ''};
 }
 async function importDrive(ib){
   const tk = tokens[ib.email + '|drive'];
@@ -359,6 +362,8 @@ async function importDrive(ib){
   importing = false;
 }
 O.importInbox = importInbox;
+// Bloques de trabajo de hoy (para colocar tareas desde el editor, sin arrastrar)
+O.todayBlocks = () => buildDay(O.today(), planDay === O.today() ? lastEvents : []).filter(i => i.kind === 'work').map(b => ({at: b.at, label: `${toHM(b.start)} – ${toHM(b.end)}`}));
 O.connectDriveInbox = connectDriveInbox;
 O.inboxStatus = () => { const ib = P().inbox; if (!ib || ib.type !== 'drive') return null; const tk = tokens[ib.email + '|drive']; return {email: ib.email, ok: !!(tk && tk.exp > Date.now() + 60e3)}; };
 async function refresh(){
