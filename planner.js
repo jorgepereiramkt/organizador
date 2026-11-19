@@ -314,7 +314,22 @@ O.views.dia = function(){
     tl = `<div class="build-empty"><b>🧱 Monta tus bloques de hoy</b><span>Arrastra bloques de trabajo a las horas que quieras y estíralos. Luego colocas tus tareas dentro.</span><button class="btn primary" data-buildday>Montar bloques</button></div>` + tl;
   // Cabecera del día: reloj, jornada y contador de tareas
   const plan = P(), ws = toMin(plan.workStart), we = Math.max(toMin(plan.workEnd), ...items.map(i => i.end).filter(e => e <= 24 * 60));
-  const jorn = isToday ? Math.max(0, Math.min(100, Math.round((nowMin - ws) / (we - ws) * 100))) : 0;
+  // Barra: tiempo de los bloques de trabajo (total, consumido y lo que queda)
+  const wTot = works.reduce((s, w) => s + (w.end - w.start), 0);
+  const wDone = isToday ? works.reduce((s, w) => s + Math.max(0, Math.min(nowMin, w.end) - w.start), 0) : 0;
+  const jorn = wTot ? Math.round(wDone / wTot * 100) : 0;
+  const nextW = works.find(w => w.end > nowMin);
+  const jornTxt = !wTot ? 'Aún no tienes bloques de trabajo hoy'
+    : !isToday ? `${dur(wTot)} de trabajo planificado`
+    : !wDone ? `${dur(wTot)} de trabajo hoy · empiezas a las ${toHM(works[0].start)}`
+    : wDone >= wTot ? `Bloques de trabajo terminados · ${dur(wTot)} hechas 💪`
+    : `<b>${dur(wDone)}</b> de ${dur(wTot)} de trabajo · ${jorn}% · te quedan ${dur(wTot - wDone)}${nextW && nextW.start > nowMin ? ` · siguiente bloque a las ${toHM(nextW.start)}` : ''}`;
+  // Reuniones del día en una fila
+  const calls = items.filter(i => i.kind === 'event' && i.isCall).sort((a,b) => a.start - b.start);
+  const mtgRow = `<div class="mtgs">${calls.length ? calls.map(c => {
+      const s = !isToday ? '' : nowMin >= c.end ? 'past' : nowMin >= c.start ? 'now' : '';
+      return `<span class="mtg ${s}" title="${esc(c.title)} · ${toHM(c.start)}–${toHM(c.end)}"><b>📞 ${toHM(c.start)}</b>${esc(c.title)}</span>`;
+    }).join('') : '<span class="mtg none">Sin reuniones hoy</span>'}</div>`;
   const hoyTs = T.filter(t => slotted(t));
   const hechasHoy = hoyTs.filter(t => t.status === 'done').length;
   const quedan = isToday ? Math.max(0, we - nowMin) : 0;
@@ -322,9 +337,10 @@ O.views.dia = function(){
   const head = `<div class="dayhead">
     <div class="clock">${isToday ? `${O.pad(now.getHours())}:${O.pad(now.getMinutes())}` : `${d.getDate()} ${O.MESES[d.getMonth()]}`}</div>
     <div class="jorn"><div class="jbar"><span style="width:${jorn}%"></span></div>
-      <small>${isToday ? (nowMin < ws ? `Tu día empieza a las ${plan.workStart}` : quedan ? `${jorn}% del día · quedan ${dur(quedan)}` : 'Día terminado') : 'Planificando otro día'}</small></div>
+      <small>${jornTxt}</small></div>
     <div class="legend"><span style="--c:${O.GROUP.agency.color}">Agencia</span><span style="--c:${O.GROUP.mine.color}">Mis clientes</span><span style="--c:#A78BFA">Llamadas</span></div>
     <div class="ring" style="--r:${ring}"><b>${hechasHoy}/${hoyTs.length}</b><small>hechas</small></div>
+    ${mtgRow}
   </div>`;
   // «Por colocar»: solo las tareas marcadas para este día (las eliges en Clientes → Tareas) que aún no están en un bloque
   const procMap = P().proc || {}, inProc = t => !!procMap[t.id];

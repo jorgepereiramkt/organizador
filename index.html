@@ -6,7 +6,7 @@
 <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' https://www.gstatic.com https://apis.google.com https://accounts.google.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://accounts.google.com; font-src https://fonts.gstatic.com; connect-src https://api.clickup.com https://script.google.com https://script.googleusercontent.com https://accounts.google.com https://firestore.googleapis.com https://identitytoolkit.googleapis.com https://securetoken.googleapis.com https://www.googleapis.com https://apis.google.com; frame-src https://organizador-jp.firebaseapp.com https://accounts.google.com; img-src 'self' data: https://lh3.googleusercontent.com https://www.google.com; manifest-src 'self'; base-uri 'none'; form-action 'self'; object-src 'none'">
 <meta name="referrer" content="no-referrer">
 <meta name="robots" content="noindex, nofollow">
-<link rel="manifest" href="manifest.json?v=20261119112037">
+<link rel="manifest" href="manifest.json?v=20261119113338">
 <link rel="icon" href="icon-192.png">
 <link rel="apple-touch-icon" href="icon-180.png">
 <meta name="theme-color" content="#0a0a0b">
@@ -327,6 +327,14 @@ a.btn{display:inline-flex;align-items:center;text-decoration:none;color:var(--te
 .jbar{height:12px;border-radius:99px;background:var(--surface-3);overflow:hidden}
 .jbar span{display:block;height:100%;border-radius:99px;background:linear-gradient(90deg,#FFC93D,var(--accent))}
 .jorn small{color:var(--muted);font-size:13px}
+.jorn small b{color:var(--text);font-weight:600}
+.mtgs{grid-column:1/-1;display:flex;gap:8px;overflow-x:auto;scrollbar-width:none;padding-top:10px;border-top:1px solid var(--line)}
+.mtgs::-webkit-scrollbar{display:none}
+.mtg{flex:0 0 auto;display:inline-flex;gap:7px;align-items:center;max-width:280px;padding:6px 12px;border-radius:999px;background:color-mix(in srgb,#A78BFA 13%,transparent);font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.mtg b{color:#E5484D;font-weight:700;font-variant-numeric:tabular-nums}
+.mtg.past{opacity:.45}
+.mtg.now{box-shadow:0 0 0 2px var(--accent)}
+.mtg.none{background:none;color:var(--faint);padding-left:0}
 .ring{--r:0;width:66px;height:66px;border-radius:50%;display:grid;place-content:center;text-align:center;
   background:radial-gradient(closest-side,var(--surface) 76%,transparent 78%),conic-gradient(var(--ok) calc(var(--r)*1%),var(--surface-3) 0)}
 .ring b{font:700 17px/1 var(--head)}
@@ -845,12 +853,12 @@ html[data-theme=light] .jplogo .lg-l{display:block}
 
 <div class="toast" id="toast"></div>
 
-<script src="app.js?v=20261119112037"></script>
-<script src="planner.js?v=20261119112037"></script>
-<script src="clients.js?v=20261119112037"></script>
-<script src="quick.js?v=20261119112037"></script>
-<script src="ia.js?v=20261119112037"></script>
-<script src="hours.js?v=20261119112037"></script>
-<script type="module" src="cloud.js?v=20261119112037"></script>
+<script src="app.js?v=20261119113338"></script>
+<script src="planner.js?v=20261119113338"></script>
+<script src="clients.js?v=20261119113338"></script>
+<script src="quick.js?v=20261119113338"></script>
+<script src="ia.js?v=20261119113338"></script>
+<script src="hours.js?v=20261119113338"></script>
+<script type="module" src="cloud.js?v=20261119113338"></script>
 </body>
 </html>
