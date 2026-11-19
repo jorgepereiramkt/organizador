@@ -225,17 +225,14 @@ O.views.dia = function(){
     <div class="legend"><span style="--c:${O.GROUP.agency.color}">Agencia</span><span style="--c:${O.GROUP.mine.color}">Mis clientes</span><span style="--c:#A78BFA">Llamadas</span></div>
     <div class="ring" style="--r:${ring}"><b>${hechasHoy}/${hoyTs.length}</b><small>hechas</small></div>
   </div>`;
-  // «Por colocar»: TODAS las tareas pendientes que no estén en un bloque de este día, agrupadas por urgencia
-  const pend = T.filter(t => t.status !== 'done' && !slotted(t)).sort(O.byOrder);
-  // Las que estaban en un bloque de un día anterior y no se marcaron como hechas: arriba del todo
-  const isLeft = t => { const sl = S.slots[t.id]; return !!(sl && sl.day < planDay); };
-  const left = pend.filter(t => isLeft(t) && !t.ia).sort((a,b) => O.urgRank(a) - O.urgRank(b) || O.byOrder(a,b));
-  const rest = pend.filter(t => !isLeft(t) && !t.ia);
-  const iaT = pend.filter(t => t.ia);
-  const side = `<section class="col side"><header><h3>Por colocar</h3><span class="count">${pend.length}</span></header>`
-    + (iaT.length ? `<div class="urg u-ia" data-field="unslot" data-ia="1"><h4>🤖 Por revisar (IA)<span>${iaT.length}</span></h4>
-        <p class="iahint">Ábrelas para corregir, o arrástralas a una urgencia o a un bloque.</p>
-        <div class="list">${iaT.map(t => O.card(t)).join('')}</div></div>` : '')
+  // «Por colocar»: solo las tareas marcadas para este día (las eliges en Clientes → Tareas) que aún no están en un bloque
+  const pend = T.filter(t => t.status !== 'done' && !t.ia && !slotted(t)).sort(O.byOrder);
+  const isLeft = t => { const sl = S.slots[t.id]; return !!((sl && sl.day < planDay) || (t.today && t.today < planDay)); };
+  const left = pend.filter(isLeft).sort((a,b) => O.urgRank(a) - O.urgRank(b) || O.byOrder(a,b));
+  const rest = pend.filter(t => !isLeft(t) && t.today === planDay);
+  const nCol = left.length + rest.length;
+  const side = `<section class="col side"><header><h3>Por colocar hoy</h3><span class="count">${nCol}</span></header>`
+    + (!nCol ? '<div class="empty">Elige en <b>Clientes → Tareas</b> lo que vas a hacer hoy (botón «Hoy»).</div>' : '')
     + (left.length ? `<div class="urg u-left" data-field="unslot"><h4>⏪ Pendientes de días anteriores<span>${left.length}</span></h4>
         <div class="list">${left.map(t => O.card(t)).join('')}</div></div>` : '')
     + Object.entries(O.URG).map(([k, u]) => {

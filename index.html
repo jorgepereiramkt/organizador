@@ -6,7 +6,7 @@
 <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' https://www.gstatic.com https://apis.google.com https://accounts.google.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://accounts.google.com; font-src https://fonts.gstatic.com; connect-src https://api.clickup.com https://accounts.google.com https://firestore.googleapis.com https://identitytoolkit.googleapis.com https://securetoken.googleapis.com https://www.googleapis.com https://apis.google.com; frame-src https://organizador-jp.firebaseapp.com https://accounts.google.com; img-src 'self' data: https://lh3.googleusercontent.com https://www.google.com; manifest-src 'self'; base-uri 'none'; form-action 'self'; object-src 'none'">
 <meta name="referrer" content="no-referrer">
 <meta name="robots" content="noindex, nofollow">
-<link rel="manifest" href="manifest.json?v=20261119011309">
+<link rel="manifest" href="manifest.json?v=20261119011707">
 <link rel="icon" href="icon-192.png">
 <link rel="apple-touch-icon" href="icon-180.png">
 <meta name="theme-color" content="#0a0a0b">
@@ -434,6 +434,20 @@ a.btn{display:inline-flex;align-items:center;text-decoration:none;color:var(--te
 .iahint{margin:0 2px 8px;font-size:11.5px;color:var(--muted)}
 .blk.morning header .mall{margin-left:8px;height:30px;padding:0 12px;font-size:12.5px;border-color:rgba(255,201,61,.6);color:#FFC93D;background:transparent}
 .blk.morning header .mall.on{background:#FFC93D;color:#0a0a0b}
+
+/* Hoy e IA */
+.pick{flex:none;align-self:center;margin-left:6px;height:30px;padding:0 11px;border-radius:99px;border:1px solid var(--line);color:var(--muted);font:600 12px var(--body);white-space:nowrap}
+.pick:hover{border-color:var(--accent);color:var(--accent)}
+.pick.on{background:var(--accent);border-color:var(--accent);color:#0a0a0b}
+.iarev{margin:6px 0 18px;padding:14px 16px;border-radius:16px;background:rgba(167,139,250,.10);border:1px solid rgba(167,139,250,.5)}
+.iarev-h{display:flex;align-items:center;gap:10px;margin-bottom:10px}
+.iarev-h b{font:700 16px var(--head)}
+.iarev-h span{color:#C4B5FD;font-weight:700}
+.iarev-h .btn{margin-left:auto;height:32px;font-size:12.5px}
+.iarev-l{display:grid;grid-template-columns:repeat(auto-fill,minmax(320px,1fr));gap:10px}
+.iaact{display:flex;gap:6px;align-self:center;margin-left:6px}
+.iaact .btn{height:32px;padding:0 12px;font-size:12.5px}
+.empty.big{padding:28px;font-size:14px;margin-bottom:16px}
 @media (max-width:760px){
   :root{--nav-h:64px}
   .app{padding:10px 12px calc(20px + var(--nav-h) + env(safe-area-inset-bottom))}
@@ -531,11 +545,11 @@ a.btn{display:inline-flex;align-items:center;text-decoration:none;color:var(--te
 
 <div class="toast" id="toast"></div>
 
-<script src="app.js?v=20261119011309"></script>
-<script src="planner.js?v=20261119011309"></script>
-<script src="clients.js?v=20261119011309"></script>
-<script src="quick.js?v=20261119011309"></script>
-<script src="hours.js?v=20261119011309"></script>
-<script type="module" src="cloud.js?v=20261119011309"></script>
+<script src="app.js?v=20261119011707"></script>
+<script src="planner.js?v=20261119011707"></script>
+<script src="clients.js?v=20261119011707"></script>
+<script src="quick.js?v=20261119011707"></script>
+<script src="hours.js?v=20261119011707"></script>
+<script type="module" src="cloud.js?v=20261119011707"></script>
 </body>
 </html>

@@ -428,7 +428,8 @@ function card(t, hide={}){
   if (t.ia) meta.unshift('<span class="iab">🤖 IA · revisa</span>');
   return `<article class="card ${g.cls} ${done?'done':''} ${t.ia?'ia':''}" data-id="${t.id}" style="--c:${clientColor(c)};--g:${g.color}" tabindex="0">
     <button class="chk" aria-label="${done?'Marcar como pendiente':'Completar'}"></button>
-    <div class="body"><p class="tt">${esc(t.title)}</p>${meta.length?`<div class="meta">${meta.join('')}</div>`:''}</div></article>`;
+    <div class="body"><p class="tt">${esc(t.title)}</p>${meta.length?`<div class="meta">${meta.join('')}</div>`:''}</div>
+    ${hide.pick && !done ? `<button class="pick${t.today === today() ? ' on' : ''}" data-pick aria-label="Para hoy" title="${t.today === today() ? 'Quitar de hoy' : 'Hacer hoy'}">${t.today === today() ? '✓ Hoy' : 'Hoy'}</button>` : ''}</article>`;
 }
 function column({title, sub='', field, value='', tasks, hide, cls='', dot, undone=false, empty='Arrastra aquí', add, byUrg}){
   const listHtml = !byUrg ? tasks.map(t => card(t, hide)).join('') : Object.entries(URG).map(([k, u]) => {
@@ -482,12 +483,25 @@ const views = {
       column({title:v, field:'status', value:k, tasks:T.filter(x => x.status === k).sort(byOrder), hide:{status:true}})).join('') + '</div>';
   },
   clientes(){
-    const T = visibleTasks();
-    setToolbar('Clientes', 'tareas pendientes de cada uno', '', 'Arrastra para cambiar de cliente');
+    const all = visibleTasks(), hoyMode = S.clientMode === 'hoy';
+    const iaT = all.filter(t => t.ia && t.status !== 'done');
+    // En «Tareas hoy» solo las marcadas para hoy (y las hechas hoy)
+    const T = all.filter(t => !t.ia && (!hoyMode || t.today === today() || (t.status === 'done' && t.doneAt === today() && t.today)));
+    const nHoy = all.filter(t => !t.ia && t.status !== 'done' && t.today === today()).length;
+    setToolbar('Clientes', hoyMode ? `${nHoy} tarea${nHoy === 1 ? '' : 's'} para hoy` : 'marca con «Hoy» lo que vas a hacer hoy', '', hoyMode ? 'Luego colócalas en Día' : 'Arrastra para cambiar de cliente');
+    let html = '';
+    if (iaT.length && !hoyMode){
+      html += `<div class="iarev"><div class="iarev-h"><b>🤖 Revisa las tareas que ha detectado la IA</b><span>${iaT.length}</span>
+        <button class="btn" data-iaall>Aprobar todas</button></div>
+        <div class="iarev-l">${iaT.map(t => card(t, {}).replace('</article>', `<div class="iaact"><button class="btn primary" data-iaok>✓ Aprobar</button><button class="btn" data-iano title="Descartar">✕</button></div></article>`)).join('')}</div>
+        <p class="iahint">Toca una tarea para corregir el texto, el cliente o la urgencia antes de aprobarla.</p></div>`;
+    }
+    if (hoyMode && !nHoy) html += '<div class="empty big">Aún no has elegido nada para hoy. En «Tareas», pulsa <b>Hoy</b> en las que vayas a hacer.</div>';
     // En filas que se adaptan a la pantalla (sin deslizar). Primero los clientes con tareas pendientes, luego el resto.
-    let html = '<div class="board grid">';
+    html += '<div class="board grid">';
     for (const [g, label] of [['mine','Mis clientes'],['agency','Agencia']]){
-      const cs = visibleClients().filter(c => c.group === g);
+      let cs = visibleClients().filter(c => c.group === g);
+      if (hoyMode) cs = cs.filter(c => T.some(x => x.client === c.id && x.status !== 'done'));
       if (!cs.length) continue;
       const cols = cs.map((c, i) => {
         const ts = T.filter(x => x.client === c.id);
@@ -497,10 +511,10 @@ const views = {
       const conT = cols.filter(x => x.pend.length).length, gc = g === 'mine' ? 'mine' : 'ag';
       html += `<div class="sep sep-${gc}"><b>${g === 'mine' ? '🔒 Mis clientes' : '🏢 Agencia'}</b><span>${conT} con tareas · ${cols.length - conT} sin pendientes</span></div>`;
       for (const {c, pend, hechas} of cols)
-        html += column({title:c.name, sub: hechas ? `${hechas} hecha${hechas>1?'s':''}` : '', field:'client', value:c.id, tasks:pend, hide:{client:true, urg:true, group:true}, dot:clientColor(c), add:c.id, cls: `cg-${gc} ${pend.length ? '' : 'quiet'}`, byUrg:true});
+        html += column({title:c.name, sub: hechas ? `${hechas} hecha${hechas>1?'s':''}` : '', field:'client', value:c.id, tasks:pend, hide:{client:true, urg:true, group:true, pick:true}, dot:clientColor(c), add: hoyMode ? undefined : c.id, cls: `cg-${gc} ${pend.length ? '' : 'quiet'}`, byUrg:true});
     }
     const sin = T.filter(x => (!x.client || !client(x.client)) && x.status !== 'done');
-    if (S.group === 'all' && sin.length) html += column({title:'Sin cliente', field:'client', value:'', tasks:sin, hide:{client:true}, dot:'var(--faint)'});
+    if (S.group === 'all' && sin.length) html += column({title:'Sin cliente', field:'client', value:'', tasks:sin, hide:{client:true, pick:true}, dot:'var(--faint)', byUrg:true});
     return html + '</div>';
   },
 };
@@ -583,8 +597,8 @@ function endDrag(){
   if (f === 'status') setStatus(t, v);
   if (f === 'client') t.client = v || null;
   // Planificador: meter/sacar la tarea de un bloque del día (no toca la fecha ni ClickUp)
-  if (f === 'slot') S.slots[t.id] = {day: zone.dataset.day, at: v};
-  if (f === 'unslot' && zone.dataset.urg){ delete S.slots[t.id]; t.priority = zone.dataset.urg; }   // a una urgencia: sale del bloque
+  if (f === 'slot'){ S.slots[t.id] = {day: zone.dataset.day, at: v}; t.today = zone.dataset.day; }
+  if (f === 'unslot' && zone.dataset.urg){ delete S.slots[t.id]; t.priority = zone.dataset.urg; if (!t.today || t.today < today()) t.today = today(); }   // a una urgencia: sale del bloque
   const revisada = t.ia && !zone.dataset.ia;
   if (revisada) t.ia = false;
   save(); S._keepScroll = true; render();
@@ -594,7 +608,7 @@ function endDrag(){
 main.addEventListener('pointerdown', e => {
   if (e.pointerType !== 'mouse' || e.button !== 0) return;
   const cardEl = e.target.closest('.card');
-  if (!cardEl || e.target.closest('.chk')) return;
+  if (!cardEl || e.target.closest('.chk,[data-pick],[data-iaok],[data-iano]')) return;
   e.preventDefault();
   const sx = e.clientX, sy = e.clientY;
   const mv = ev => { if (!D && Math.hypot(ev.clientX-sx, ev.clientY-sy) > 6) beginDrag(cardEl, sx, sy); if (D) moveDrag(ev.clientX, ev.clientY); };
@@ -620,6 +634,25 @@ main.addEventListener('contextmenu', e => { if (e.target.closest('.card')) e.pre
 
 main.addEventListener('click', e => {
   if (justDragged) return;
+  const pk = e.target.closest('[data-pick]');
+  if (pk){
+    const t = task(pk.closest('.card').dataset.id);
+    t.today = t.today === today() ? null : today();
+    if (!t.today) delete S.slots[t.id];
+    save(); S._keepScroll = true; render();
+    toast(t.today ? 'Para hoy ✓' : 'Quitada de hoy');
+    return;
+  }
+  if (e.target.closest('[data-iaall]')){
+    const ts = S.tasks.filter(t => t.ia); ts.forEach(t => t.ia = false); save(); render(); ts.forEach(pushCreate);
+    toast(`${ts.length} aprobadas`); return;
+  }
+  const iaB = e.target.closest('[data-iaok],[data-iano]');
+  if (iaB){
+    const t = task(iaB.closest('.card').dataset.id);
+    if (iaB.dataset.iano !== undefined){ S.tasks = S.tasks.filter(x => x !== t); save(); render(); toast('Descartada'); return; }
+    t.ia = false; save(); render(); pushCreate(t); toast(`Aprobada${t.client ? ' · ' + client(t.client).name : ''}`); return;
+  }
   const chk = e.target.closest('.chk');
   const cardEl = e.target.closest('.card');
   if (chk && cardEl){
