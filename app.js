@@ -163,7 +163,10 @@ async function connect(token){
 function disconnect(){ S.cu = CU_DEFAULT(); S.tasks = S.tasks.filter(t => !t.cu); S.clients = S.clients.filter(c => !c.auto); save(); render(); modeIdle(); }
 
 /* Clientes de la agencia = carpetas de ClickUp (o listas sueltas sin carpeta). Se crean solos con tus tareas. */
-const folderKey = (folderId, listId) => folderId ? 'f:' + folderId : 'l:' + listId;
+const rawKey = (folderId, listId) => folderId ? 'f:' + folderId : 'l:' + listId;
+// Clientes unidos: una carpeta/lista de ClickUp puede contar como otro cliente de la agencia (⚙ → «Unir con…»)
+const cuAlias = () => (S.plan && S.plan.cuAlias) || {};
+const folderKey = (folderId, listId) => { const k = rawKey(folderId, listId); return cuAlias()[k] || k; };
 function ensureAgencyClient(key, name){
   let c = client(key);
   if (!c){
@@ -176,9 +179,7 @@ const hidden = () => new Set(S.cu.hidden || []);
 // Listas de un cliente de la agencia
 function clientLists(c){
   if (!c) return [];
-  if (c.id.startsWith('f:')) return S.cu.lists.filter(l => l.folder === c.id.slice(2));
-  if (c.id.startsWith('l:')) return S.cu.lists.filter(l => l.id === c.id.slice(2));
-  return [];
+  return S.cu.lists.filter(l => folderKey(l.folder, l.id) === c.id);
 }
 // Elegir la lista según lo que digas: «meta», «google», «email»…
 const LIST_HINTS = [
@@ -812,6 +813,7 @@ function renderClients(){
     ${c.auto ? `<span class="lock" style="grid-column:auto">Agencia</span>`
       : `<select data-k="group"><option value="mine" ${c.group==='mine'?'selected':''}>Mío</option><option value="agency" ${c.group==='agency'?'selected':''}>Agencia</option></select>`}
     <button type="button" class="x" data-del aria-label="${c.auto ? 'Ocultar cliente' : 'Borrar cliente'}">×</button>
+    ${c.auto ? `<span></span><select class="kw" data-merge><option value="">Unir con otro cliente de la agencia…</option>${S.clients.filter(x => x.auto && x.id !== c.id).map(x => `<option value="${x.id}">${esc(x.name)}</option>`).join('')}</select>` : ''}
     <span></span><input class="kw" value="${esc(c.keywords||'')}" data-k="keywords" placeholder="palabras clave extra, separadas por comas">
     <span></span><span class="lock">${c.auto ? `🔗 Carpeta de ClickUp · ${clientLists(c).length} listas` : c.group === 'mine' ? '🔒 Solo en la app, nunca va a ClickUp' : 'Sin carpeta de ClickUp: sus tareas no se suben'}</span></div>`;
   const mine = S.clients.filter(c => c.group === 'mine'), ag = S.clients.filter(c => c.group !== 'mine');
@@ -875,6 +877,20 @@ clList.addEventListener('input', e => {
   save(); render(); preview();
   if (k === 'group') renderClients();
 });
+clList.addEventListener('change', e => {
+  const sel = e.target.closest('[data-merge]'); if (!sel || !sel.value) return;
+  const from = client(sel.closest('.cl-row').dataset.id), to = client(sel.value);
+  if (!from || !to || !confirm(`¿Unir «${from.name}» con «${to.name}»? Sus tareas pasarán a «${to.name}». En ClickUp no se toca nada.`)){ sel.value = ''; return; }
+  mergeAgency(from.id, to.id); toast(`Unido con ${to.name}`);
+});
+function mergeAgency(fromId, toId){
+  S.plan = S.plan || {}; const al = S.plan.cuAlias = S.plan.cuAlias || {};
+  for (const k in al) if (al[k] === fromId) al[k] = toId;   // lo que ya apuntaba a «from» ahora va a «to»
+  al[fromId] = toId;
+  for (const t of S.tasks) if (t.client === fromId) t.client = toId;
+  S.clients = S.clients.filter(c => c.id !== fromId);
+  save(); renderClients(); render(); sync(true);
+}
 clList.addEventListener('click', e => {
   if (!e.target.closest('[data-del]')) return;
   const id = e.target.closest('.cl-row').dataset.id, c = client(id);
