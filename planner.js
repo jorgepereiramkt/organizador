@@ -92,7 +92,7 @@ async function fetchEvents(day){
     if (evCache[key]) return out.push(...evCache[key]);
     if (!tokenOk(acc.email)) return;
     const evs = [];
-    await Promise.all(acc.cals.filter(c => c.on).map(async c => {
+    await Promise.all(acc.cals.filter(c => c.on && !(P().inbox && P().inbox.calId === c.id)).map(async c => {
       const u = `https://www.googleapis.com/calendar/v3/calendars/${encodeURIComponent(c.id)}/events?singleEvents=true&orderBy=startTime`
         + `&timeMin=${encodeURIComponent(start.toISOString())}&timeMax=${encodeURIComponent(end.toISOString())}&maxResults=100`;
       const r = await gapi(u, tokens[acc.email].token);
@@ -179,7 +179,8 @@ O.views.dia = function(){
   const mDone = new Set(P().morningDone[planDay] || []), mItems = P().morning;
   const morningRow = () => !mItems.length ? '' : `<div class="trow mrow ${mDone.size >= mItems.length ? 'past' : ''}" style="--c:#FFC93D;--p:${Math.round(mDone.size / mItems.length * 100)}%">
       <div class="tcol"><b>☀️</b><small>cada día</small></div><div class="rail"><span></span></div>
-      <div class="tbody"><div class="blk morning"><header><b>Arranque del día · revisión de clientes + organizar</b><span class="count">${mDone.size}/${mItems.length}</span></header>
+      <div class="tbody"><div class="blk morning"><header><b>Arranque del día · revisión de clientes + organizar</b><span class="count">${mDone.size}/${mItems.length}</span>
+        <button type="button" class="btn mall${mDone.size >= mItems.length ? ' on' : ''}" data-morningall>${mDone.size >= mItems.length ? '✓ Hecho' : 'Marcar todo hecho'}</button></header>
         <ul>${mItems.map((m, i) => `<li><button type="button" class="mchk${mDone.has(i) ? ' on' : ''}" data-morning="${i}" aria-label="Marcar">${mDone.has(i) ? '✓' : ''}</button><span>${esc(m)}</span></li>`).join('')}</ul></div></div></div>`;
   let mPut = false;
   let tl = allDay.length ? `<div class="allday">${allDay.map(e => `<span class="tag" style="--c:${e.color}"><i></i>${esc(e.title)}</span>`).join('')}</div>` : '';
@@ -228,9 +229,13 @@ O.views.dia = function(){
   const pend = T.filter(t => t.status !== 'done' && !slotted(t)).sort(O.byOrder);
   // Las que estaban en un bloque de un día anterior y no se marcaron como hechas: arriba del todo
   const isLeft = t => { const sl = S.slots[t.id]; return !!(sl && sl.day < planDay); };
-  const left = pend.filter(isLeft).sort((a,b) => O.urgRank(a) - O.urgRank(b) || O.byOrder(a,b));
-  const rest = pend.filter(t => !isLeft(t));
+  const left = pend.filter(t => isLeft(t) && !t.ia).sort((a,b) => O.urgRank(a) - O.urgRank(b) || O.byOrder(a,b));
+  const rest = pend.filter(t => !isLeft(t) && !t.ia);
+  const iaT = pend.filter(t => t.ia);
   const side = `<section class="col side"><header><h3>Por colocar</h3><span class="count">${pend.length}</span></header>`
+    + (iaT.length ? `<div class="urg u-ia" data-field="unslot" data-ia="1"><h4>🤖 Por revisar (IA)<span>${iaT.length}</span></h4>
+        <p class="iahint">Ábrelas para corregir, o arrástralas a una urgencia o a un bloque.</p>
+        <div class="list">${iaT.map(t => O.card(t)).join('')}</div></div>` : '')
     + (left.length ? `<div class="urg u-left" data-field="unslot"><h4>⏪ Pendientes de días anteriores<span>${left.length}</span></h4>
         <div class="list">${left.map(t => O.card(t)).join('')}</div></div>` : '')
     + Object.entries(O.URG).map(([k, u]) => {
@@ -245,7 +250,43 @@ O.views.dia.after = () => {
   const need = P().accounts.some(a => tokenOk(a.email) && !evCache[a.email + '|' + planDay]);
   if (need && !loading) refresh();
 };
+/* ---------- Buzón: tareas que Claude deja en un calendario ---------- */
+// Cada evento del calendario buzón = una tarea. Título = la tarea. Descripción: «cliente: …», «urgencia: …».
+// Entran en «Por revisar (IA)» para que las revises antes de colocarlas (y antes de subir nada a ClickUp).
+let importing = false;
+async function importInbox(){
+  const ib = P().inbox; if (!ib || !ib.calId || importing || !tokenOk(ib.email)) return;
+  importing = true;
+  try {
+    const now = new Date(), seen = (P().inboxSeen = P().inboxSeen || {});
+    const u = `https://www.googleapis.com/calendar/v3/calendars/${encodeURIComponent(ib.calId)}/events?singleEvents=true&maxResults=250`
+      + `&timeMin=${encodeURIComponent(O.addDays(now, -30).toISOString())}&timeMax=${encodeURIComponent(O.addDays(now, 30).toISOString())}`;
+    const r = await gapi(u, tokens[ib.email].token);
+    let n = 0;
+    for (const e of r.items || []){
+      if (e.status === 'cancelled' || seen[e.id]) continue;
+      seen[e.id] = Date.now();
+      const desc = (e.description || '').replace(/<[^>]+>/g, '\n');
+      const get = k => { const m = desc.match(new RegExp('^\\s*' + k + '\\s*:\\s*(.+)$', 'im')); return m ? m[1].trim() : ''; };
+      const title = (e.summary || '').replace(/^[📥\s]+/u, '').trim(); if (!title) continue;
+      const cName = O.norm(get('cliente'));
+      let cl = cName ? S.clients.find(c => O.norm(c.name) === cName) || S.clients.find(c => O.norm(c.name).includes(cName) || cName.includes(O.norm(c.name).split(' ')[0])) : null;
+      if (!cl){ const p = O.parse(title)[0]; cl = p && p.client ? O.client(p.client) : null; }
+      const ur = O.norm(get('urgencia'));
+      const priority = /super|urgentisim|critic/.test(ur) ? 'super' : /urgent/.test(ur) ? 'alta' : /media|normal/.test(ur) ? 'normal' : 'baja';
+      S.tasks.push({id: O.uid(), title, client: cl ? cl.id : null, day: null, status: 'todo', priority, order: O.maxOrder() + 1, doneAt: null, ia: true, iaNote: get('nota')});
+      n++;
+    }
+    // olvidar los vistos de hace más de 60 días
+    for (const [k, t] of Object.entries(seen)) if (t < Date.now() - 60 * 864e5) delete seen[k];
+    if (n){ O.save(); O.render(); O.toast(`🤖 ${n} tarea${n > 1 ? 's' : ''} nueva${n > 1 ? 's' : ''} por revisar`); }
+    else O.save();
+  } catch(e){ /* sin conexión o permiso caducado: se reintenta luego */ }
+  importing = false;
+}
+O.importInbox = importInbox;
 async function refresh(){
+  importInbox();
   loading = true; calError = '';
   try { lastEvents = await fetchEvents(planDay); O.planEvents = {day: planDay, events: lastEvents}; }
   catch(e){ calError = 'Calendario: ' + e.message; }
@@ -259,9 +300,11 @@ function setDay(n){
   if (accs.length) refresh();
 }
 document.addEventListener('click', e => {
-  const b = e.target.closest('[data-morning]'); if (!b) return;
-  const plan = P(), i = +b.dataset.morning, set = new Set(plan.morningDone[planDay] || []);
-  set.has(i) ? set.delete(i) : set.add(i);
+  const all = e.target.closest('[data-morningall]');
+  const b = e.target.closest('[data-morning]'); if (!b && !all) return;
+  const plan = P(), set = new Set(plan.morningDone[planDay] || []);
+  if (all){ if (set.size >= plan.morning.length) set.clear(); else plan.morning.forEach((_, i) => set.add(i)); }
+  else { const i = +b.dataset.morning; set.has(i) ? set.delete(i) : set.add(i); }
   plan.morningDone[planDay] = [...set];
   // guardar solo las últimas 2 semanas
   for (const d of Object.keys(plan.morningDone)) if (d < O.iso(O.addDays(new Date(), -14))) delete plan.morningDone[d];
@@ -299,7 +342,11 @@ function renderPlanSettings(){
         ${a.cals.map((c, ci) => `<label class="check"><input type="checkbox" data-cal="${ai}:${ci}" ${c.on ? 'checked' : ''}><i class="dot" style="background:${c.color}"></i>${esc(c.name)}</label>`).join('')}
         <button type="button" class="btn danger" data-accdel="${ai}">Quitar cuenta</button></div>`).join('')
       + `<div class="actions" style="margin:0"><button type="button" class="btn" id="accAdd">+ Conectar cuenta de Google</button></div>
-         <div class="note">Solo lectura. Puedes conectar tu cuenta personal y la de la agencia y elegir qué calendarios cuentan. Los eventos no se guardan en la nube.</div>`}`;
+         <div class="note">Solo lectura. Puedes conectar tu cuenta personal y la de la agencia y elegir qué calendarios cuentan. Los eventos no se guardan en la nube.</div>
+         <label>📥 Calendario buzón (tareas que te deja Claude)<select data-inbox>
+           <option value="">— Ninguno —</option>${plan.accounts.map(a => `<optgroup label="${esc(a.email)}">${a.cals.map(c =>
+             `<option value="${esc(a.email)}|${esc(c.id)}" ${plan.inbox && plan.inbox.calId === c.id ? 'selected' : ''}>${esc(c.name)}</option>`).join('')}</optgroup>`).join('')}
+         </select></label>`}`;
 }
 document.addEventListener('click', async e => {
   const box = e.target.closest('#planBox'); if (!box) return;
@@ -319,6 +366,7 @@ document.addEventListener('change', e => {
   const box = e.target.closest('#planBox'); if (!box) return;
   const plan = P(), t = e.target;
   if (t.dataset.pk) plan[t.dataset.pk] = t.value;
+  if (t.dataset.inbox !== undefined){ const [email, calId] = t.value.split('|'); plan.inbox = calId ? {email, calId} : null; clearCache(); lastEvents = []; setTimeout(importInbox, 300); }
   if (t.dataset.morningtxt !== undefined) plan.morning = t.value.split('\n').map(x => x.trim()).filter(Boolean);
   if (t.dataset.rk){ const r = plan.routines[+t.closest('.rt').dataset.i]; r[t.dataset.rk] = t.type === 'checkbox' ? t.checked : t.value; }
   if (t.dataset.cal){ const [ai, ci] = t.dataset.cal.split(':').map(Number); plan.accounts[ai].cals[ci].on = t.checked; clearCache(); lastEvents = []; }

@@ -50,7 +50,7 @@ function resumen(c){
 function fichaCard(c){
   const r = resumen(c), sv = c.services || [];
   const pct = r.total ? Math.round((r.auto + r.mixto / 2) / r.total * 100) : 0;
-  return `<article class="ficha" data-ficha="${c.id}" style="--c:${c.color}" tabindex="0">
+  return `<article class="ficha" data-ficha="${c.id}" style="--c:${O.clientColor(c)}" tabindex="0">
     <header><i></i><b>${esc(c.name)}</b>${c.hours ? `<span class="hrs">${c.hours} h/mes</span>` : ''}</header>
     ${sv.length ? `<ul>${sv.map(s => `<li><span title="${MODES[s.mode || 'manual'].label}">${MODES[s.mode || 'manual'].icon}</span>${esc(s.name)}</li>`).join('')}</ul>
       <div class="bar" title="${pct}% automatizado"><span style="width:${pct}%"></span></div>
@@ -87,7 +87,7 @@ function draw(){
   for (const n of [...desdeCU, ...SUGERIDOS]){ const k = n.toLowerCase(); if (!vistos.has(k)){ vistos.add(k); sugeridos.push(n); } }
   sugeridos.splice(14);
   form.innerHTML = `
-    <h2><span class="dot" style="background:${c.color}"></span> ${esc(c.name)} <span class="badge">${ag ? 'Agencia' : '🔒 Mío'}</span></h2>
+    <h2><span class="dot" style="background:${O.clientColor(c)}"></span> ${esc(c.name)} <span class="badge">${ag ? 'Agencia' : '🔒 Mío'}</span></h2>
     ${ag ? `<label>Horas al mes con este cliente<input type="number" min="0" step="0.5" data-f="hours" value="${c.hours || ''}" placeholder="normalmente entre 8 y 20"></label>` : ''}
     <label>Notas (contacto, objetivos, cosas a recordar)<textarea rows="2" data-f="notes">${esc(c.notes || '')}</textarea></label>
     <h3 class="h3">Servicios</h3>

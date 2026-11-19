@@ -68,7 +68,7 @@ O.views.dia.after = () => {
   if (!conHoras().length || $('#main .objetivos')) return;
   const p = H().log[day] || proposal(day);
   const chips = conHoras().filter(c => p[c.id] > 0).map(c =>
-    `<span class="tag" style="--c:${c.color}"><i></i>${esc(c.name)} · ${fmt(p[c.id])}</span>`).join('');
+    `<span class="tag" style="--c:${O.clientColor(c)}"><i></i>${esc(c.name)} · ${fmt(p[c.id])}</span>`).join('');
   if (!chips) return;
   const div = document.createElement('div');
   div.className = 'objetivos';
@@ -89,7 +89,7 @@ O.views.clientes = function(){
   const rows = cs.map(c => {
     const g = c.hours ? goal(c) : 0, l = logged(c.id, month), pct = g ? Math.min(100, Math.round(l / g * 100)) : 0;
     totG += g; totL += l;
-    return `<div class="hrow" data-ficha="${c.id}" style="--c:${c.color}">
+    return `<div class="hrow" data-ficha="${c.id}" style="--c:${O.clientColor(c)}">
       <b><i></i>${esc(c.name)}</b>
       <span>${c.hours ? `${c.hours} h/mes` : '<em>sin horas</em>'}</span>
       <div class="bar"><span style="width:${pct}%"></span></div>
@@ -144,7 +144,7 @@ function draw(ya){
     <div class="note">Esto es una <b>propuesta</b> según las horas del mes, tus reuniones y tus tareas de hoy. Ajústala a lo que crees que le has dedicado a cada cliente y confirma. Solo se registra lo que confirmes.</div>
     <div class="crows">${cs.map(c => {
       const t = taskFor(c), m = draft[c.id] || 0;
-      return `<div class="crow" data-cid="${c.id}" style="--c:${c.color}">
+      return `<div class="crow" data-cid="${c.id}" style="--c:${O.clientColor(c)}">
         <b><i></i>${esc(c.name)}</b>
         <div class="stepper"><button type="button" data-step="-15">−</button><input type="number" min="0" step="5" value="${m}" data-min> <span>min</span><button type="button" data-step="15">+</button></div>
         ${!O.online() ? '' : regTasks(c).length > 1

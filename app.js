@@ -274,7 +274,7 @@ const isAgency = id => { const c = client(id); return !!(c && c.group === 'agenc
 // Regla de oro: solo se sube a ClickUp lo que es de un cliente marcado como «Agencia». Lo tuyo nunca sale de la app.
 async function pushCreate(t){
   const c = client(t.client);
-  if (!online() || t.cu || !c || c.group !== 'agency') return;
+  if (!online() || t.cu || t.ia || !c || c.group !== 'agency') return;   // las de la IA esperan a que las revises
   const l = chooseList(c, t.title);
   if (!l) return toast('Ese cliente no tiene listas en ClickUp');
   await write(async () => {
@@ -405,18 +405,28 @@ const byOrder = (a,b) => (a.order||0) - (b.order||0);
 // Colores por tipo (no por cliente): agencia, mis clientes y sin cliente. Las llamadas tienen el suyo en el Día.
 const GROUP = {agency:{color:'#4F8CFF', label:'Agencia', cls:'g-ag'}, mine:{color:'#3DDC97', label:'Mío', cls:'g-mine'}, none:{color:'#8A8A94', label:'', cls:'g-none'}};
 const groupOf = c => c ? (c.group === 'mine' ? GROUP.mine : GROUP.agency) : GROUP.none;
+// Cada cliente tiene su tono dentro de la familia de su grupo: verdes/amarillos para los míos, azules/turquesas para la agencia
+function clientColor(c){
+  if (!c) return GROUP.none.color;
+  const fam = S.clients.filter(x => (x.group === 'mine') === (c.group === 'mine')).sort((a, b) => a.name.localeCompare(b.name));
+  const i = Math.max(0, fam.findIndex(x => x.id === c.id)), n = Math.max(fam.length, 2);
+  const [h0, h1] = c.group === 'mine' ? [62, 165] : [178, 238];
+  const h = Math.round(h0 + (h1 - h0) * i / (n - 1)), l = i % 2 ? 66 : 54, sat = i % 3 === 2 ? 62 : 78;
+  return `hsl(${h} ${sat}% ${l}%)`;
+}
 function card(t, hide={}){
   const c = client(t.client), done = t.status === 'done', late = !done && t.day && t.day < today();
   const g = groupOf(c);
   const meta = [];
-  if (g.label && !hide.group) meta.push(`<span class="gb">${g.label}</span>`);
+  if (g.label && !hide.group) meta.push(`<span class="gb" style="--g:${g.color}">${g.label}</span>`);
   if (!hide.client) meta.push(c ? `<span class="cl">${esc(c.name)}</span>` : `<span class="cl">Sin cliente</span>`);
   if (!hide.day && t.day) meta.push(`<span class="${late?'late':''}">${late?'Atrasada · ':''}${dayLabel(t.day)}</span>`);
   if (t.cu && t.listName) meta.push(`<span class="st">${esc(t.listName)}</span>`);
   if (!done && !hide.urg){ const u = URG[t.priority] ? t.priority : 'normal'; meta.unshift(`<span class="ub u-${u}">${URG[u].icon} ${URG[u].label}</span>`); }
   if (!hide.status && t.status !== 'todo' && !done) meta.push(`<span class="st">${STATUS[t.status]}</span>`);
   if (online() && !t.cu && isAgency(t.client)) meta.push('<span class="st">Sin subir a ClickUp</span>');
-  return `<article class="card ${g.cls} ${done?'done':''}" data-id="${t.id}" style="--c:${g.color}" tabindex="0">
+  if (t.ia) meta.unshift('<span class="iab">🤖 IA · revisa</span>');
+  return `<article class="card ${g.cls} ${done?'done':''} ${t.ia?'ia':''}" data-id="${t.id}" style="--c:${clientColor(c)};--g:${g.color}" tabindex="0">
     <button class="chk" aria-label="${done?'Marcar como pendiente':'Completar'}"></button>
     <div class="body"><p class="tt">${esc(t.title)}</p>${meta.length?`<div class="meta">${meta.join('')}</div>`:''}</div></article>`;
 }
@@ -487,7 +497,7 @@ const views = {
       const conT = cols.filter(x => x.pend.length).length, gc = g === 'mine' ? 'mine' : 'ag';
       html += `<div class="sep sep-${gc}"><b>${g === 'mine' ? '🔒 Mis clientes' : '🏢 Agencia'}</b><span>${conT} con tareas · ${cols.length - conT} sin pendientes</span></div>`;
       for (const {c, pend, hechas} of cols)
-        html += column({title:c.name, sub: hechas ? `${hechas} hecha${hechas>1?'s':''}` : '', field:'client', value:c.id, tasks:pend, hide:{client:true, urg:true, group:true}, dot:c.color, add:c.id, cls: `cg-${gc} ${pend.length ? '' : 'quiet'}`, byUrg:true});
+        html += column({title:c.name, sub: hechas ? `${hechas} hecha${hechas>1?'s':''}` : '', field:'client', value:c.id, tasks:pend, hide:{client:true, urg:true, group:true}, dot:clientColor(c), add:c.id, cls: `cg-${gc} ${pend.length ? '' : 'quiet'}`, byUrg:true});
     }
     const sin = T.filter(x => (!x.client || !client(x.client)) && x.status !== 'done');
     if (S.group === 'all' && sin.length) html += column({title:'Sin cliente', field:'client', value:'', tasks:sin, hide:{client:true}, dot:'var(--faint)'});
@@ -575,8 +585,10 @@ function endDrag(){
   // Planificador: meter/sacar la tarea de un bloque del día (no toca la fecha ni ClickUp)
   if (f === 'slot') S.slots[t.id] = {day: zone.dataset.day, at: v};
   if (f === 'unslot' && zone.dataset.urg){ delete S.slots[t.id]; t.priority = zone.dataset.urg; }   // a una urgencia: sale del bloque
+  const revisada = t.ia && !zone.dataset.ia;
+  if (revisada) t.ia = false;
   save(); S._keepScroll = true; render();
-  afterChange(t, was);
+  if (revisada) pushCreate(t); else afterChange(t, was);
 }
 
 main.addEventListener('pointerdown', e => {
@@ -651,7 +663,9 @@ ed.addEventListener('close', () => {
   t.title = edForm.title.value.trim() || t.title; t.client = edForm.client.value || null;
   t.day = edForm.day.value || null; t.priority = edForm.priority.value;
   if (edForm.status.value !== t.status) setStatus(t, edForm.status.value);
-  save(); render(); afterChange(t, was);
+  const revisada = !!t.ia; t.ia = false;
+  save(); render();
+  if (revisada) pushCreate(t); else afterChange(t, was);
 });
 ed.addEventListener('click', e => { if (e.target === ed) ed.close('cancel'); });
 
@@ -662,7 +676,7 @@ function preview(){
   pv.innerHTML = items.map(p => {
     const c = client(p.client);
     return `<div class="pv"><b>${esc(p.title)}</b>
-      ${c ? `<span class="tag" style="--c:${c.color}"><i></i>${esc(c.name)}</span>` : '<span class="tag miss">sin cliente</span>'}
+      ${c ? `<span class="tag" style="--c:${clientColor(c)}"><i></i>${esc(c.name)}</span>` : '<span class="tag miss">sin cliente</span>'}
       ${c && c.group === 'agency' && online() ? (l => l ? `<span class="tag">ClickUp › ${esc(l.name)}</span>` : '')(chooseList(c, p.title)) : c && c.group === 'mine' ? '<span class="tag">🔒 solo app</span>' : ''}
       <span class="tag ${p.priority === 'super' || p.priority === 'alta' ? 'warn' : ''}">${URG[p.priority].icon} ${URG[p.priority].label}</span>
       <span class="tag miss">por colocar</span></div>`;
@@ -828,5 +842,5 @@ if (online()) sync(true);
 // Mantener PC y móvil al día: cada 60 s con la app abierta y al volver a ella
 setInterval(() => { if (document.visibilityState === 'visible') sync(true); }, 60000);
 document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') sync(true); });
-window.__org = {S, GROUP, URG, urgRank, parse, pushCreate, uid, maxOrder, clientLists, online, PALETA, cu, listInfo, norm, isRegTask, applyCloud, cloudEmpty, cloudReady, wipeLocal, toast, views, render, save, card, setToolbar, visibleTasks, client, task, esc, iso, fromIso, addDays, today, dayLabel, DIAS_L, MESES, pad, byOrder};
+window.__org = {S, GROUP, clientColor, URG, urgRank, parse, pushCreate, uid, maxOrder, clientLists, online, PALETA, cu, listInfo, norm, isRegTask, applyCloud, cloudEmpty, cloudReady, wipeLocal, toast, views, render, save, card, setToolbar, visibleTasks, client, task, esc, iso, fromIso, addDays, today, dayLabel, DIAS_L, MESES, pad, byOrder};
 })();
