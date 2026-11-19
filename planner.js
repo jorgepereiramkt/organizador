@@ -337,7 +337,8 @@ O.views.dia = function(){
   const curC = isToday && calls.find(c => nowMin >= c.start && nowMin < c.end), nextC = isToday && calls.find(c => c.start > nowMin);
   const timer = !isToday || (!curC && !nextC) ? '' : `<div class="cdbox${curC ? ' in' : ''}">${curC
       ? `<small>En reunión · termina en</small><b data-cdto="${base + curC.end * 60e3}"></b><span>${esc(curC.title)}</span>`
-      : `<small>Siguiente reunión en</small><b data-cdto="${base + nextC.start * 60e3}"></b><span>${toHM(nextC.start)} · ${esc(nextC.title)}</span>`}</div>`;
+      : `<small>Siguiente reunión en</small><b data-cdto="${base + nextC.start * 60e3}" data-mtg="${esc(nextC.title)}"></b><span>${toHM(nextC.start)} · ${esc(nextC.title)}</span>`}
+      <button type="button" class="cdbell${bellOn() ? ' on' : ''}" data-bell title="${bellOn() ? 'Aviso con sonido 5 min antes: activado' : 'Activar aviso con sonido 5 min antes'}">${bellOn() ? '🔔' : '🔕'}</button></div>`;
   // Reuniones del día en una fila
   const mtgRow = `<div class="mtgs">${calls.length ? calls.map(c => {
       const s = !isToday ? '' : nowMin >= c.end ? 'past' : nowMin >= c.start ? 'now' : '';
@@ -719,8 +720,39 @@ function done(){ O.save(); renderPlanSettings(); if (S.view === 'dia') { O.rende
 $('#settingsBtn').addEventListener('click', renderPlanSettings);
 
 // Cada minuto: reloj y barra del día
+// Aviso de reunión 5 minutos antes: sonido + notificación (en este dispositivo, con la app abierta)
+const bellOn = () => { try { return localStorage.getItem('jp-bell') !== 'off'; } catch(e){ return true; } };
+let actx = null;
+function chime(){
+  try {
+    actx = actx || new (window.AudioContext || window.webkitAudioContext)(); actx.resume();
+    const t0 = actx.currentTime;
+    [[880, 0], [1175, .18], [1568, .36]].forEach(([f, d]) => {
+      const o = actx.createOscillator(), g = actx.createGain(); o.type = 'sine'; o.frequency.value = f;
+      g.gain.setValueAtTime(0, t0 + d); g.gain.linearRampToValueAtTime(.25, t0 + d + .02); g.gain.exponentialRampToValueAtTime(.001, t0 + d + .9);
+      o.connect(g).connect(actx.destination); o.start(t0 + d); o.stop(t0 + d + 1);
+    });
+  } catch(e){}
+}
+// el navegador solo deja sonar después de un toque: se «desbloquea» con el primer clic
+document.addEventListener('pointerdown', () => { if (!actx && bellOn()) try { actx = new (window.AudioContext || window.webkitAudioContext)(); actx.resume(); } catch(e){} }, {once: true});
+const avisadas = (() => { try { return JSON.parse(localStorage.getItem('jp-avisos') || '{}'); } catch(e){ return {}; } })();
+function avisar(key, title){
+  avisadas[key] = 1; try { localStorage.setItem('jp-avisos', JSON.stringify(Object.fromEntries(Object.entries(avisadas).filter(([k]) => +k > Date.now() - 864e5)))); } catch(e){}
+  if (!bellOn()) return;
+  chime(); O.toast(`📞 En 5 min: ${title}`);
+  try { if ('Notification' in window && Notification.permission === 'granted') new Notification('Reunión en 5 minutos', {body: title, icon: 'logo-claro.png', tag: 'reu-' + key}); } catch(e){}
+}
+document.addEventListener('click', e => {
+  if (!e.target.closest('[data-bell]')) return;
+  const on = !bellOn(); try { localStorage.setItem('jp-bell', on ? 'on' : 'off'); } catch(err){}
+  if (on){ chime(); O.toast('🔔 Te avisaré con un sonido 5 min antes de cada reunión'); try { if ('Notification' in window && Notification.permission === 'default') Notification.requestPermission(); } catch(err){} }
+  else O.toast('🔕 Aviso de reuniones desactivado en este dispositivo');
+  O.render();
+});
 // Temporizador de la siguiente reunión: se actualiza cada segundo
 function tickCd(){ for (const el of document.querySelectorAll('[data-cdto]')){ const ms = +el.dataset.cdto - Date.now(), s = Math.max(0, Math.round(ms / 1000));
+  if (el.dataset.mtg !== undefined && s > 0 && s <= 300 && !avisadas[el.dataset.cdto]) avisar(el.dataset.cdto, el.dataset.mtg);
   const h = Math.floor(s / 3600), m = Math.floor(s % 3600 / 60), ss = s % 60;
   el.textContent = h ? `${h} h ${O.pad(m)} min` : `${O.pad(m)}:${O.pad(ss)}`; el.closest('.cdbox')?.classList.toggle('soon', s < 600); } }
 setInterval(tickCd, 1000);
