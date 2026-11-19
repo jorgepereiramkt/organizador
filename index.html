@@ -6,7 +6,7 @@
 <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' https://www.gstatic.com https://apis.google.com https://accounts.google.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://accounts.google.com; font-src https://fonts.gstatic.com; connect-src https://api.clickup.com https://accounts.google.com https://firestore.googleapis.com https://identitytoolkit.googleapis.com https://securetoken.googleapis.com https://www.googleapis.com https://apis.google.com; frame-src https://organizador-jp.firebaseapp.com https://accounts.google.com; img-src 'self' data: https://lh3.googleusercontent.com https://www.google.com; manifest-src 'self'; base-uri 'none'; form-action 'self'; object-src 'none'">
 <meta name="referrer" content="no-referrer">
 <meta name="robots" content="noindex, nofollow">
-<link rel="manifest" href="manifest.json?v=20261119010537">
+<link rel="manifest" href="manifest.json?v=20261119010702">
 <link rel="icon" href="icon-192.png">
 <link rel="apple-touch-icon" href="icon-180.png">
 <meta name="theme-color" content="#0a0a0b">
@@ -400,6 +400,27 @@ a.btn{display:inline-flex;align-items:center;text-decoration:none;color:var(--te
 .mchk.on{background:#FFC93D;border-color:#FFC93D}
 .mchk.on + span{text-decoration:line-through;color:var(--faint)}
 .trow.mrow .rail span{background:#FFC93D}
+
+/* Urgencia en tarjetas y grupos por urgencia dentro de cada cliente */
+.ub{font:700 10.5px var(--body);padding:2px 8px;border-radius:99px;letter-spacing:.02em}
+.ub.u-super{background:#ff5a5a;color:#fff}
+.ub.u-alta{background:var(--accent);color:#0a0a0b}
+.ub.u-normal{background:rgba(255,201,61,.18);color:#FFC93D}
+.ub.u-baja{background:rgba(61,220,151,.14);color:#3DDC97}
+.ugrp{display:flex;flex-direction:column;gap:8px;padding:8px 0 4px;border-top:1px dashed var(--line)}
+.ugrp:first-child{border-top:0;padding-top:0}
+.uh{font:700 11px var(--body);text-transform:uppercase;letter-spacing:.06em;display:flex;align-items:center;gap:6px}
+.uh span{color:var(--faint);font-weight:500}
+.ugrp.u-super .uh{color:#ff5a5a}.ugrp.u-alta .uh{color:var(--accent)}.ugrp.u-normal .uh{color:#FFC93D}.ugrp.u-baja .uh{color:#3DDC97}
+.ugrp.u-super .card{box-shadow:0 0 0 1px rgba(255,90,90,.55)}
+/* Separación clara: mis clientes / agencia */
+.board.grid .sep{padding:12px 16px;border-radius:14px;margin-top:22px;font-size:14px}
+.board.grid .sep b{font:700 17px var(--head);text-transform:none;letter-spacing:0}
+.board.grid .sep-mine{background:linear-gradient(90deg,rgba(61,220,151,.20),transparent 70%);border-left:5px solid #3DDC97;color:#3DDC97}
+.board.grid .sep-ag{background:linear-gradient(90deg,rgba(79,140,255,.22),transparent 70%);border-left:5px solid #4F8CFF;color:#4F8CFF}
+.board.grid .sep b{color:var(--text)}
+.board.grid .col.cg-mine{border-top:4px solid #3DDC97}
+.board.grid .col.cg-ag{border-top:4px solid #4F8CFF}
 @media (max-width:760px){
   :root{--nav-h:64px}
   .app{padding:10px 12px calc(20px + var(--nav-h) + env(safe-area-inset-bottom))}
@@ -497,11 +518,11 @@ a.btn{display:inline-flex;align-items:center;text-decoration:none;color:var(--te
 
 <div class="toast" id="toast"></div>
 
-<script src="app.js?v=20261119010537"></script>
-<script src="planner.js?v=20261119010537"></script>
-<script src="clients.js?v=20261119010537"></script>
-<script src="quick.js?v=20261119010537"></script>
-<script src="hours.js?v=20261119010537"></script>
-<script type="module" src="cloud.js?v=20261119010537"></script>
+<script src="app.js?v=20261119010702"></script>
+<script src="planner.js?v=20261119010702"></script>
+<script src="clients.js?v=20261119010702"></script>
+<script src="quick.js?v=20261119010702"></script>
+<script src="hours.js?v=20261119010702"></script>
+<script type="module" src="cloud.js?v=20261119010702"></script>
 </body>
 </html>

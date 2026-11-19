@@ -409,23 +409,25 @@ function card(t, hide={}){
   const c = client(t.client), done = t.status === 'done', late = !done && t.day && t.day < today();
   const g = groupOf(c);
   const meta = [];
-  if (g.label) meta.push(`<span class="gb">${g.label}</span>`);
+  if (g.label && !hide.group) meta.push(`<span class="gb">${g.label}</span>`);
   if (!hide.client) meta.push(c ? `<span class="cl">${esc(c.name)}</span>` : `<span class="cl">Sin cliente</span>`);
   if (!hide.day && t.day) meta.push(`<span class="${late?'late':''}">${late?'Atrasada · ':''}${dayLabel(t.day)}</span>`);
   if (t.cu && t.listName) meta.push(`<span class="st">${esc(t.listName)}</span>`);
-  if (t.priority === 'super' && !done) meta.push('<span class="alta">🔥 Súper urgente</span>');
-  if (t.priority === 'alta' && !done) meta.push('<span class="alta">Urgente</span>');
-  if (t.priority === 'baja' && !done) meta.push('<span class="st">Cuando pueda</span>');
+  if (!done && !hide.urg){ const u = URG[t.priority] ? t.priority : 'normal'; meta.unshift(`<span class="ub u-${u}">${URG[u].icon} ${URG[u].label}</span>`); }
   if (!hide.status && t.status !== 'todo' && !done) meta.push(`<span class="st">${STATUS[t.status]}</span>`);
   if (online() && !t.cu && isAgency(t.client)) meta.push('<span class="st">Sin subir a ClickUp</span>');
   return `<article class="card ${g.cls} ${done?'done':''}" data-id="${t.id}" style="--c:${g.color}" tabindex="0">
     <button class="chk" aria-label="${done?'Marcar como pendiente':'Completar'}"></button>
     <div class="body"><p class="tt">${esc(t.title)}</p>${meta.length?`<div class="meta">${meta.join('')}</div>`:''}</div></article>`;
 }
-function column({title, sub='', field, value='', tasks, hide, cls='', dot, undone=false, empty='Arrastra aquí', add}){
+function column({title, sub='', field, value='', tasks, hide, cls='', dot, undone=false, empty='Arrastra aquí', add, byUrg}){
+  const listHtml = !byUrg ? tasks.map(t => card(t, hide)).join('') : Object.entries(URG).map(([k, u]) => {
+    const ts = tasks.filter(t => (URG[t.priority] ? t.priority : 'normal') === k);
+    return ts.length ? `<div class="ugrp u-${k}"><div class="uh">${u.icon} ${u.label} <span>${ts.length}</span></div>${ts.map(t => card(t, hide)).join('')}</div>` : '';
+  }).join('');
   return `<section class="col ${cls}" data-field="${field}" data-value="${value}" ${undone?'data-undone="1"':''}>
     <header><h3>${dot?`<i style="--c:${dot}"></i>`:''}${esc(title)} ${sub?`<span class="csub">${esc(sub)}</span>`:''}</h3><span class="count">${tasks.length}</span></header>
-    <div class="list">${tasks.length ? tasks.map(t => card(t, hide)).join('') : `<div class="empty${add !== undefined ? ' mini' : ''}">${add !== undefined ? 'Sin tareas pendientes' : empty}</div>`}</div>
+    <div class="list">${tasks.length ? listHtml : `<div class="empty${add !== undefined ? ' mini' : ''}">${add !== undefined ? 'Sin tareas pendientes' : empty}</div>`}</div>
     ${add !== undefined ? `<form class="qadd" data-qclient="${add}"><input placeholder="Añadir tarea" title="Intro para añadir · entiende «mañana», «el viernes», «urgente»…" aria-label="Añadir tarea a ${esc(title)}" autocomplete="off" enterkeyhint="done"></form>` : ''}</section>`;
 }
 function setToolbar(title, sub, extra='', hint='Arrastra las tareas para moverlas'){
@@ -482,10 +484,10 @@ const views = {
         const pend = ts.filter(x => x.status !== 'done').sort((a,b) => urgRank(a) - urgRank(b) || byOrder(a,b));
         return {c, i, pend, hechas: ts.length - pend.length};
       }).sort((a, b) => (b.pend.length > 0) - (a.pend.length > 0) || a.i - b.i);
-      const conT = cols.filter(x => x.pend.length).length;
-      html += `<div class="sep">${label}<span>${conT} con tareas · ${cols.length - conT} sin pendientes</span></div>`;
+      const conT = cols.filter(x => x.pend.length).length, gc = g === 'mine' ? 'mine' : 'ag';
+      html += `<div class="sep sep-${gc}"><b>${g === 'mine' ? '🔒 Mis clientes' : '🏢 Agencia'}</b><span>${conT} con tareas · ${cols.length - conT} sin pendientes</span></div>`;
       for (const {c, pend, hechas} of cols)
-        html += column({title:c.name, sub: hechas ? `${hechas} hecha${hechas>1?'s':''}` : '', field:'client', value:c.id, tasks:pend, hide:{client:true}, dot:c.color, add:c.id, cls: pend.length ? '' : 'quiet'});
+        html += column({title:c.name, sub: hechas ? `${hechas} hecha${hechas>1?'s':''}` : '', field:'client', value:c.id, tasks:pend, hide:{client:true, urg:true, group:true}, dot:c.color, add:c.id, cls: `cg-${gc} ${pend.length ? '' : 'quiet'}`, byUrg:true});
     }
     const sin = T.filter(x => (!x.client || !client(x.client)) && x.status !== 'done');
     if (S.group === 'all' && sin.length) html += column({title:'Sin cliente', field:'client', value:'', tasks:sin, hide:{client:true}, dot:'var(--faint)'});
