@@ -196,6 +196,9 @@ const LIST_HINTS = [
 ];
 function chooseList(c, title, prefer){
   const ls = clientLists(c); if (!ls.length) return null;
+  // Regla fija: las tareas de clientes van a «Review & Strategy»; las de Jorge Personal, a «Tareas Internas»
+  const fija = ls.find(l => /tareas internas/.test(norm(l.name))) || ls.find(l => /review/.test(norm(l.name)) && /strategy/.test(norm(l.name)));
+  if (fija) return fija;
   if (prefer){ const same = ls.find(l => norm(l.name) === norm(prefer)); if (same) return same; }
   const t = norm(title || '');
   for (const [re, target] of LIST_HINTS) if (re.test(t)){ const l = ls.find(l => target.test(norm(l.name))); if (l) return l; }
