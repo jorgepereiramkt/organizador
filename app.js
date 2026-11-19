@@ -897,9 +897,11 @@ function applyTheme(){
   document.documentElement.dataset.theme = dark ? 'dark' : 'light';
   const mc = document.querySelector('meta[name=theme-color]'); if (mc) mc.content = dark ? '#000000' : '#f5f5f7';
   document.querySelectorAll('[data-themebtn]').forEach(b => b.setAttribute('aria-pressed', b.dataset.themebtn === m));
+  const tb = document.getElementById('themeBtn'); if (tb){ tb.textContent = dark ? '☀️' : '🌙'; tb.setAttribute('aria-label', dark ? 'Cambiar a modo día' : 'Cambiar a modo noche'); }
 }
 applyTheme();
 matchMedia('(prefers-color-scheme: dark)').addEventListener('change', applyTheme);
+document.getElementById('themeBtn').addEventListener('click', () => { const dark = document.documentElement.dataset.theme === 'dark'; try { localStorage.setItem('jp-theme', dark ? 'light' : 'dark'); } catch(err){} applyTheme(); });
 document.addEventListener('click', e => { const b = e.target.closest('[data-themebtn]'); if (!b) return; try { localStorage.setItem('jp-theme', b.dataset.themebtn); } catch(err){} applyTheme(); });
 S.view = 'clientes'; S.clientMode = 'tareas';   // cada mañana se empieza revisando los clientes
 render(); modeIdle();

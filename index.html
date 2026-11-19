@@ -6,7 +6,7 @@
 <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' https://www.gstatic.com https://apis.google.com https://accounts.google.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://accounts.google.com; font-src https://fonts.gstatic.com; connect-src https://api.clickup.com https://accounts.google.com https://firestore.googleapis.com https://identitytoolkit.googleapis.com https://securetoken.googleapis.com https://www.googleapis.com https://apis.google.com; frame-src https://organizador-jp.firebaseapp.com https://accounts.google.com; img-src 'self' data: https://lh3.googleusercontent.com https://www.google.com; manifest-src 'self'; base-uri 'none'; form-action 'self'; object-src 'none'">
 <meta name="referrer" content="no-referrer">
 <meta name="robots" content="noindex, nofollow">
-<link rel="manifest" href="manifest.json?v=20261119023028">
+<link rel="manifest" href="manifest.json?v=20261119101601">
 <link rel="icon" href="icon-192.png">
 <link rel="apple-touch-icon" href="icon-180.png">
 <meta name="theme-color" content="#0a0a0b">
@@ -701,6 +701,36 @@ html[data-theme=light] .tcol b{color:#1d1d1f}
 /* Columna de cliente: su color arriba y su nombre en una etiqueta de su color */
 .board.grid .col.cg-mine,.board.grid .col.cg-ag{border-top:5px solid var(--cc)!important}
 .colname{background:var(--cc);color:#111;padding:4px 12px;border-radius:99px;font:700 14px var(--head);letter-spacing:-.01em}
+
+/* Botón día/noche */
+#themeBtn{font-size:17px}
+/* Montar bloques */
+.build-btn{background:var(--accent)!important;color:#000!important}
+.build-empty{display:flex;flex-direction:column;align-items:flex-start;gap:8px;padding:18px;margin-bottom:12px;border-radius:18px;border:2px dashed rgba(255,107,61,.5);background:rgba(255,107,61,.06)}
+.build-empty b{font:700 17px var(--head)}
+.build-empty span{color:var(--muted);font-size:13.5px}
+#buildDlg{width:min(760px,calc(100vw - 16px));height:min(92dvh,900px);padding:0}
+.bsheet{height:100%;display:flex;flex-direction:column;gap:8px}
+.bhead{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.bhead h2{margin:0}
+.bwrap{flex:1;min-height:0;display:grid;grid-template-columns:120px 1fr;gap:12px}
+.bpal{display:flex;flex-direction:column;gap:8px}
+.bchip{height:46px;border-radius:12px;background:rgba(255,107,61,.16);color:var(--accent);font:700 14px var(--body);touch-action:none;cursor:grab;border:1px dashed rgba(255,107,61,.6)}
+.bscroll{overflow:auto;border-radius:14px;background:var(--surface-3)}
+.bgrid{position:relative;margin-left:52px;margin-right:10px}
+.bhour{position:absolute;left:-52px;right:0;border-top:1px solid var(--line);height:0}
+.bhour span{position:absolute;left:4px;top:-8px;font-size:11px;color:var(--muted);font-variant-numeric:tabular-nums}
+.bfix{position:absolute;left:0;right:0;border-radius:10px;padding:4px 10px;background:rgba(142,142,147,.28);font-size:12px;overflow:hidden;display:flex;gap:8px;align-items:baseline}
+.bfix.call{background:rgba(255,90,90,.22);box-shadow:inset 3px 0 0 #ff5a5a}
+.bfix small{color:var(--muted)}
+.bblk{position:absolute;left:8%;right:0;border-radius:12px;padding:6px 12px;background:var(--accent);color:#000;box-shadow:0 6px 18px rgba(255,107,61,.35);touch-action:none;cursor:grab;overflow:hidden;display:flex;gap:8px;align-items:baseline}
+.bblk.drag{cursor:grabbing;opacity:.92;z-index:5}
+.bblk small{font-weight:600;opacity:.8}
+.bdel{position:absolute;right:6px;top:4px;width:24px;height:24px;border-radius:50%;background:rgba(0,0,0,.15);font-size:15px;line-height:1}
+.bres{position:absolute;left:0;right:0;bottom:0;height:12px;cursor:ns-resize}
+.bres::after{content:"";position:absolute;left:50%;bottom:4px;width:30px;height:4px;margin-left:-15px;border-radius:4px;background:rgba(0,0,0,.35)}
+.bghost{position:fixed;left:0;top:0;width:200px;border-radius:12px;background:var(--accent);color:#000;font:700 13px var(--body);padding:6px 12px;pointer-events:none;z-index:200;opacity:.9;box-shadow:0 12px 30px rgba(0,0,0,.35)}
+@media (max-width:760px){ .bwrap{grid-template-columns:1fr} .bpal{flex-direction:row;overflow-x:auto} .bchip{flex:none;padding:0 14px} #buildDlg{height:94dvh} }
 </style>
 </head>
 <body>
@@ -730,6 +760,7 @@ html[data-theme=light] .tcol b{color:#1d1d1f}
       <button class="chip" data-group="mine">Mis clientes</button>
       <button class="chip" data-group="agency">Agencia</button>
     </div>
+    <button class="icon" id="themeBtn" aria-label="Cambiar a modo noche" title="Modo día / noche">🌙</button>
     <button class="icon" id="settingsBtn" aria-label="Ajustes"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg></button>
   </header>
 
@@ -780,12 +811,12 @@ html[data-theme=light] .tcol b{color:#1d1d1f}
 
 <div class="toast" id="toast"></div>
 
-<script src="app.js?v=20261119023028"></script>
-<script src="planner.js?v=20261119023028"></script>
-<script src="clients.js?v=20261119023028"></script>
-<script src="quick.js?v=20261119023028"></script>
-<script src="ia.js?v=20261119023028"></script>
-<script src="hours.js?v=20261119023028"></script>
-<script type="module" src="cloud.js?v=20261119023028"></script>
+<script src="app.js?v=20261119101601"></script>
+<script src="planner.js?v=20261119101601"></script>
+<script src="clients.js?v=20261119101601"></script>
+<script src="quick.js?v=20261119101601"></script>
+<script src="ia.js?v=20261119101601"></script>
+<script src="hours.js?v=20261119101601"></script>
+<script type="module" src="cloud.js?v=20261119101601"></script>
 </body>
 </html>

@@ -146,7 +146,11 @@ async function fetchEvents(day){
 function minutesOfDay(d, day){ const base = O.fromIso(day); return Math.round((d - base) / 60000); }
 
 /* ---------- Construir el día ---------- */
-function buildDay(day, events){
+// Desde el 20/11 los bloques de trabajo los montas tú cada día (Montar bloques). Antes, se generan solos en los huecos.
+const MANUAL_FROM = '2026-11-20';
+const isManual = day => day >= MANUAL_FROM;
+const dayBlocks = day => ((P().dayBlocks = P().dayBlocks || {})[day]);
+function buildDay(day, events, auto){
   const plan = P(), dow = O.fromIso(day).getDay();
   const items = [];
   for (const e of events.filter(e => !e.allDay)) items.push({kind: e.free ? 'free' : 'event', ...e});
@@ -164,6 +168,10 @@ function buildDay(day, events){
     if (cur >= we) break;
   }
   if (cur < we) gaps.push([cur, we]);
+  if (!auto && isManual(day)){
+    for (const b of (dayBlocks(day) || [])) items.push({kind:'work', start:b.start, end:b.end, at:toHM(b.start), bid:b.id});
+    return items.sort((a,b) => a.start - b.start || (a.kind === 'work') - (b.kind === 'work'));
+  }
   for (const [s, e] of gaps){
     let len = e - s; if (len < plan.minBlock) continue;
     const n = Math.ceil(len / plan.maxBlock), size = Math.round(len / n / 5) * 5;
@@ -194,6 +202,7 @@ O.views.dia = function(){
     `<button class="icon" data-pday="-1" aria-label="Día anterior"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m15 18-6-6 6-6"/></svg></button>
      <button class="chip" data-pday="0">Hoy</button>
      <button class="icon" data-pday="1" aria-label="Día siguiente"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m9 18 6-6-6-6"/></svg></button>
+     ${isManual(planDay) ? `<button class="chip build-btn" data-buildday>🧱 Montar bloques</button>` : ''}
      <span class="cal-st">${calStatus()}</span>`, 'Arrastra tareas a los bloques de trabajo');
 
   const items = buildDay(planDay, lastEvents);
@@ -248,6 +257,8 @@ O.views.dia = function(){
     if (!mPut && /bloque\s*0/i.test(it.title || '')){ tl += morningRow(); mPut = true; }
   }
   if (!mPut) tl = morningRow() + tl;
+  if (isManual(planDay) && !(dayBlocks(planDay) || []).length)
+    tl = `<div class="build-empty"><b>🧱 Monta tus bloques de hoy</b><span>Arrastra bloques de trabajo a las horas que quieras y estíralos. Luego colocas tus tareas dentro.</span><button class="btn primary" data-buildday>Montar bloques</button></div>` + tl;
   // Cabecera del día: reloj, jornada y contador de tareas
   const plan = P(), ws = toMin(plan.workStart), we = Math.max(toMin(plan.workEnd), ...items.map(i => i.end).filter(e => e <= 24 * 60));
   const jorn = isToday ? Math.max(0, Math.min(100, Math.round((nowMin - ws) / (we - ws) * 100))) : 0;
@@ -362,6 +373,114 @@ async function importDrive(ib){
   importing = false;
 }
 O.importInbox = importInbox;
+
+/* ---------- Montar bloques (vista de horas, arrastrar / mover / estirar) ---------- */
+const PX = 1.1, SNAP = 15, G0 = 7 * 60, G1 = 22 * 60;   // 1 min = 1,1 px; de 7:00 a 22:00
+const bdlg = document.createElement('dialog');
+bdlg.id = 'buildDlg';
+bdlg.innerHTML = `<div class="sheet bsheet">
+  <div class="bhead"><h2>Montar bloques · <span id="bdTitle"></span></h2><span class="sp"></span>
+    <button type="button" class="btn" data-bauto>Propuesta automática</button><button type="button" class="btn" data-bclear>Vaciar</button>
+    <button type="button" class="btn primary" data-bclose>Listo</button></div>
+  <p class="iahint">Arrastra un bloque desde la izquierda a la hora que quieras (o tócalo para añadirlo en el primer hueco). Muévelo arrastrando y estíralo desde el borde de abajo.</p>
+  <div class="bwrap"><div class="bpal">${[[30,'30 min'],[45,'45 min'],[60,'1 h'],[90,'1 h 30'],[120,'2 h']].map(([m, l]) => `<button type="button" class="bchip" data-bdur="${m}">＋ ${l}</button>`).join('')}</div>
+    <div class="bscroll"><div class="bgrid" id="bgrid"></div></div></div></div>`;
+document.body.appendChild(bdlg);
+const bgrid = bdlg.querySelector('#bgrid');
+let bDay = null;
+const snap = m => Math.round(m / SNAP) * SNAP;
+const clampB = (s, e) => { const d = e - s; s = Math.max(G0, Math.min(G1 - d, s)); return [s, s + d]; };
+function openBuild(day){
+  bDay = day; const d = O.fromIso(day);
+  bdlg.querySelector('#bdTitle').textContent = `${O.DIAS_L[d.getDay()]} ${d.getDate()} ${O.MESES[d.getMonth()]}`;
+  if (!dayBlocks(day)) P().dayBlocks[day] = [];
+  drawGrid(); bdlg.showModal();
+  const first = bgrid.querySelector('.bblk,.bfix'); bdlg.querySelector('.bscroll').scrollTop = first ? Math.max(0, first.offsetTop - 60) : (9 * 60 - G0) * PX;
+}
+function drawGrid(){
+  const evs = planDay === bDay ? lastEvents : [];
+  const fixed = buildDay(bDay, evs).filter(i => i.kind !== 'work' && i.kind !== 'free');
+  let h = '';
+  for (let m = G0; m <= G1; m += 60) h += `<div class="bhour" style="top:${(m - G0) * PX}px"><span>${toHM(m)}</span></div>`;
+  for (const f of fixed) h += `<div class="bfix${f.isCall ? ' call' : ''}" style="top:${(f.start - G0) * PX}px;height:${(f.end - f.start) * PX}px"><b>${esc(f.title)}</b><small>${toHM(f.start)}–${toHM(f.end)}</small></div>`;
+  for (const b of dayBlocks(bDay)) h += `<div class="bblk" data-bid="${b.id}" style="top:${(b.start - G0) * PX}px;height:${(b.end - b.start) * PX}px">
+      <b>Trabajo</b><small>${toHM(b.start)}–${toHM(b.end)} · ${dur(b.end - b.start)}</small>
+      <button type="button" class="bdel" data-bdel aria-label="Quitar bloque">×</button><i class="bres" data-bres></i></div>`;
+  bgrid.style.height = (G1 - G0) * PX + 'px';
+  bgrid.innerHTML = h;
+}
+function setBlock(b, s, e){
+  const old = toHM(b.start);
+  b.start = s; b.end = e;
+  // las tareas colocadas en ese bloque se mueven con él
+  for (const sl of Object.values(S.slots)) if (sl.day === bDay && sl.at === old) sl.at = toHM(s);
+}
+function addBlock(start, len){
+  const [s, e] = clampB(snap(start), snap(start) + len);
+  dayBlocks(bDay).push({id: Math.random().toString(36).slice(2, 8), start: s, end: e});
+  O.save(); drawGrid();
+}
+function firstFree(len){
+  const busy = [...buildDay(bDay, planDay === bDay ? lastEvents : []).filter(i => i.kind !== 'free').map(i => [i.start, i.end]), ...dayBlocks(bDay).map(b => [b.start, b.end])].sort((a, b) => a[0] - b[0]);
+  let t = toMin(P().workStart);
+  for (const [s, e] of busy){ if (s - t >= len) break; if (e > t) t = e; }
+  return t;
+}
+const yToMin = y => G0 + (y - bgrid.getBoundingClientRect().top) / PX;
+// Mover y estirar bloques
+bgrid.addEventListener('pointerdown', e => {
+  if (e.target.closest('[data-bdel]')) return;
+  const el = e.target.closest('.bblk'); if (!el) return;
+  e.preventDefault();
+  const b = dayBlocks(bDay).find(x => x.id === el.dataset.bid), resize = !!e.target.closest('[data-bres]');
+  const y0 = e.clientY, s0 = b.start, e0 = b.end;
+  el.setPointerCapture(e.pointerId); el.classList.add('drag');
+  const mv = ev => {
+    const dm = (ev.clientY - y0) / PX;
+    if (resize){ const ne = Math.max(s0 + SNAP, Math.min(G1, snap(e0 + dm))); el.style.height = (ne - s0) * PX + 'px'; el.dataset.ne = ne; el.querySelector('small').textContent = `${toHM(s0)}–${toHM(ne)} · ${dur(ne - s0)}`; }
+    else { const [ns, ne] = clampB(snap(s0 + dm), snap(s0 + dm) + (e0 - s0)); el.style.top = (ns - G0) * PX + 'px'; el.dataset.ns = ns; el.querySelector('small').textContent = `${toHM(ns)}–${toHM(ne)} · ${dur(ne - ns)}`; }
+  };
+  const up = () => {
+    el.removeEventListener('pointermove', mv); el.removeEventListener('pointerup', up); el.removeEventListener('pointercancel', up);
+    if (resize && el.dataset.ne) setBlock(b, s0, +el.dataset.ne);
+    if (!resize && el.dataset.ns){ const ns = +el.dataset.ns; setBlock(b, ns, ns + (e0 - s0)); }
+    O.save(); drawGrid();
+  };
+  el.addEventListener('pointermove', mv); el.addEventListener('pointerup', up); el.addEventListener('pointercancel', up);
+});
+// Arrastrar un bloque nuevo desde la paleta (o tocarlo para ponerlo en el primer hueco)
+bdlg.querySelector('.bpal').addEventListener('pointerdown', e => {
+  const c = e.target.closest('[data-bdur]'); if (!c) return;
+  e.preventDefault();
+  const len = +c.dataset.bdur, x0 = e.clientX, y0 = e.clientY;
+  let ghost = null;
+  c.setPointerCapture(e.pointerId);
+  const mv = ev => {
+    if (!ghost && Math.hypot(ev.clientX - x0, ev.clientY - y0) > 6){
+      ghost = document.createElement('div'); ghost.className = 'bghost'; ghost.style.height = len * PX + 'px'; ghost.textContent = 'Trabajo · ' + dur(len); document.body.appendChild(ghost);
+    }
+    if (ghost){ ghost.style.transform = `translate(${ev.clientX - 60}px, ${ev.clientY - 14}px)`; }
+  };
+  const up = ev => {
+    c.removeEventListener('pointermove', mv); c.removeEventListener('pointerup', up); c.removeEventListener('pointercancel', up);
+    if (!ghost) return addBlock(firstFree(len), len);
+    ghost.remove();
+    const r = bgrid.getBoundingClientRect();
+    if (ev.clientX >= r.left && ev.clientX <= r.right && ev.clientY >= r.top && ev.clientY <= r.bottom) addBlock(yToMin(ev.clientY - 14), len);
+  };
+  c.addEventListener('pointermove', mv); c.addEventListener('pointerup', up); c.addEventListener('pointercancel', up);
+});
+bdlg.addEventListener('click', e => {
+  if (e.target.closest('[data-bdel]')){ const id = e.target.closest('.bblk').dataset.bid; P().dayBlocks[bDay] = dayBlocks(bDay).filter(b => b.id !== id); O.save(); drawGrid(); }
+  if (e.target.closest('[data-bclear]') && confirm('¿Quitar todos los bloques de este día?')){ P().dayBlocks[bDay] = []; O.save(); drawGrid(); }
+  if (e.target.closest('[data-bauto]')){
+    P().dayBlocks[bDay] = buildDay(bDay, planDay === bDay ? lastEvents : [], true).filter(i => i.kind === 'work').map(i => ({id: Math.random().toString(36).slice(2, 8), start: i.start, end: i.end}));
+    O.save(); drawGrid();
+  }
+  if (e.target.closest('[data-bclose]')) bdlg.close();
+});
+bdlg.addEventListener('close', () => { if (S.view === 'dia') O.render(); });
+document.addEventListener('click', e => { if (e.target.closest('[data-buildday]')) openBuild(planDay); });
 // Bloques de trabajo de hoy (para colocar tareas desde el editor, sin arrastrar)
 O.todayBlocks = () => buildDay(O.today(), planDay === O.today() ? lastEvents : []).filter(i => i.kind === 'work').map(b => ({at: b.at, label: `${toHM(b.start)} – ${toHM(b.end)}`}));
 O.connectDriveInbox = connectDriveInbox;
