@@ -6,7 +6,7 @@
 <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' https://www.gstatic.com https://apis.google.com https://accounts.google.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://accounts.google.com; font-src https://fonts.gstatic.com; connect-src https://api.clickup.com https://script.google.com https://script.googleusercontent.com https://accounts.google.com https://firestore.googleapis.com https://identitytoolkit.googleapis.com https://securetoken.googleapis.com https://www.googleapis.com https://apis.google.com; frame-src https://organizador-jp.firebaseapp.com https://accounts.google.com; img-src 'self' data: https://lh3.googleusercontent.com https://www.google.com; manifest-src 'self'; base-uri 'none'; form-action 'self'; object-src 'none'">
 <meta name="referrer" content="no-referrer">
 <meta name="robots" content="noindex, nofollow">
-<link rel="manifest" href="manifest.json?v=20261119111053">
+<link rel="manifest" href="manifest.json?v=20261119112037">
 <link rel="icon" href="icon-192.png">
 <link rel="apple-touch-icon" href="icon-180.png">
 <meta name="theme-color" content="#0a0a0b">
@@ -312,6 +312,13 @@ a.btn{display:inline-flex;align-items:center;text-decoration:none;color:var(--te
 .card{background:color-mix(in srgb,var(--c,#555) 14%,var(--surface-2));border-left:4px solid var(--c,var(--faint))}
 .card:hover{border-color:color-mix(in srgb,var(--c,#555) 45%,transparent);border-left-color:var(--c,var(--faint))}
 .card .tt{font-weight:600;font-size:14.5px;line-height:1.35}
+.npeek{display:flex;gap:6px;align-items:center;margin-top:3px;min-width:0;font-size:12px;color:var(--muted)}
+.npeek .ntx{flex:1 1 auto;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.npeek .nlink{flex:0 0 auto;max-width:150px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;padding:1px 7px;border-radius:999px;background:color-mix(in srgb,var(--accent) 12%,transparent);color:var(--accent);text-decoration:none;font-weight:600}
+.npeek .nmore{flex:0 0 auto;color:var(--faint)}
+.edlinks{display:flex;flex-wrap:wrap;gap:6px;margin-top:-4px}
+.edlinks:empty{display:none}
+.edlinks a{padding:4px 10px;border-radius:999px;background:color-mix(in srgb,var(--accent) 12%,transparent);color:var(--accent);text-decoration:none;font:600 13px var(--body)}
 .meta .cl{color:color-mix(in srgb,var(--c) 65%,#fff);font-weight:600}
 .card.done{opacity:.55}
 .dayhead{display:grid;grid-template-columns:auto 1fr auto;gap:22px;align-items:center;background:var(--surface);border:1px solid var(--line);border-radius:16px;padding:14px 18px;margin-bottom:14px}
@@ -816,6 +823,8 @@ html[data-theme=light] .jplogo .lg-l{display:block}
     <label>Estado<select name="status"><option value="todo">Por hacer</option><option value="doing">En curso</option><option value="review">En revisión</option><option value="done">Hecho</option></select></label>
     <label>Urgencia<select name="priority"><option value="super">🔥 Súper urgente</option><option value="alta">🔴 Urgente</option><option value="normal">🟡 Media</option><option value="baja">🟢 Cuando pueda</option></select></label>
   </div>
+  <label>Notas y enlaces<textarea name="notes" rows="4" placeholder="Recursos, enlaces, lo que te han pasado para hacer esta tarea…"></textarea></label>
+  <div class="edlinks" id="edLinks"></div>
   <div class="actions"><button class="btn danger" value="del">Borrar</button><a class="btn" id="edLink" target="_blank" rel="noopener" hidden>ClickUp ↗</a><span class="sp"></span><button class="btn" value="cancel" formnovalidate>Cancelar</button><button class="btn primary" value="ok">Guardar</button></div>
 </form></dialog>
 
@@ -836,12 +845,12 @@ html[data-theme=light] .jplogo .lg-l{display:block}
 
 <div class="toast" id="toast"></div>
 
-<script src="app.js?v=20261119111053"></script>
-<script src="planner.js?v=20261119111053"></script>
-<script src="clients.js?v=20261119111053"></script>
-<script src="quick.js?v=20261119111053"></script>
-<script src="ia.js?v=20261119111053"></script>
-<script src="hours.js?v=20261119111053"></script>
-<script type="module" src="cloud.js?v=20261119111053"></script>
+<script src="app.js?v=20261119112037"></script>
+<script src="planner.js?v=20261119112037"></script>
+<script src="clients.js?v=20261119112037"></script>
+<script src="quick.js?v=20261119112037"></script>
+<script src="ia.js?v=20261119112037"></script>
+<script src="hours.js?v=20261119112037"></script>
+<script type="module" src="cloud.js?v=20261119112037"></script>
 </body>
 </html>

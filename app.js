@@ -420,6 +420,17 @@ function clientColor(c){
   const i = Math.max(0, fam.findIndex(x => x.id === c.id)), pal = c.group === 'mine' ? PAL_MINE : PAL_AG;
   return pal[i % pal.length];
 }
+// Notas de cada tarea: solo en la app (se sincronizan con tu cuenta, nunca van a ClickUp)
+const URL_RE = /https?:\/\/[^\s<>"']*[^\s<>"'.,;:!?)\]]/g;
+const noteOf = id => ((S.plan && S.plan.tnotes) || {})[id] || '';
+function setNote(id, txt){ if (!S.plan) return; const n = S.plan.tnotes = S.plan.tnotes || {}; txt = txt.trim(); if (txt) n[id] = txt; else delete n[id]; }
+const linkHost = u => { try { return new URL(u).hostname.replace(/^www\./, ''); } catch(e){ return 'enlace'; } };
+function notePeek(id){
+  const n = noteOf(id); if (!n) return '';
+  const links = [...new Set(n.match(URL_RE) || [])];
+  const text = n.replace(URL_RE, '').replace(/\s+/g, ' ').trim();
+  return `<div class="npeek">${text ? `<span class="ntx">📝 ${esc(text)}</span>` : ''}${links.slice(0, 2).map(u => `<a class="nlink" href="${esc(u)}" target="_blank" rel="noopener" title="${esc(u)}">🔗 ${esc(linkHost(u))}</a>`).join('')}${links.length > 2 ? `<span class="nmore">+${links.length - 2}</span>` : ''}</div>`;
+}
 function card(t, hide={}){
   const c = client(t.client), done = t.status === 'done', late = !done && t.day && t.day < today();
   const g = groupOf(c);
@@ -434,7 +445,7 @@ function card(t, hide={}){
   if (t.ia) meta.unshift(t.src === 'call' ? `<span class="callb">📞 ${esc(t.meeting || 'Videollamada')}</span>` : '<span class="iab">🤖 IA · revisa</span>');
   return `<article class="card ${g.cls} ${done?'done':''} ${t.ia?'ia':''}" data-id="${t.id}" style="--c:${clientColor(c)};--g:${g.color}" tabindex="0">
     <button class="chk" aria-label="${done?'Marcar como pendiente':'Completar'}"></button>
-    <div class="body"><p class="tt">${esc(t.title)}</p>${meta.length?`<div class="meta">${meta.join('')}</div>`:''}</div>
+    <div class="body"><p class="tt">${esc(t.title)}</p>${notePeek(t.id)}${meta.length?`<div class="meta">${meta.join('')}</div>`:''}</div>
     ${hide.pick && !done ? `<button class="pick${t.today === today() ? ' on' : ''}" data-pick aria-label="Para hoy" title="${t.today === today() ? 'Quitar de hoy' : 'Hacer hoy'}">${t.today === today() ? '✓ Hoy' : 'Hoy'}</button>` : ''}</article>`;
 }
 function column({title, sub='', field, value='', tasks, hide, cls='', dot, undone=false, empty='Arrastra aquí', add, byUrg}){
@@ -622,7 +633,7 @@ function endDrag(){
 main.addEventListener('pointerdown', e => {
   if (e.pointerType !== 'mouse' || e.button !== 0) return;
   const cardEl = e.target.closest('.card');
-  if (!cardEl || e.target.closest('.chk,[data-pick],[data-iaok],[data-iano]')) return;
+  if (!cardEl || e.target.closest('.chk,[data-pick],[data-iaok],[data-iano],.npeek a')) return;
   e.preventDefault();
   const sx = e.clientX, sy = e.clientY;
   const mv = ev => { if (!D && Math.hypot(ev.clientX-sx, ev.clientY-sy) > 6) beginDrag(cardEl, sx, sy); if (D) moveDrag(ev.clientX, ev.clientY); };
@@ -631,7 +642,7 @@ main.addEventListener('pointerdown', e => {
 });
 main.addEventListener('touchstart', e => {
   const cardEl = e.target.closest('.card');
-  if (!cardEl || e.touches.length > 1 || e.target.closest('.chk')) return;
+  if (!cardEl || e.touches.length > 1 || e.target.closest('.chk,.npeek a')) return;
   const p0 = e.touches[0], sx = p0.clientX, sy = p0.clientY;
   let lx = sx, ly = sy;
   const timer = setTimeout(() => { beginDrag(cardEl, lx, ly); navigator.vibrate && navigator.vibrate(12); }, 260);
@@ -672,6 +683,7 @@ main.addEventListener('click', e => {
     if (iaB.dataset.iano !== undefined){ S.tasks = S.tasks.filter(x => x !== t); save(); render(); toast('Descartada'); return; }
     t.ia = false; save(); render(); pushCreate(t); toast(`Aprobada${t.client ? ' · ' + client(t.client).name : ''}`); return;
   }
+  if (e.target.closest('.npeek a')) return;
   const chk = e.target.closest('.chk');
   const cardEl = e.target.closest('.card');
   if (chk && cardEl){
@@ -697,10 +709,13 @@ function clientOptions(sel){
   const grp = (g,l) => `<optgroup label="${l}">` + S.clients.filter(c=>c.group===g).map(c => `<option value="${c.id}" ${c.id===sel?'selected':''}>${esc(c.name)}</option>`).join('') + '</optgroup>';
   return `<option value="">Sin cliente</option>` + grp('mine','Mis clientes') + grp('agency','Agencia');
 }
+const noteLinks = txt => [...new Set(txt.match(URL_RE) || [])].map(u => `<a href="${esc(u)}" target="_blank" rel="noopener">🔗 ${esc(linkHost(u))}</a>`).join('');
+edForm.notes.addEventListener('input', () => { $('#edLinks').innerHTML = noteLinks(edForm.notes.value); });
 function openEditor(id){
   const t = task(id); if (!t) return; editing = id;
   edForm.title.value = t.title; edForm.client.innerHTML = clientOptions(t.client);
   edForm.day.value = t.day || ''; edForm.status.value = t.status; edForm.priority.value = t.priority;
+  edForm.notes.value = noteOf(t.id); $('#edLinks').innerHTML = noteLinks(edForm.notes.value);
   const link = $('#edLink'); link.hidden = !t.url; if (t.url) link.href = t.url;
   // Para hoy + colocar en un bloque de hoy (sin arrastrar, cómodo en el móvil)
   edForm.today.checked = t.today === today();
@@ -717,6 +732,7 @@ ed.addEventListener('close', () => {
     S.tasks = S.tasks.filter(x => x !== t); save(); render(); toast('Tarea borrada'); pushDelete(t); return;
   }
   if (ed.returnValue !== 'ok') return;
+  setNote(t.id, edForm.notes.value);
   t.title = edForm.title.value.trim() || t.title; t.client = edForm.client.value || null;
   t.day = edForm.day.value || null; t.priority = edForm.priority.value;
   if (edForm.status.value !== t.status) setStatus(t, edForm.status.value);
