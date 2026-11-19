@@ -85,6 +85,7 @@ function applyCloud(d){
   S.tasks = [...S.tasks.filter(t => t.cu), ...(d.tasks || [])];
   S.cu.hidden = d.hidden || [];
   if (d.plan) S.plan = d.plan;
+  dropAliased();
   S.slots = d.slots || {};
   if (d.hours) S.hours = d.hours;
   if (d.ai) S.ai = d.ai;
@@ -167,6 +168,11 @@ const rawKey = (folderId, listId) => folderId ? 'f:' + folderId : 'l:' + listId;
 // Clientes unidos: una carpeta/lista de ClickUp puede contar como otro cliente de la agencia (⚙ → «Unir con…»)
 const cuAlias = () => (S.plan && S.plan.cuAlias) || {};
 const folderKey = (folderId, listId) => { const k = rawKey(folderId, listId); return cuAlias()[k] || k; };
+function dropAliased(){
+  const al = cuAlias(); if (!Object.keys(al).length) return;
+  for (const t of S.tasks) if (al[t.client]) t.client = al[t.client];
+  S.clients = S.clients.filter(c => !al[c.id]);
+}
 function ensureAgencyClient(key, name){
   let c = client(key);
   if (!c){
@@ -197,7 +203,9 @@ const LIST_HINTS = [
 function chooseList(c, title, prefer){
   const ls = clientLists(c); if (!ls.length) return null;
   // Regla fija: las tareas de clientes van a «Review & Strategy»; las de Jorge Personal, a «Tareas Internas»
-  const fija = ls.find(l => /tareas internas/.test(norm(l.name))) || ls.find(l => /review/.test(norm(l.name)) && /strategy/.test(norm(l.name)));
+  // (si el cliente no tiene «Review & Strategy», va a su lista «Jorge | …»)
+  const fija = ls.find(l => /tareas internas/.test(norm(l.name))) || ls.find(l => /review/.test(norm(l.name)) && /strategy/.test(norm(l.name)))
+    || ls.find(l => /^jorge\s*\|/.test(norm(l.name).trim()));
   if (fija) return fija;
   if (prefer){ const same = ls.find(l => norm(l.name) === norm(prefer)); if (same) return same; }
   const t = norm(title || '');
@@ -233,6 +241,7 @@ async function sync(silent){
   syncing = true; setMode('Sincronizando…');
   try {
     if (!S.cu.teams || !S.cu.lists.length || !('folder' in (S.cu.lists[0] || {}))) await loadLists();
+    dropAliased();
     const prev = new Map(S.tasks.map(t => [t.id, t]));
     const since = Date.now() - 14 * 864e5, hid = hidden();
     const out = new Map();
