@@ -326,6 +326,11 @@ O.views.dia = function(){
   const wDone = upto(wU), cDone = upto(cU), done = wDone + cDone;
   const jorn = tot ? Math.round(done / tot * 100) : 0;
   const pw = tot ? wDone / tot * 100 : 0, pc = tot ? cDone / tot * 100 : 0;
+  // Barra por tramos: cada bloque y cada reunión en orden; lo hecho se rellena (naranja trabajo, morado reunión)
+  const segBar = !tot ? '<div class="jbar"></div>' : `<div class="jsegs">${[...wU.map(x => [...x, 'w']), ...cU.map(x => [...x, 'c'])].sort((a,b) => a[0]-b[0]).map(([a, b, k]) => {
+      const f = !isToday ? 0 : Math.max(0, Math.min(1, (nowMin - a) / (b - a)));
+      return `<span class="jseg ${k}${f > 0 && f < 1 ? ' cur' : ''}" style="flex-grow:${b - a}" title="${k === 'c' ? 'Reunión' : 'Bloque'} ${toHM(a)}–${toHM(b)}"><i style="width:${Math.round(f * 100)}%"></i></span>`;
+    }).join('')}</div>`;
   const split = `<span class="jsplit"><em><i class="jw"></i>Bloques ${dur(wDone)} / ${dur(wTot)}</em><em><i class="jc"></i>Reuniones ${dur(cDone)} / ${dur(cTot)}</em></span>`;
   const jornTxt = !tot ? 'Aún no tienes bloques de trabajo hoy'
     : !isToday ? `${dur(tot)} de trabajo planificado ${split}`
@@ -350,7 +355,7 @@ O.views.dia = function(){
   const ring = hoyTs.length ? Math.round(hechasHoy / hoyTs.length * 100) : 0;
   const head = `<div class="dayhead">
     <div class="clock">${isToday ? `${O.pad(now.getHours())}:${O.pad(now.getMinutes())}` : `${d.getDate()} ${O.MESES[d.getMonth()]}`}</div>
-    <div class="jorn"><div class="jbar"><span style="width:${pw}%"></span><span class="jc" style="left:${pw}%;width:${pc}%"></span></div>
+    <div class="jorn">${segBar}
       <small>${jornTxt}</small></div>
     <div class="legend"><span style="--c:${O.GROUP.agency.color}">Agencia</span><span style="--c:${O.GROUP.mine.color}">Mis clientes</span><span style="--c:#A78BFA">Llamadas</span></div>
     <div class="ring" style="--r:${ring}"><b>${hechasHoy}/${hoyTs.length}</b><small>hechas</small></div>
