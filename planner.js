@@ -195,8 +195,8 @@ function minutesOfDay(d, day){ const base = O.fromIso(day); return Math.round((d
 /* ---------- Construir el día ---------- */
 // Desde el 20/11 los bloques de trabajo los montas tú cada día (Montar bloques). Antes, se generan solos en los huecos.
 const MANUAL_FROM = '2026-11-20';
-const isManual = day => day >= MANUAL_FROM;
 const dayBlocks = day => ((P().dayBlocks = P().dayBlocks || {})[day]);
+const isManual = day => day >= MANUAL_FROM || !!dayBlocks(day);
 function buildDay(day, events, auto){
   const plan = P(), dow = O.fromIso(day).getDay();
   const items = [];
@@ -255,7 +255,7 @@ O.views.dia = function(){
     `<button class="icon" data-pday="-1" aria-label="Día anterior"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m15 18-6-6 6-6"/></svg></button>
      <button class="chip" data-pday="0">Hoy</button>
      <button class="icon" data-pday="1" aria-label="Día siguiente"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m9 18 6-6-6-6"/></svg></button>
-     ${isManual(planDay) ? `<button class="chip build-btn" data-buildday>🧱 Montar bloques</button>` : ''}
+     <button class="chip build-btn" data-buildday>🧱 Montar bloques</button>
      <span class="cal-st">${calStatus()}</span>`, 'Arrastra tareas a los bloques de trabajo');
 
   const items = buildDay(planDay, lastEvents);
@@ -280,7 +280,7 @@ O.views.dia = function(){
   let mPut = false;
   let tl = allDay.length ? `<div class="allday">${allDay.map(e => `<span class="tag" style="--c:${e.color}"><i></i>${esc(e.title)}</span>`).join('')}</div>` : '';
   for (const it of items){
-    const st = !isToday ? 'future' : nowMin >= it.end ? 'past' : nowMin >= it.start ? 'now' : 'future';
+    const st = !isToday ? '' : nowMin >= it.end ? 'past' : nowMin >= it.start ? 'now' : 'future';
     const pct = st === 'past' ? 100 : st === 'now' ? Math.round((nowMin - it.start) / (it.end - it.start) * 100) : 0;
     let body, color;
     if (it.kind === 'work'){
@@ -461,7 +461,9 @@ const clampB = (s, e) => { const d = e - s; s = Math.max(G0, Math.min(G1 - d, s)
 function openBuild(day){
   bDay = day; const d = O.fromIso(day);
   bdlg.querySelector('#bdTitle').textContent = `${O.DIAS_L[d.getDay()]} ${d.getDate()} ${O.MESES[d.getMonth()]}`;
-  if (!dayBlocks(day)) P().dayBlocks[day] = [];
+  if (!dayBlocks(day)) P().dayBlocks[day] = day >= MANUAL_FROM ? [] :
+    buildDay(day, planDay === day ? lastEvents : [], true).filter(i => i.kind === 'work').map(i => ({id: Math.random().toString(36).slice(2, 8), start: i.start, end: i.end}));
+  O.save();
   drawGrid(); bdlg.showModal();
   const first = bgrid.querySelector('.bblk,.bfix'); bdlg.querySelector('.bscroll').scrollTop = first ? Math.max(0, first.offsetTop - 60) : (9 * 60 - G0) * PX;
 }
