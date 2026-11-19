@@ -228,7 +228,9 @@ function calStatus(){
   if (!GCAL_CLIENT_ID) return '';
   if (!accs.length) return `<button class="chip" data-gcal="add">📅 Conectar Google Calendar</button>`;
   const short = e => { const [u, d] = e.split('@'); return d === 'gmail.com' ? u : d.split('.')[0]; };
-  return accs.map(a => a.bridge ? `<span class="chip on" title="Calendarios por el puente: sin permisos cada hora">🔗 Google</span>` : tokenOk(a.email)
+  const viaP = new Set(((accs.find(a => a.bridge) || {}).cals || []).map(c => c.id));
+  const cubierta = a => !a.bridge && P().bridge && (a.cals || []).filter(c => c.on).every(c => viaP.has(c.id));
+  return accs.filter(a => !cubierta(a)).map(a => a.bridge ? `<span class="chip on" title="Calendarios por el puente: sin permisos cada hora">🔗 Google</span>` : tokenOk(a.email)
     ? `<span class="chip on" title="${esc(a.email)}">📅 ${esc(short(a.email))}</span>`
     : `<button class="chip warn" data-gcal="${esc(a.email)}" title="Google pide confirmar cada hora">↻ ${esc(short(a.email))}</button>`).join('')
     + `<button class="chip" data-gcal="add" title="Conectar otra cuenta de Google">+ Calendario</button>`;
