@@ -739,14 +739,18 @@ $('#settingsBtn').addEventListener('click', renderPlanSettings);
 // Aviso de reunión 5 minutos antes: sonido + notificación (en este dispositivo, con la app abierta)
 const bellOn = () => { try { return localStorage.getItem('jp-bell') !== 'off'; } catch(e){ return true; } };
 let actx = null;
-function chime(){
+// 5 min: campanita suave de tres notas. 1 min: «bip-bip» rápido repetido, más urgente.
+function chime(kind = 'soft'){
   try {
     actx = actx || new (window.AudioContext || window.webkitAudioContext)(); actx.resume();
     const t0 = actx.currentTime;
-    [[880, 0], [1175, .18], [1568, .36]].forEach(([f, d]) => {
-      const o = actx.createOscillator(), g = actx.createGain(); o.type = 'sine'; o.frequency.value = f;
-      g.gain.setValueAtTime(0, t0 + d); g.gain.linearRampToValueAtTime(.25, t0 + d + .02); g.gain.exponentialRampToValueAtTime(.001, t0 + d + .9);
-      o.connect(g).connect(actx.destination); o.start(t0 + d); o.stop(t0 + d + 1);
+    const notes = kind === 'urgent'
+      ? [0, .14, .5, .64, 1, 1.14].map(d => [1320, d, .1, 'triangle'])
+      : [[880, 0, .9, 'sine'], [1175, .18, .9, 'sine'], [1568, .36, .9, 'sine']];
+    notes.forEach(([f, d, len, type]) => {
+      const o = actx.createOscillator(), g = actx.createGain(); o.type = type; o.frequency.value = f;
+      g.gain.setValueAtTime(0, t0 + d); g.gain.linearRampToValueAtTime(kind === 'urgent' ? .3 : .25, t0 + d + .01); g.gain.exponentialRampToValueAtTime(.001, t0 + d + len);
+      o.connect(g).connect(actx.destination); o.start(t0 + d); o.stop(t0 + d + len + .05);
     });
   } catch(e){}
 }
@@ -756,7 +760,7 @@ const avisadas = (() => { try { return JSON.parse(localStorage.getItem('jp-aviso
 function avisar(key, title, min = 5){
   avisadas[key] = 1; try { localStorage.setItem('jp-avisos', JSON.stringify(Object.fromEntries(Object.entries(avisadas).filter(([k]) => parseInt(k) > Date.now() - 864e5)))); } catch(e){}
   if (!bellOn()) return;
-  chime(); if (min === 1) setTimeout(chime, 1200); O.toast(min === 1 ? `📞 ¡En 1 minuto!: ${title}` : `📞 En 5 min: ${title}`);
+  chime(min === 1 ? 'urgent' : 'soft'); O.toast(min === 1 ? `📞 ¡En 1 minuto!: ${title}` : `📞 En 5 min: ${title}`);
   try { if ('Notification' in window && Notification.permission === 'granted') new Notification(min === 1 ? 'Reunión en 1 minuto' : 'Reunión en 5 minutos', {body: title, icon: 'logo-claro.png', tag: 'reu-' + key}); } catch(e){}
 }
 document.addEventListener('click', e => {
