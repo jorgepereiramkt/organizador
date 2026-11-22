@@ -175,7 +175,10 @@ O.views.clientes = function(){
       <span class="sp"></span>
       ${isCur ? `<button class="btn primary${atrasado ? '' : ' muted'}" data-hfill>⏩ Rellenar hasta hoy</button>` : ''}
       <button class="btn" data-hreload>↻ Leer ClickUp</button></div>
-    <label class="check hauto"><input type="checkbox" id="hAuto" ${H().auto ? 'checked' : ''}> Registrar solo cada día laborable a partir de las 19:00 lo que toca ese día (máx. 1 h 30 por cliente)</label>
+    ${(() => { const cl = H().cloud || {};
+      return cl.on ? `<div class="hcloud on">☁️ <b>Registro automático activo</b> · cada día laborable a las 19:05 tu Apps Script registra lo que toca, aunque no abras la app${cl.trigger ? '' : ' · <em>falta crear el aviso diario en el script</em>'} · plan enviado ${cl.at ? new Date(cl.at).toTimeString().slice(0, 5) : ''}<button class="btn" data-hcloud>Desactivar</button></div>`
+        : `<div class="hcloud">☁️ Registra solo cada día a las 19:05 <b>aunque no abras la app</b><button class="btn primary" data-hcloud>Activar</button></div>
+           <label class="check hauto"><input type="checkbox" id="hAuto" ${H().auto ? 'checked' : ''}> Mientras tanto: registrar desde la app a partir de las 19:00 si está abierta (máx. 1 h 30 por cliente)</label>`; })()}
     ${isCur && H().log[hoyD] && H().log[hoyD]._auto ? `<div class="note">⏱ Hoy se registró automáticamente. <button class="btn" data-hundo>Deshacer lo de hoy</button></div>` : ''}
     <div class="hcards">${cards || '<div class="empty">Conecta ClickUp para ver los clientes de la agencia.</div>'}</div>
     <h3 class="h3">📅 ${O.MESES[d0.getMonth()]} día a día</h3>
@@ -288,10 +291,58 @@ async function pushDay(day, row, añadir){
   O.toast(fail ? `ClickUp: ${ok} registradas, ${fail} con error` : `⏱ Registradas en ClickUp las horas de hoy (${ok} clientes)`);
 }
 
+/* ---------- Automático en la nube: tu Apps Script registra a las 19:05 aunque no abras la app ---------- */
+// La app le manda el plan (minutos por día y cliente) y tu token de ClickUp. El aviso diario lo crea «instalarAutomatico» en el script.
+function cloudPlan(){
+  const hoy = O.today(), plan = {}, mes = monthOf(hoy);
+  const sig = fromIso(mes + '-01'); sig.setMonth(sig.getMonth() + 1); const mes2 = monthOf(iso(sig));
+  const hoyP = proposal(hoy);
+  for (const c of agencyClients()){
+    const tk = taskFor(c), team = teamOf(c); if (!tk || !team) continue;
+    // este mes: lo que toca hoy se repite los días que quedan (se recalcula cada vez que abres la app)
+    const m1 = hoyP[c.id] || 0;
+    if (m1) for (const d of workDays(mes).filter(d => d >= hoy)) (plan[d] = plan[d] || {})[tk.id] = {team, min: m1};
+    // mes siguiente: reparto parejo por si no abres la app en unos días
+    const t2 = target(mes2, c) * 60, wd2 = workDays(mes2);
+    if (t2 && wd2.length){ const m2 = Math.min(MAX_DIA, r5(t2 / wd2.length)); for (const d of wd2) (plan[d] = plan[d] || {})[tk.id] = {team, min: m2}; }
+  }
+  return plan;
+}
+async function sendCloud(conToken){
+  const url = S.plan && S.plan.bridge; if (!url) throw new Error('conecta antes el Puente de Google (⚙)');
+  const body = {a: 'hoursplan', me: S.cu.me, start: (S.plan && S.plan.workStart) || '09:00', plan: cloudPlan()};
+  if (conToken) body.token = S.cu.token;
+  const r = await fetch(url, {method: 'POST', body: JSON.stringify(body), headers: {'Content-Type': 'text/plain;charset=utf-8'}, redirect: 'follow'});
+  const j = await r.json(); if (j.error) throw new Error(j.error);
+  const h = H(); h.cloud = {...(h.cloud || {}), on: true, at: Date.now(), trigger: !!j.trigger}; O.save();
+  return j;
+}
+let cloudBusy = false;
+async function cloudSync(){   // mantiene el plan al día (como mucho cada 30 min)
+  const h = H(); if (!h.cloud || !h.cloud.on || cloudBusy || !O.online()) return;
+  if (h.cloud.at && Date.now() - h.cloud.at < 30 * 60e3) return;
+  cloudBusy = true; try { await loadRegistered(monthOf(O.today())); await sendCloud(false); } catch(e){} cloudBusy = false;
+}
+setTimeout(cloudSync, 15000); setInterval(cloudSync, 10 * 60e3);
+document.addEventListener('click', async e => {
+  if (e.target.closest('[data-hcloud]')){
+    const h = H();
+    if (h.cloud && h.cloud.on){
+      if (!confirm('¿Desactivar el registro automático en la nube? (deja de registrar a las 19:05)')) return;
+      try { await fetch(S.plan.bridge, {method: 'POST', body: JSON.stringify({a: 'hoursoff'}), headers: {'Content-Type': 'text/plain;charset=utf-8'}}); } catch(err){}
+      h.cloud.on = false; O.save(); O.render(); return O.toast('Registro automático desactivado');
+    }
+    if (!confirm('Para registrar tus horas cada día laborable a las 19:05 aunque no abras la app, la app enviará a tu Apps Script «Puente Organizador» (privado, solo tuyo) tu token de ClickUp y el reparto de minutos de cada cliente. ¿Lo activo?')) return;
+    try { await loadRegistered(monthOf(O.today())); const j = await sendCloud(true); O.render(); O.toast(j.trigger ? '☁️ Automático activado' : '☁️ Plan enviado. Falta crear el aviso diario en el Apps Script'); }
+    catch(err){ O.toast('No se pudo activar: ' + err.message); }
+  }
+});
+
 /* ---------- Automático a las 19:00 ---------- */
 // Sin servidor: se hace cuando la app está abierta a partir de las 19:00 (o la primera vez que la abras después).
 async function autoCheck(){
   const h = H(), now = new Date(), day = O.today();
+  if (h.cloud && h.cloud.on) return;   // ya lo hace tu Apps Script
   if (!h.auto || !O.online() || !isWork(now) || now.getHours() < 19 || h.log[day] || !conHoras().length) return;
   const month = monthOf(day);
   if (!h.reg[month] || Date.now() - h.reg[month].at > 30 * 60e3){ await loadRegistered(month); }
