@@ -493,8 +493,8 @@ function weekView(){
       if (i.kind === 'work'){ cls = 'work'; color = 'var(--accent)'; label = 'Trabajo';
         const ts = wkTasks(d, i, its); extra = ts.length ? ` · ${ts.filter(t => t.status === 'done').length}/${ts.length}` : '';
         if (d < hoy){ cls += ' wk-old'; inner = ts.length ? `<span class="wk-sum">✓ ${ts.filter(t => t.status === 'done').length}/${ts.length}</span>` : ''; }
-        else inner = `<div class="wk-ts">${ts.map(t => { const c = O.client(t.client);
-          return `<article class="card wk-t${t.status === 'done' ? ' done' : ''}" data-id="${t.id}" style="--c:${O.clientColor(c)}"><button class="chk" aria-label="Completar"></button><span class="wk-tx"><span class="tt">${esc(t.title)}</span><span class="wk-cl">${c ? esc(c.name) : 'Sin cliente'}</span></span></article>`; }).join('')}</div>`; }
+        else inner = `<div class="wk-ts">${ts.map((t, k) => { const c = O.client(t.client);
+          return `<article class="card wk-t${t.status === 'done' ? ' done' : ''}" data-id="${t.id}" style="--c:${O.clientColor(c)}"><span class="wk-n">#${k + 1}</span><button class="chk" aria-label="Completar"></button><span class="wk-tx"><span class="tt">${esc(t.title)}</span><span class="wk-cl">${c ? esc(c.name) : 'Sin cliente'}</span></span></article>`; }).join('')}</div>`; }
       else if (i.kind === 'routine'){ cls = 'rout'; color = ROUTC[i.id] || '#A3A3AD'; }
       else if (i.isCall){ cls = 'call'; color = '#A78BFA'; label = '📞 ' + label; }
       else if (i.kind === 'free'){ cls = 'free'; }
