@@ -14,6 +14,7 @@ const NO_SERVICIO = /onboarding|review|strategy|tarea principal|general|interno|
 /* ---------- Vista: Clientes → Tareas | Fichas ---------- */
 const tareas = O.views.clientes;
 O.views.clientes = function(){
+  if (S.clientMode === 'cartera') return cartera();
   if (S.clientMode !== 'fichas') return tareas();
   O.setToolbar('Clientes', 'servicios y cómo los resuelves', '', 'Toca una ficha para editarla');
   const grupos = [['mine', 'Mis clientes', '🔒 Solo en la app'], ['agency', 'Agencia', 'ClickUp']];
@@ -35,13 +36,47 @@ O.views.clientes.after = () => {
   sw.className = 'modes';
   sw.innerHTML = `<button class="chip" data-cmode="tareas" aria-pressed="${S.clientMode !== 'fichas'}">Tareas</button>
     <button class="chip" data-cmode="hoy" aria-pressed="${S.clientMode === 'hoy'}">Tareas hoy</button>
-    <button class="chip" data-cmode="fichas" aria-pressed="${S.clientMode === 'fichas'}">Fichas</button>`;
+    <button class="chip" data-cmode="fichas" aria-pressed="${S.clientMode === 'fichas'}">Fichas</button>
+    <button class="chip" data-cmode="cartera" aria-pressed="${S.clientMode === 'cartera'}">Cartera</button>`;
   tb.insertBefore(sw, tb.querySelector('.sp'));
 };
 $('#toolbar').addEventListener('click', e => {
   const b = e.target.closest('[data-cmode]'); if (!b) return;
   S.clientMode = b.dataset.cmode; O.render();
 });
+
+/* ---------- Cartera: tus clientes (los que te dan ingresos) por estado ---------- */
+const ESTADOS = [['actual', '🟢 Actuales', 'Te pagan ahora'], ['pausa', '⏸️ Pausados', 'Parados por ahora'], ['antiguo', '🗄️ Antiguos', 'Ya no trabajáis juntos']];
+const estadoDe = c => ESTADOS.some(([k]) => k === c.estado) ? c.estado : 'actual';
+const eur = n => (Math.round(n) || 0).toLocaleString('es-ES') + ' €';
+function cartera(){
+  O.setToolbar('Clientes', 'tu cartera: arrastra cada cliente a su estado', '', 'Toca un cliente para editar ingresos y servicios');
+  const mios = S.clients.filter(c => c.group === 'mine');
+  const act = mios.filter(c => estadoDe(c) === 'actual'), mes = act.reduce((s, c) => s + (+c.fee || 0), 0);
+  const pend = c => S.tasks.filter(t => t.client === c.id && t.status !== 'done' && !t.ia);
+  const card = c => { const p = pend(c), urg = p.filter(t => t.priority === 'super' || t.priority === 'alta').length, sv = c.services || [];
+    return `<article class="cart" draggable="true" data-cart="${c.id}" style="--c:${O.clientColor(c)}" tabindex="0">
+      <header><span class="clp">${esc(c.name)}</span>${c.fee ? `<b class="fee">${eur(c.fee)}<small>/mes</small></b>` : '<b class="fee none">— €/mes</b>'}</header>
+      ${sv.length ? `<div class="csv">${sv.map(s => `<span>${MODES[s.mode || 'manual'].icon} ${esc(s.name)}</span>`).join('')}</div>` : '<p class="vacio">Sin servicios</p>'}
+      <footer><span>${p.length ? `${p.length} pendiente${p.length > 1 ? 's' : ''}${urg ? ` · <em>${urg} urgente${urg > 1 ? 's' : ''}</em>` : ''}` : 'Sin pendientes ✓'}</span>${c.since ? `<span>desde ${esc(c.since)}</span>` : ''}</footer>
+      ${c.notes ? `<p class="cnote">${esc(c.notes.split('\n')[0])}</p>` : ''}</article>`; };
+  return `<div class="cart-sum"><div><b>${eur(mes)}</b><small>al mes con ${act.length} cliente${act.length === 1 ? '' : 's'} actual${act.length === 1 ? '' : 'es'}</small></div>
+      <div><b>${eur(mes * 12)}</b><small>al año a este ritmo</small></div>
+      ${ESTADOS.slice(1).map(([k, t]) => `<div><b>${mios.filter(c => estadoDe(c) === k).length}</b><small>${t.slice(3).toLowerCase()}</small></div>`).join('')}</div>
+    <div class="cart-board">${ESTADOS.map(([k, t, sub]) => { const cs = mios.filter(c => estadoDe(c) === k).sort((a, b) => (+b.fee || 0) - (+a.fee || 0) || a.name.localeCompare(b.name));
+      const tot = cs.reduce((s, c) => s + (+c.fee || 0), 0);
+      return `<section class="cart-col" data-cestado="${k}"><h3>${t}<span>${cs.length}${tot ? ` · ${eur(tot)}/mes` : ''}</span></h3><small class="sub">${sub}</small>
+        <div class="cart-list">${cs.map(card).join('') || '<div class="empty">Arrastra aquí</div>'}</div></section>`; }).join('')}</div>`;
+}
+// arrastrar tarjetones entre columnas (ratón); en el móvil se cambia el estado en la ficha
+let cartDrag = null;
+document.addEventListener('dragstart', e => { const c = e.target.closest && e.target.closest('[data-cart]'); if (!c) return; cartDrag = c.dataset.cart; e.dataTransfer.effectAllowed = 'move'; c.classList.add('dragging'); });
+document.addEventListener('dragend', e => { const c = e.target.closest && e.target.closest('[data-cart]'); if (c) c.classList.remove('dragging'); document.querySelectorAll('.cart-col.over').forEach(x => x.classList.remove('over')); });
+document.addEventListener('dragover', e => { if (!cartDrag) return; const col = e.target.closest && e.target.closest('[data-cestado]'); if (!col) return; e.preventDefault();
+  document.querySelectorAll('.cart-col.over').forEach(x => x !== col && x.classList.remove('over')); col.classList.add('over'); });
+document.addEventListener('drop', e => { if (!cartDrag) return; const col = e.target.closest && e.target.closest('[data-cestado]'); const id = cartDrag; cartDrag = null; if (!col) return; e.preventDefault();
+  const c = O.client(id); if (!c) return; c.estado = col.dataset.cestado; O.save(); O.render(); O.toast(`${c.name} → ${col.querySelector('h3').firstChild.textContent.trim()}`); });
+document.addEventListener('click', e => { const c = e.target.closest('[data-cart]'); if (c) openFicha(c.dataset.cart); });
 
 function resumen(c){
   const sv = c.services || [];
@@ -90,6 +125,9 @@ function draw(){
   form.innerHTML = `
     <h2><span class="dot" style="background:${O.clientColor(c)}"></span> ${esc(c.name)} <span class="badge">${ag ? 'Agencia' : '🔒 Mío'}</span></h2>
     ${ag ? `<label>Horas al mes con este cliente<input type="number" min="0" step="0.5" data-f="hours" value="${c.hours || ''}" placeholder="normalmente entre 8 y 20"></label>` : ''}
+    ${!ag ? `<div class="row"><label>Estado<select data-f="estado">${ESTADOS.map(([k, t]) => `<option value="${k}" ${estadoDe(c) === k ? 'selected' : ''}>${t}</option>`).join('')}</select></label>
+      <label>Ingresos al mes (€)<input type="number" min="0" step="10" data-f="fee" value="${c.fee || ''}" placeholder="0"></label>
+      <label>Cliente desde<input type="month" data-f="since" value="${esc(c.since || '')}"></label></div>` : ''}
     <label>Notas (contacto, objetivos, cosas a recordar)<textarea rows="2" data-f="notes">${esc(c.notes || '')}</textarea></label>
     <h3 class="h3">Servicios</h3>
     <div class="svs">${c.services.map((s, i) => `<div class="sv" data-i="${i}">
@@ -104,7 +142,7 @@ function draw(){
 }
 form.addEventListener('input', e => {
   const t = e.target;
-  if (t.dataset.f){ cur[t.dataset.f] = t.dataset.f === 'hours' ? (parseFloat(t.value) || 0) : t.value; }
+  if (t.dataset.f){ cur[t.dataset.f] = (t.dataset.f === 'hours' || t.dataset.f === 'fee') ? (parseFloat(t.value) || 0) : t.value; }
   if (t.dataset.s){ cur.services[+t.closest('.sv').dataset.i][t.dataset.s] = t.value; }
   O.save();
 });
