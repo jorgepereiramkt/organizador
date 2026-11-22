@@ -20,12 +20,17 @@ O.views.clientes = function(){
   const grupos = [['mine', 'Mis clientes', '🔒 Solo en la app'], ['agency', 'Agencia', 'ClickUp']];
   let html = '';
   for (const [g, titulo, sub] of grupos){
-    const cs = S.clients.filter(c => (g === 'mine') === (c.group === 'mine'))
+    let cs = S.clients.filter(c => (g === 'mine') === (c.group === 'mine'))
       .filter(c => S.group === 'all' || S.group === g);
     if (!cs.length && S.group !== 'all' && S.group !== g) continue;
-    html += `<h3 class="rama">${titulo} <span>${cs.length} · ${sub}</span></h3><div class="fichas">`;
+    const resto = g === 'mine' ? cs.filter(c => estadoDe(c) !== 'actual') : [];
+    if (g === 'mine') cs = cs.filter(c => estadoDe(c) === 'actual');
+    html += `<h3 class="rama">${titulo} <span>${cs.length} · ${sub}${g === 'mine' ? ' · arrastra una ficha abajo para apartarla' : ''}</span></h3><div class="fichas"${g === 'mine' ? ' data-cestado="actual"' : ''}>`;
     html += cs.map(fichaCard).join('') || `<div class="empty">${g === 'mine' ? 'Crea tus clientes en ⚙ → «+ Cliente».' : 'Aparecen al conectar ClickUp.'}</div>`;
     html += '</div>';
+    if (g === 'mine') html += `<div class="apartados">${ESTADOS.slice(1).map(([k, t, s]) => { const xs = resto.filter(c => estadoDe(c) === k);
+      return `<section class="apart" data-cestado="${k}"><h4>${t}<span>${xs.length}</span><small>${s}</small></h4>
+        <div class="fichas mini">${xs.map(fichaCard).join('') || '<div class="empty">Arrastra aquí una ficha</div>'}</div></section>`; }).join('')}</div>`;
   }
   return html;
 };
@@ -70,12 +75,13 @@ function cartera(){
 }
 // arrastrar tarjetones entre columnas (ratón); en el móvil se cambia el estado en la ficha
 let cartDrag = null;
-document.addEventListener('dragstart', e => { const c = e.target.closest && e.target.closest('[data-cart]'); if (!c) return; cartDrag = c.dataset.cart; e.dataTransfer.effectAllowed = 'move'; c.classList.add('dragging'); });
-document.addEventListener('dragend', e => { const c = e.target.closest && e.target.closest('[data-cart]'); if (c) c.classList.remove('dragging'); document.querySelectorAll('.cart-col.over').forEach(x => x.classList.remove('over')); });
+document.addEventListener('dragstart', e => { const c = e.target.closest && e.target.closest('[data-cart],[data-fdrag]'); if (!c) return; cartDrag = c.dataset.cart || c.dataset.fdrag; e.dataTransfer.effectAllowed = 'move'; c.classList.add('dragging'); });
+document.addEventListener('dragend', e => { const c = e.target.closest && e.target.closest('[data-cart],[data-fdrag]'); if (c) c.classList.remove('dragging'); document.querySelectorAll('[data-cestado].over').forEach(x => x.classList.remove('over')); });
 document.addEventListener('dragover', e => { if (!cartDrag) return; const col = e.target.closest && e.target.closest('[data-cestado]'); if (!col) return; e.preventDefault();
-  document.querySelectorAll('.cart-col.over').forEach(x => x !== col && x.classList.remove('over')); col.classList.add('over'); });
+  document.querySelectorAll('[data-cestado].over').forEach(x => x !== col && x.classList.remove('over')); col.classList.add('over'); });
 document.addEventListener('drop', e => { if (!cartDrag) return; const col = e.target.closest && e.target.closest('[data-cestado]'); const id = cartDrag; cartDrag = null; if (!col) return; e.preventDefault();
-  const c = O.client(id); if (!c) return; c.estado = col.dataset.cestado; O.save(); O.render(); O.toast(`${c.name} → ${col.querySelector('h3').firstChild.textContent.trim()}`); });
+  const c = O.client(id); if (!c || c.group !== 'mine') return; c.estado = col.dataset.cestado; O.save(); O.render();
+  O.toast(`${c.name} → ${(ESTADOS.find(([k]) => k === c.estado) || [, ''])[1]}`); });
 document.addEventListener('click', e => { const c = e.target.closest('[data-cart]'); if (c) openFicha(c.dataset.cart); });
 
 function resumen(c){
@@ -86,7 +92,7 @@ function resumen(c){
 function fichaCard(c){
   const r = resumen(c), sv = c.services || [];
   const pct = r.total ? Math.round((r.auto + r.mixto / 2) / r.total * 100) : 0;
-  return `<article class="ficha" data-ficha="${c.id}" style="--c:${O.clientColor(c)}" tabindex="0">
+  return `<article class="ficha" data-ficha="${c.id}" ${c.group === 'mine' ? `draggable="true" data-fdrag="${c.id}"` : ''} style="--c:${O.clientColor(c)}" tabindex="0">
     <header><i></i><b>${esc(c.name)}</b>${c.hours ? `<span class="hrs">${c.hours} h/mes</span>` : ''}</header>
     ${sv.length ? `<ul>${sv.map(s => `<li><span title="${MODES[s.mode || 'manual'].label}">${MODES[s.mode || 'manual'].icon}</span>${esc(s.name)}</li>`).join('')}</ul>
       <div class="bar" title="${pct}% automatizado"><span style="width:${pct}%"></span></div>

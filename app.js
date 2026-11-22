@@ -545,6 +545,8 @@ const views = {
     html += '<div class="board grid">';
     for (const [g, label] of [['mine','Mis clientes'],['agency','Agencia']]){
       let cs = visibleClients().filter(c => c.group === g);
+      const apartados = cs.filter(c => g === 'mine' && (c.estado === 'pausa' || c.estado === 'antiguo')).length;
+      cs = cs.filter(c => !(g === 'mine' && (c.estado === 'pausa' || c.estado === 'antiguo')));
       if (hoyMode) cs = cs.filter(c => T.some(x => x.client === c.id && x.status !== 'done'));
       if (!cs.length) continue;
       const cols = cs.map((c, i) => {
@@ -553,7 +555,7 @@ const views = {
         return {c, i, pend, hechas: ts.length - pend.length};
       }).sort((a, b) => (b.pend.length > 0) - (a.pend.length > 0) || a.i - b.i);
       const conT = cols.filter(x => x.pend.length).length, gc = g === 'mine' ? 'mine' : 'ag';
-      html += `<div class="sep sep-${gc}"><b>${g === 'mine' ? '🔒 Mis clientes' : '🏢 Agencia'}</b><span>${conT} con tareas · ${cols.length - conT} sin pendientes</span></div>`;
+      html += `<div class="sep sep-${gc}"><b>${g === 'mine' ? '🔒 Mis clientes' : '🏢 Agencia'}</b><span>${conT} con tareas · ${cols.length - conT} sin pendientes${apartados ? ` · ${apartados} pausado${apartados > 1 ? 's' : ''} o antiguo${apartados > 1 ? 's' : ''} (en Fichas)` : ''}</span></div>`;
       for (const {c, pend, hechas} of cols)
         html += column({title:c.name, sub: hechas ? `${hechas} hecha${hechas>1?'s':''}` : '', field:'client', value:c.id, tasks:pend, hide:{client:true, urg:true, group:true, pick:true}, dot:clientColor(c), add: hoyMode ? undefined : c.id, cls: `cg-${gc} ${pend.length ? '' : 'quiet'}`, byUrg:true});
     }
