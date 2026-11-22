@@ -108,7 +108,7 @@ function fillPlan(month){
   const wd = workDays(month), dias = wd.filter(d => d <= hoy), cs = agencyClients().filter(c => taskFor(c));
   const diaReg = d => cs.reduce((s, c) => s + regDay(month, c.id, d), 0);
   // días «flojos»: sin registrar o con algo testimonial (menos de 1 h en total)
-  const flojos = dias.filter(d => diaReg(d) < 60); if (!flojos.length) return {plan, resumen: []};
+  const flojos = dias.filter(d => diaReg(d) < 60);
   const rnd = (a, b) => a + Math.random() * (b - a);
   // lo que falta a cada cliente (sin contar el relleno) repartido entre los días flojos, con variación
   const reparto = {};
@@ -120,18 +120,19 @@ function fillPlan(month){
   }
   // las reuniones con un cliente ese día cuentan como horas suyas (como mínimo)
   for (const d of flojos) for (const c of cs.filter(c => !isFiller(c))){ const mt = r5(meetMin(d, c)); if (mt && mt > ((reparto[d] || {})[c.id] || 0)) (reparto[d] = reparto[d] || {})[c.id] = mt; }
-  // total del día entre 7 h 30 y 9 h 30 (para cuadrar el mes); la diferencia, a Jorge Personal
+  // total del día entre 7 h 30 y 9 h 30 (para cuadrar el mes); la diferencia, a Jorge Personal.
+  // Se mira cada día laborable hasta hoy (no solo los vacíos): si se queda corto, se completa con Jorge Personal.
   const f = cs.find(isFiller), T = monthTotal(month) * 60;
-  let faltaTot = T ? Math.round(T * dias.length / wd.length - cs.reduce((s, c) => s + (registered(month, c.id) || 0), 0)) : 0;
-  flojos.forEach((d, k) => {
+  const diasF = T && f ? dias.filter(d => diaReg(d) + Object.values(reparto[d] || {}).reduce((a, b) => a + b, 0) < DIA_MIN) : flojos;
+  let faltaTot = T ? Math.round(T * dias.length / wd.length - cs.reduce((s, c) => s + (registered(month, c.id) || 0), 0) - Object.values(reparto).reduce((s, r) => s + Object.values(r).reduce((a, b) => a + b, 0), 0)) : 0;
+  const todos = [...new Set([...flojos, ...diasF])].sort();
+  todos.forEach(d => {
     const row = reparto[d] || {}, ya = diaReg(d);
-    if (f && T){
-      let D = k === flojos.length - 1 ? faltaTot : faltaTot / (flojos.length - k) * rnd(0.92, 1.08);
-      D = Math.min(DIA_MAX, Math.max(DIA_MIN, D)) - ya;
-      let sc = Object.values(row).reduce((a, b) => a + b, 0);
-      if (sc > D){ for (const id in row) row[id] = r5(row[id] * D / sc); sc = Object.values(row).reduce((a, b) => a + b, 0); }
-      const rel = r5(Math.max(0, D - sc)); if (rel) Object.assign(row, splitFiller(f, rel));
-      faltaTot -= ya + Object.values(row).reduce((a, b) => a + b, 0);
+    if (f && T && diasF.includes(d)){
+      const quedanF = diasF.filter(x => x >= d).length, sc = Object.values(row).reduce((a, b) => a + b, 0);
+      let D = Math.min(DIA_MAX, Math.max(DIA_MIN, (ya + sc) + Math.max(0, faltaTot) / quedanF * rnd(0.9, 1.1)));
+      if (D < ya + sc) D = ya + sc;
+      const rel = r5(Math.max(0, D - ya - sc)); if (rel){ Object.assign(row, splitFiller(f, rel)); faltaTot -= rel; }
     }
     for (const id in row){ if (!row[id]) continue; (plan[d] = plan[d] || {})[id] = row[id]; const k = id.startsWith('tid:') ? f.id : id; tot[k] = tot[k] || {m: 0, n: new Set()}; tot[k].m += row[id]; tot[k].n.add(d); }
   });
