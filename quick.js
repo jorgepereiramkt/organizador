@@ -29,7 +29,7 @@ function recent(){
   // Clientes con más tareas recientes primero
   const n = {};
   for (const t of S.tasks) if (t.client) n[t.client] = (n[t.client] || 0) + 1;
-  return [...S.clients].sort((a, b) => (b.group === 'mine') - (a.group === 'mine') || (n[b.id] || 0) - (n[a.id] || 0) || a.name.localeCompare(b.name));
+  return S.clients.filter(c => !O.isApartado(c)).sort((a, b) => (b.group === 'mine') - (a.group === 'mine') || (n[b.id] || 0) - (n[a.id] || 0) || a.name.localeCompare(b.name));
 }
 function drawClients(){
   const mine = recent().filter(c => c.group === 'mine'), ag = recent().filter(c => c.group !== 'mine');

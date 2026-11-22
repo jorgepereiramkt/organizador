@@ -420,12 +420,15 @@ function dayLabel(s){
 
 /* ---------- Render ---------- */
 const main = $('#main'), toolbar = $('#toolbar');
-function visibleClients(){ return S.clients.filter(c => S.group === 'all' || c.group === S.group); }
+const isApartado = c => !!c && (c.estado === 'pausa' || c.estado === 'antiguo');
+function visibleClients(){ return S.clients.filter(c => (S.group === 'all' || c.group === S.group) && !isApartado(c)); }
 // Tareas de ClickUp con ⭐: solo sirven para registrar horas, no salen en los paneles de tareas
 const isRegTask = t => !!(t.cu && /\u2B50|tarea principal/i.test(t.title || ''));   // cualquier tarea con ⭐
 function visibleTasks(){
   const ids = new Set(visibleClients().map(c => c.id));
-  return S.tasks.filter(t => !isRegTask(t) && (t.client && client(t.client) ? ids.has(t.client) : S.group === 'all'));
+  // las tareas de clientes apartados solo siguen a la vista si ya están colocadas en un bloque de hoy en adelante
+  const colocada = t => { const sl = S.slots[t.id]; return sl && sl.day >= today(); };
+  return S.tasks.filter(t => !isRegTask(t) && (t.client && client(t.client) ? (ids.has(t.client) || (isApartado(client(t.client)) && colocada(t) && (S.group === 'all' || client(t.client).group === S.group))) : S.group === 'all'));
 }
 const byOrder = (a,b) => (a.order||0) - (b.order||0);
 
@@ -545,8 +548,7 @@ const views = {
     html += '<div class="board grid">';
     for (const [g, label] of [['mine','Mis clientes'],['agency','Agencia']]){
       let cs = visibleClients().filter(c => c.group === g);
-      const apartados = cs.filter(c => g === 'mine' && (c.estado === 'pausa' || c.estado === 'antiguo')).length;
-      cs = cs.filter(c => !(g === 'mine' && (c.estado === 'pausa' || c.estado === 'antiguo')));
+      const apartados = S.clients.filter(c => c.group === g && isApartado(c)).length;
       if (hoyMode) cs = cs.filter(c => T.some(x => x.client === c.id && x.status !== 'done'));
       if (!cs.length) continue;
       const cols = cs.map((c, i) => {
@@ -735,7 +737,7 @@ toolbar.addEventListener('click', e => {
 const ed = $('#ed'), edForm = $('#edForm');
 let editing = null;
 function clientOptions(sel){
-  const grp = (g,l) => `<optgroup label="${l}">` + S.clients.filter(c=>c.group===g).map(c => `<option value="${c.id}" ${c.id===sel?'selected':''}>${esc(c.name)}</option>`).join('') + '</optgroup>';
+  const grp = (g,l) => `<optgroup label="${l}">` + S.clients.filter(c=>c.group===g && (!isApartado(c) || c.id===sel)).map(c => `<option value="${c.id}" ${c.id===sel?'selected':''}>${esc(c.name)}</option>`).join('') + '</optgroup>';
   return `<option value="">Sin cliente</option>` + grp('mine','Mis clientes') + grp('agency','Agencia');
 }
 const noteLinks = txt => [...new Set(txt.match(URL_RE) || [])].map(u => `<a href="${esc(u)}" target="_blank" rel="noopener">🔗 ${esc(linkHost(u))}</a>`).join('');
@@ -983,5 +985,5 @@ if (online()) sync(true);
 // Mantener PC y móvil al día: cada 60 s con la app abierta y al volver a ella
 setInterval(() => { if (document.visibilityState === 'visible') sync(true); }, 60000);
 document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') sync(true); });
-window.__org = {S, GROUP, clientColor, URG, urgRank, parse, pushCreate, uid, maxOrder, clientLists, online, PALETA, cu, listInfo, norm, isRegTask, applyCloud, cloudEmpty, cloudReady, wipeLocal, toast, views, render, save, card, setToolbar, visibleTasks, client, task, esc, iso, fromIso, addDays, today, dayLabel, DIAS_L, MESES, pad, byOrder};
+window.__org = {S, isApartado, GROUP, clientColor, URG, urgRank, parse, pushCreate, uid, maxOrder, clientLists, online, PALETA, cu, listInfo, norm, isRegTask, applyCloud, cloudEmpty, cloudReady, wipeLocal, toast, views, render, save, card, setToolbar, visibleTasks, client, task, esc, iso, fromIso, addDays, today, dayLabel, DIAS_L, MESES, pad, byOrder};
 })();

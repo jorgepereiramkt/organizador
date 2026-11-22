@@ -18,20 +18,21 @@ O.views.clientes = function(){
   if (S.clientMode !== 'fichas') return tareas();
   O.setToolbar('Clientes', 'servicios y cómo los resuelves', '', 'Toca una ficha para editarla');
   const grupos = [['mine', 'Mis clientes', '🔒 Solo en la app'], ['agency', 'Agencia', 'ClickUp']];
-  let html = '';
+  let html = '', resto = [];
   for (const [g, titulo, sub] of grupos){
     let cs = S.clients.filter(c => (g === 'mine') === (c.group === 'mine'))
       .filter(c => S.group === 'all' || S.group === g);
     if (!cs.length && S.group !== 'all' && S.group !== g) continue;
-    const resto = g === 'mine' ? cs.filter(c => estadoDe(c) !== 'actual') : [];
-    if (g === 'mine') cs = cs.filter(c => estadoDe(c) === 'actual');
-    html += `<h3 class="rama">${titulo} <span>${cs.length} · ${sub}${g === 'mine' ? ' · arrastra una ficha abajo para apartarla' : ''}</span></h3><div class="fichas"${g === 'mine' ? ' data-cestado="actual"' : ''}>`;
+    resto.push(...cs.filter(c => estadoDe(c) !== 'actual'));
+    cs = cs.filter(c => estadoDe(c) === 'actual');
+    html += `<h3 class="rama">${titulo} <span>${cs.length} · ${sub} · arrastra una ficha abajo para apartarla</span></h3><div class="fichas" data-cestado="actual">`;
     html += cs.map(fichaCard).join('') || `<div class="empty">${g === 'mine' ? 'Crea tus clientes en ⚙ → «+ Cliente».' : 'Aparecen al conectar ClickUp.'}</div>`;
     html += '</div>';
-    if (g === 'mine') html += `<div class="apartados">${ESTADOS.slice(1).map(([k, t, s]) => { const xs = resto.filter(c => estadoDe(c) === k);
-      return `<section class="apart" data-cestado="${k}"><h4>${t}<span>${xs.length}</span><small>${s}</small></h4>
-        <div class="fichas mini">${xs.map(fichaCard).join('') || '<div class="empty">Arrastra aquí una ficha</div>'}</div></section>`; }).join('')}</div>`;
   }
+  // Pausados y antiguos (de cualquier grupo): no salen en Tareas, Día, Semana, Horas ni al añadir tareas
+  html += `<h3 class="rama">Apartados <span>no aparecen en el resto de la app · arrástralos arriba para recuperarlos</span></h3><div class="apartados">${ESTADOS.slice(1).map(([k, t, s]) => { const xs = resto.filter(c => estadoDe(c) === k);
+    return `<section class="apart" data-cestado="${k}"><h4>${t}<span>${xs.length}</span><small>${s}</small></h4>
+      <div class="fichas mini">${xs.map(fichaCard).join('') || '<div class="empty">Arrastra aquí una ficha</div>'}</div></section>`; }).join('')}</div>`;
   return html;
 };
 O.views.clientes.after = () => {
@@ -80,7 +81,7 @@ document.addEventListener('dragend', e => { const c = e.target.closest && e.targ
 document.addEventListener('dragover', e => { if (!cartDrag) return; const col = e.target.closest && e.target.closest('[data-cestado]'); if (!col) return; e.preventDefault();
   document.querySelectorAll('[data-cestado].over').forEach(x => x !== col && x.classList.remove('over')); col.classList.add('over'); });
 document.addEventListener('drop', e => { if (!cartDrag) return; const col = e.target.closest && e.target.closest('[data-cestado]'); const id = cartDrag; cartDrag = null; if (!col) return; e.preventDefault();
-  const c = O.client(id); if (!c || c.group !== 'mine') return; c.estado = col.dataset.cestado; O.save(); O.render();
+  const c = O.client(id); if (!c) return; c.estado = col.dataset.cestado; O.save(); O.render();
   O.toast(`${c.name} → ${(ESTADOS.find(([k]) => k === c.estado) || [, ''])[1]}`); });
 document.addEventListener('click', e => { const c = e.target.closest('[data-cart]'); if (c) openFicha(c.dataset.cart); });
 
@@ -92,7 +93,7 @@ function resumen(c){
 function fichaCard(c){
   const r = resumen(c), sv = c.services || [];
   const pct = r.total ? Math.round((r.auto + r.mixto / 2) / r.total * 100) : 0;
-  return `<article class="ficha" data-ficha="${c.id}" ${c.group === 'mine' ? `draggable="true" data-fdrag="${c.id}"` : ''} style="--c:${O.clientColor(c)}" tabindex="0">
+  return `<article class="ficha" data-ficha="${c.id}" draggable="true" data-fdrag="${c.id}" style="--c:${O.clientColor(c)}" tabindex="0">
     <header><i></i><b>${esc(c.name)}</b>${c.hours ? `<span class="hrs">${c.hours} h/mes</span>` : ''}</header>
     ${sv.length ? `<ul>${sv.map(s => `<li><span title="${MODES[s.mode || 'manual'].label}">${MODES[s.mode || 'manual'].icon}</span>${esc(s.name)}</li>`).join('')}</ul>
       <div class="bar" title="${pct}% automatizado"><span style="width:${pct}%"></span></div>
@@ -131,6 +132,7 @@ function draw(){
   form.innerHTML = `
     <h2><span class="dot" style="background:${O.clientColor(c)}"></span> ${esc(c.name)} <span class="badge">${ag ? 'Agencia' : '🔒 Mío'}</span></h2>
     ${ag ? `<label>Horas al mes con este cliente<input type="number" min="0" step="0.5" data-f="hours" value="${c.hours || ''}" placeholder="normalmente entre 8 y 20"></label>` : ''}
+    ${ag ? `<label>Estado<select data-f="estado">${ESTADOS.map(([k, t]) => `<option value="${k}" ${estadoDe(c) === k ? 'selected' : ''}>${t}</option>`).join('')}</select></label>` : ''}
     ${!ag ? `<div class="row"><label>Estado<select data-f="estado">${ESTADOS.map(([k, t]) => `<option value="${k}" ${estadoDe(c) === k ? 'selected' : ''}>${t}</option>`).join('')}</select></label>
       <label>Ingresos al mes (€)<input type="number" min="0" step="10" data-f="fee" value="${c.fee || ''}" placeholder="0"></label>
       <label>Cliente desde<input type="month" data-f="since" value="${esc(c.since || '')}"></label></div>` : ''}

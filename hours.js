@@ -25,7 +25,7 @@ function workDays(month){
   for (let d = new Date(y, m - 1, 1); d.getMonth() === m - 1; d.setDate(d.getDate() + 1)) if (isWork(d)) out.push(iso(d));
   return out;
 }
-const agencyClients = () => S.clients.filter(c => c.group !== 'mine');
+const agencyClients = () => S.clients.filter(c => c.group !== 'mine' && !O.isApartado(c));
 const mdata = (month, c) => { const r = (H().months[month] || {})[c.id] || {}; return {est: r.est ?? (c.hours || 0), real: r.real ?? r.est ?? (c.hours || 0)}; };
 const conHoras = (month = monthOf(O.today())) => agencyClients().filter(c => mdata(month, c).real > 0);
 const regTasks = c => S.tasks.filter(t => t.client === c.id && O.isRegTask(t));
