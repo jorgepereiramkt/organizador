@@ -147,9 +147,39 @@ function snapPut(email, day, evs){
   const all = P().evSnap = P().evSnap || {}, mine = all[email] = all[email] || {};
   const old = mine[day]; if (old && JSON.stringify(old.evs) === JSON.stringify(evs)) { old.at = Date.now(); return; }
   mine[day] = {at: Date.now(), evs};
-  const min = O.iso(O.addDays(new Date(), -3)); for (const d in mine) if (d < min) delete mine[d];
+  const min = O.iso(O.addDays(new Date(), -40)); for (const d in mine) if (d < min) delete mine[d];
   O.save();
 }
+O.callsOn = day => {
+  const out = [], seen = new Set(), add = e => { if (!e || e.allDay || !e.isCall) return; const k = e.title + '|' + e.start; if (seen.has(k)) return; seen.add(k); out.push({title: e.title, min: Math.max(0, e.end - e.start)}); };
+  for (const a of P().accounts || []) for (const e of snapGet(a.email, day)) add(e);
+  for (const e of (typeof weekEv !== 'undefined' && weekEv[day]) || []) add(e);
+  if (day === planDay) for (const e of lastEvents || []) add(e);
+  return out;
+};
+O.fetchMonthAgency = async function(month){
+  const [y, m] = month.split('-').map(Number), start = new Date(y, m - 1, 1), end = new Date(y, m, 1);
+  for (const acc of (P().accounts || []).filter(a => !a.bridge && tokenOk(a.email))){
+    const byDay = {};
+    try {
+      for (const c of acc.cals.filter(c => c.on)){
+        const u = `https://www.googleapis.com/calendar/v3/calendars/${encodeURIComponent(c.id)}/events?singleEvents=true&orderBy=startTime&maxResults=250`
+          + `&timeMin=${encodeURIComponent(start.toISOString())}&timeMax=${encodeURIComponent(end.toISOString())}`;
+        const r = await gapi(u, tokens[acc.email].token);
+        for (const e of r.items || []){
+          if (e.status === 'cancelled' || (e.attendees || []).some(a => a.self && a.responseStatus === 'declined')) continue;
+          if (!(e.start && e.start.dateTime)) continue;
+          const s = new Date(e.start.dateTime), en = new Date(e.end.dateTime), day = O.iso(s);
+          const others = (e.attendees || []).filter(a => !a.self && !a.resource).length, tt = O.norm(e.summary || '');
+          const isCall = others > 0 || !!e.hangoutLink || !!e.conferenceData || /<>|\breu\b|reunion|llamada|\bcall\b|meet|zoom|entrevista|☎|📞/.test(tt + (e.summary || ''));
+          (byDay[day] = byDay[day] || []).push({title: e.summary || '(sin título)', allDay: false, color: c.color, cal: c.name, free: e.transparency === 'transparent', isCall,
+            start: Math.max(0, minutesOfDay(s, day)), end: Math.min(24 * 60, minutesOfDay(en, day))});
+        }
+      }
+      for (const [d, evs] of Object.entries(byDay)) snapPut(acc.email, d, evs);
+    } catch(e){ console.warn('mes', acc.email, e); }
+  }
+};
 const clearCache = () => { for (const k in evCache) delete evCache[k]; };
 async function fetchEvents(day){
   const start = O.fromIso(day), end = O.addDays(start, 1);

@@ -32,7 +32,26 @@ const agencyClients = () => S.clients.filter(c => c.group !== 'mine' && !O.isApa
 const mdata = (month, c) => { const r = (H().months[month] || {})[c.id] || {}; return {est: r.est ?? (c.hours || 0), real: r.real ?? r.est ?? (c.hours || 0)}; };
 const conHoras = (month = monthOf(O.today())) => agencyClients().filter(c => mdata(month, c).real > 0 || mdata(month, c).est > 0);
 const regTasks = c => S.tasks.filter(t => t.client === c.id && O.isRegTask(t));
-function taskFor(c){ const rs = regTasks(c); return (c.timeTask && rs.find(t => t.id === c.timeTask)) || rs[0] || null; }
+function taskFor(c){ const rs = regTasks(c); return (c.timeTask && rs.find(t => t.id === c.timeTask)) || (/jorge\s*personal/i.test(c.name || '') && rs.find(t => /tarea/i.test(t.title))) || rs[0] || null; }
+// Jorge Personal se reparte en 3 tareas: internas (la que más), reuniones internas y proyectos internos
+const fillerTasks = c => { const rs = regTasks(c); return {tareas: rs.find(t => /tarea/i.test(t.title)) || rs[0], reun: rs.find(t => /reuni/i.test(t.title)), proy: rs.find(t => /proyect/i.test(t.title))}; };
+const pick = a => a[Math.floor(Math.random() * a.length)];
+function splitFiller(c, min){
+  const ft = fillerTasks(c), out = {}; if (!ft.tareas || min < 5) return out;
+  let reun = ft.reun && Math.random() < 0.45 ? pick([30, 30, 60, 60, 120]) : 0;
+  let proy = ft.proy && Math.random() < 0.35 ? (Math.random() < 0.2 ? 180 : Math.round((35 + Math.random() * 25) / 5) * 5) : 0;
+  while (reun + proy > min * 0.6 && (reun || proy)){ if (proy >= reun) proy = proy > 60 ? 60 : 0; else reun = reun > 30 ? 30 : 0; }
+  if (reun) out['tid:' + ft.reun.id] = reun;
+  if (proy) out['tid:' + ft.proy.id] = proy;
+  out['tid:' + ft.tareas.id] = Math.round((min - reun - proy) / 5) * 5;
+  return out;
+}
+// minutos de reunión con un cliente ese día (por el título del evento: nombre del cliente o sus palabras clave)
+function meetMin(day, c){
+  const words = [...O.norm(c.name).split(/\s+/), ...String(c.keywords || '').split(',').map(w => O.norm(w.trim()))].filter(w => w.length >= 4 && !/^(jorge|brand|retroaging|agency)$/.test(w));
+  if (!words.length || !O.callsOn) return 0;
+  return O.callsOn(day).filter(e => { const t = O.norm(e.title); return words.some(w => t.includes(w)); }).reduce((s, e) => s + e.min, 0);
+}
 const teamOf = c => { const l = O.clientLists(c)[0]; return l && l.team; };
 
 /* ---------- Lo registrado en ClickUp este mes ---------- */
@@ -47,9 +66,10 @@ async function loadRegistered(month = viewMonth){
     for (const c of agencyClients()){
       const tk = taskFor(c), team = teamOf(c);
       if (!tk || !team) continue;
-      const r = await O.cu(`/team/${team}/time_entries?start_date=${start}&end_date=${end}&task_id=${tk.id}&assignee=${S.cu.me}`);
+      const tks = isFiller(c) ? Object.values(fillerTasks(c)).filter(Boolean) : [tk], data = [];
+      for (const x of tks){ const r = await O.cu(`/team/${team}/time_entries?start_date=${start}&end_date=${end}&task_id=${x.id}&assignee=${S.cu.me}`); data.push(...(r.data || [])); }
       const dd = byDay[c.id] = {};
-      for (const e of r.data || []){ const m = +e.duration > 0 ? +e.duration / 60000 : 0; if (!m) continue; const d = iso(new Date(+e.start)); dd[d] = (dd[d] || 0) + m; }
+      for (const e of data){ const m = +e.duration > 0 ? +e.duration / 60000 : 0; if (!m) continue; const d = iso(new Date(+e.start)); dd[d] = (dd[d] || 0) + m; }
       for (const d in dd) dd[d] = Math.round(dd[d]);
       out[c.id] = Object.values(dd).reduce((a, b) => a + b, 0);
     }
@@ -98,6 +118,8 @@ function fillPlan(month){
     const media = resto / flojos.length;
     flojos.forEach((d, k) => { if (resto < 5) return; let m = k === flojos.length - 1 ? resto : r5(media * rnd(0.8, 1.2)); m = r5(Math.min(Math.max(m, 15), resto, 150)); if (!m) return; (reparto[d] = reparto[d] || {})[c.id] = m; resto -= m; });
   }
+  // las reuniones con un cliente ese día cuentan como horas suyas (como mínimo)
+  for (const d of flojos) for (const c of cs.filter(c => !isFiller(c))){ const mt = r5(meetMin(d, c)); if (mt && mt > ((reparto[d] || {})[c.id] || 0)) (reparto[d] = reparto[d] || {})[c.id] = mt; }
   // total del día entre 7 h 30 y 9 h 30 (para cuadrar el mes); la diferencia, a Jorge Personal
   const f = cs.find(isFiller), T = monthTotal(month) * 60;
   let faltaTot = T ? Math.round(T * dias.length / wd.length - cs.reduce((s, c) => s + (registered(month, c.id) || 0), 0)) : 0;
@@ -108,17 +130,18 @@ function fillPlan(month){
       D = Math.min(DIA_MAX, Math.max(DIA_MIN, D)) - ya;
       let sc = Object.values(row).reduce((a, b) => a + b, 0);
       if (sc > D){ for (const id in row) row[id] = r5(row[id] * D / sc); sc = Object.values(row).reduce((a, b) => a + b, 0); }
-      const rel = r5(Math.max(0, D - sc)); if (rel) row[f.id] = rel;
+      const rel = r5(Math.max(0, D - sc)); if (rel) Object.assign(row, splitFiller(f, rel));
       faltaTot -= ya + Object.values(row).reduce((a, b) => a + b, 0);
     }
-    for (const id in row){ if (!row[id]) continue; (plan[d] = plan[d] || {})[id] = row[id]; tot[id] = tot[id] || {m: 0, n: 0}; tot[id].m += row[id]; tot[id].n++; }
+    for (const id in row){ if (!row[id]) continue; (plan[d] = plan[d] || {})[id] = row[id]; const k = id.startsWith('tid:') ? f.id : id; tot[k] = tot[k] || {m: 0, n: new Set()}; tot[k].m += row[id]; tot[k].n.add(d); }
   });
-  const resumen = Object.entries(tot).map(([id, t]) => ({c: O.client(id), total: t.m, dias: t.n}));
+  const resumen = Object.entries(tot).map(([id, t]) => ({c: O.client(id), total: t.m, dias: t.n.size}));
   return {plan, resumen};
 }
 async function fillToToday(month){
   if (!O.online()) return O.toast('Conecta ClickUp primero');
   await loadRegistered(month);
+  try { if (O.fetchMonthAgency) await O.fetchMonthAgency(month); } catch(e){}
   const {plan, resumen} = fillPlan(month);
   if (!resumen.length) return O.toast('Nada que rellenar: vas al día ✓');
   resumen.sort((a, b) => b.total - a.total);
@@ -336,22 +359,24 @@ async function undoDay(day){
 async function pushDay(day, row, añadir){
   const h = H(); const prev = añadir ? {} : (h.cu[day] || {}), ids = añadir ? {...(h.cu[day] || {})} : {};
   const start0 = fromIso(day); const [hh, mm] = ((S.plan && S.plan.workStart) || '09:00').split(':').map(Number);
-  start0.setHours(hh, mm, 0, 0);
+  start0.setHours(hh, mm + Math.floor(Math.random() * 40), 0, 0);
   let t = start0.getTime(), ok = 0, fail = 0;
-  for (const c of agencyClients()){
-    const team = teamOf(c); if (!team) continue;
+  const f = agencyClients().find(isFiller);
+  for (const [key, m0] of Object.entries(row)){
+    const c = key.startsWith('tid:') ? f : O.client(key); if (!c) continue;
+    const team = teamOf(c), tid = key.startsWith('tid:') ? key.slice(4) : (taskFor(c) || {}).id; if (!team || !tid) continue;
     try {
-      if (prev[c.id]) await O.cu(`/team/${team}/time_entries/${prev[c.id]}`, {method:'DELETE'}).catch(() => {});
-      const m = Math.min(MAX_DIA, row[c.id] || 0), tk = taskFor(c);
-      if (m > 0 && tk){
-        const r = await O.cu(`/team/${team}/time_entries`, {method:'POST', body: {start: t, duration: m * 60000, description: 'Organizador', tid: tk.id}});
-        ids[c.id] = r && r.data && r.data.id; t += m * 60000; ok++;
+      if (prev[key]) await O.cu(`/team/${team}/time_entries/${prev[key]}`, {method:'DELETE'}).catch(() => {});
+      const m = añadir ? (m0 || 0) : Math.min(MAX_DIA, m0 || 0);
+      if (m > 0){
+        const r = await O.cu(`/team/${team}/time_entries`, {method:'POST', body: {start: t, duration: m * 60000, description: '', tid}});
+        ids[key] = r && r.data && r.data.id; t += (m + Math.floor(Math.random() * 20)) * 60000; ok++;
       }
     } catch(e){ fail++; }
   }
   h.cu[day] = ids; if (añadir) h.log[day] = {...(h.log[day] || {}), ...row}; O.save();
   if (añadir) return;
-  O.toast(fail ? `ClickUp: ${ok} registradas, ${fail} con error` : `⏱ Registradas en ClickUp las horas de hoy (${ok} clientes)`);
+  O.toast(fail ? `ClickUp: ${ok} registradas, ${fail} con error` : `⏱ Registradas en ClickUp las horas de hoy (${ok})`);
 }
 
 /* ---------- Automático en la nube: tu Apps Script registra a las 19:05 aunque no abras la app ---------- */
@@ -360,12 +385,17 @@ function cloudPlan(){
   const hoy = O.today(), mes = monthOf(hoy), sig = fromIso(mes + '-01'); sig.setMonth(sig.getMonth() + 1);
   const months = {};
   for (const mo of [mes, monthOf(iso(sig))]){
-    months[mo] = {total: Math.round(monthTotal(mo) * 60), clients: agencyClients().map(c => { const tk = taskFor(c), team = teamOf(c), t = target(mo, c);
-      return tk && team && (t || isFiller(c)) ? {tid: tk.id, team, name: c.name, budget: Math.round(t * 60), factor: 1, filler: isFiller(c)} : null; }).filter(Boolean)};
+    const meet = {};
+    for (const d of workDays(mo).filter(d => d >= hoy)) for (const c of agencyClients().filter(c => !isFiller(c))){ const tk = taskFor(c), mt = r5(meetMin(d, c)); if (tk && mt) (meet[d] = meet[d] || {})[tk.id] = mt; }
+    months[mo] = {total: Math.round(monthTotal(mo) * 60), meet, clients: agencyClients().map(c => { const tk = taskFor(c), team = teamOf(c), t = target(mo, c);
+      if (!tk || !team || !(t || isFiller(c))) return null;
+      const ft = isFiller(c) ? fillerTasks(c) : null;
+      return {tid: tk.id, team, name: c.name, budget: Math.round(t * 60), factor: 1, filler: isFiller(c), ...(ft ? {subs: {tareas: ft.tareas && ft.tareas.id, reun: ft.reun && ft.reun.id, proy: ft.proy && ft.proy.id}} : {})}; }).filter(Boolean)};
   }
   return months;
 }
 async function sendCloud(conToken){
+  try { if (O.fetchMonthAgency) await O.fetchMonthAgency(monthOf(O.today())); } catch(e){}
   const url = S.plan && S.plan.bridge; if (!url) throw new Error('conecta antes el Puente de Google (⚙)');
   const body = {a: 'hoursplan', me: S.cu.me, start: (S.plan && S.plan.workStart) || '09:00', months: cloudPlan(), off: Object.keys(libres()).filter(d => d >= O.today())};
   if (conToken) body.token = S.cu.token;
