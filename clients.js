@@ -54,6 +54,8 @@ $('#toolbar').addEventListener('click', e => {
 /* ---------- Cartera: tus clientes (los que te dan ingresos) por estado ---------- */
 const ESTADOS = [['actual', '🟢 Actuales', 'Te pagan ahora'], ['pausa', '⏸️ Pausados', 'Parados por ahora'], ['antiguo', '🗄️ Antiguos', 'Ya no trabajáis juntos']];
 const estadoDe = c => ESTADOS.some(([k]) => k === c.estado) ? c.estado : 'actual';
+const TIERS = {S: 'Tier S · top', A: 'Tier A', B: 'Tier B', C: 'Tier C'};
+const tierBadge = c => c.tier && TIERS[c.tier] ? `<span class="tier t-${c.tier}" title="${TIERS[c.tier]}">${c.tier}</span>` : '';
 const eur = n => (Math.round(n) || 0).toLocaleString('es-ES') + ' €';
 function cartera(){
   O.setToolbar('Clientes', 'tu cartera: arrastra cada cliente a su estado', '', 'Toca un cliente para editar ingresos y servicios');
@@ -62,11 +64,11 @@ function cartera(){
   const pend = c => S.tasks.filter(t => t.client === c.id && t.status !== 'done' && !t.ia);
   const card = c => { const p = pend(c), urg = p.filter(t => t.priority === 'super' || t.priority === 'alta').length, sv = c.services || [];
     return `<article class="cart" draggable="true" data-cart="${c.id}" style="--c:${O.clientColor(c)}" tabindex="0">
-      <header><span class="clp">${esc(c.name)}</span>${c.fee ? `<b class="fee">${eur(c.fee)}<small>/mes</small></b>` : '<b class="fee none">— €/mes</b>'}</header>
+      <header><span class="clp">${esc(c.name)}</span>${tierBadge(c)}${c.fee ? `<b class="fee">${eur(c.fee)}<small>/mes s/IVA</small></b>` : '<b class="fee none">— €/mes</b>'}</header>
       ${sv.length ? `<div class="csv">${sv.map(s => `<span>${MODES[s.mode || 'manual'].icon} ${esc(s.name)}</span>`).join('')}</div>` : '<p class="vacio">Sin servicios</p>'}
       <footer><span>${p.length ? `${p.length} pendiente${p.length > 1 ? 's' : ''}${urg ? ` · <em>${urg} urgente${urg > 1 ? 's' : ''}</em>` : ''}` : 'Sin pendientes ✓'}</span>${c.since ? `<span>desde ${esc(c.since)}</span>` : ''}</footer>
       ${c.notes ? `<p class="cnote">${esc(c.notes.split('\n')[0])}</p>` : ''}</article>`; };
-  return `<div class="cart-sum"><div><b>${eur(mes)}</b><small>al mes con ${act.length} cliente${act.length === 1 ? '' : 's'} actual${act.length === 1 ? '' : 'es'}</small></div>
+  return `<div class="cart-sum"><div><b>${eur(mes)}</b><small>al mes sin IVA con ${act.length} cliente${act.length === 1 ? '' : 's'} actual${act.length === 1 ? '' : 'es'}</small></div>
       <div><b>${eur(mes * 12)}</b><small>al año a este ritmo</small></div>
       ${ESTADOS.slice(1).map(([k, t]) => `<div><b>${mios.filter(c => estadoDe(c) === k).length}</b><small>${t.slice(3).toLowerCase()}</small></div>`).join('')}</div>
     <div class="cart-board">${ESTADOS.map(([k, t, sub]) => { const cs = mios.filter(c => estadoDe(c) === k).sort((a, b) => (+b.fee || 0) - (+a.fee || 0) || a.name.localeCompare(b.name));
@@ -103,7 +105,8 @@ function resumen(c){
 function fichaCard(c){
   const sv = c.services || [];
   return `<article class="ficha" data-ficha="${c.id}" draggable="true" data-fdrag="${c.id}" style="--c:${O.clientColor(c)}" tabindex="0">
-    <header><i></i><b>${esc(c.name)}</b>${c.hours ? `<span class="hrs">${c.hours} h/mes</span>` : ''}</header>
+    <header><i></i><b>${esc(c.name)}</b>${tierBadge(c)}${c.hours ? `<span class="hrs">${c.hours} h/mes</span>` : ''}</header>
+    ${c.group === 'mine' && c.fee ? `<div class="ffee">${eur(c.fee)}<small>/mes sin IVA</small></div>` : ''}
     ${sv.length ? `<ul>${sv.map(s => `<li>${esc(s.name)}</li>`).join('')}</ul>` : '<p class="vacio">Sin servicios todavía</p>'}
   </article>`;
 }
@@ -138,9 +141,11 @@ function draw(){
   form.innerHTML = `
     <h2><span class="dot" style="background:${O.clientColor(c)}"></span> ${esc(c.name)} <span class="badge">${ag ? 'Agencia' : '🔒 Mío'}</span></h2>
     ${ag ? `<label>Horas al mes con este cliente<input type="number" min="0" step="0.5" data-f="hours" value="${c.hours || ''}" placeholder="normalmente entre 8 y 20"></label>` : ''}
-    ${ag ? `<label>Estado<select data-f="estado">${ESTADOS.map(([k, t]) => `<option value="${k}" ${estadoDe(c) === k ? 'selected' : ''}>${t}</option>`).join('')}</select></label>` : ''}
+    ${ag ? `<div class="row"><label>Estado<select data-f="estado">${ESTADOS.map(([k, t]) => `<option value="${k}" ${estadoDe(c) === k ? 'selected' : ''}>${t}</option>`).join('')}</select></label>
+      <label>Tier<select data-f="tier"><option value="">—</option>${Object.entries(TIERS).map(([k, t]) => `<option value="${k}" ${c.tier === k ? 'selected' : ''}>${t}</option>`).join('')}</select></label></div>` : ''}
     ${!ag ? `<div class="row"><label>Estado<select data-f="estado">${ESTADOS.map(([k, t]) => `<option value="${k}" ${estadoDe(c) === k ? 'selected' : ''}>${t}</option>`).join('')}</select></label>
-      <label>Ingresos al mes (€)<input type="number" min="0" step="10" data-f="fee" value="${c.fee || ''}" placeholder="0"></label>
+      <label>Tier<select data-f="tier"><option value="">—</option>${Object.entries(TIERS).map(([k, t]) => `<option value="${k}" ${c.tier === k ? 'selected' : ''}>${t}</option>`).join('')}</select></label></div>
+      <div class="row"><label>Facturación media sin IVA (€/mes)<input type="number" min="0" step="10" data-f="fee" value="${c.fee || ''}" placeholder="0"></label>
       <label>Cliente desde<input type="month" data-f="since" value="${esc(c.since || '')}"></label></div>` : ''}
     <label>Notas (contacto, objetivos, cosas a recordar)<textarea rows="2" data-f="notes">${esc(c.notes || '')}</textarea></label>
     <h3 class="h3">Servicios</h3>
