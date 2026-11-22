@@ -33,7 +33,7 @@ O.views.clientes = function(){
   html += `<h3 class="rama">Apartados <span>no aparecen en el resto de la app · arrástralos arriba para recuperarlos</span></h3><div class="apartados">${ESTADOS.slice(1).map(([k, t, s]) => { const xs = resto.filter(c => estadoDe(c) === k);
     return `<section class="apart" data-cestado="${k}"><h4>${t}<span>${xs.length}</span><small>${s}</small></h4>
       <div class="fichas mini">${xs.map(fichaCard).join('') || '<div class="empty">Arrastra aquí una ficha</div>'}</div></section>`; }).join('')}</div>`;
-  return html;
+  return html + leadsSection();
 };
 O.views.clientes.after = () => {
   const tb = $('#toolbar');
@@ -96,6 +96,70 @@ document.addEventListener('drop', e => { if (!cartDrag) return; const col = e.ta
   if (other && (antes || 'actual') === c.estado){ O.save(); O.render(); return; } O.save(); O.render();
   O.toast(`${c.name} → ${(ESTADOS.find(([k]) => k === c.estado) || [, ''])[1]}`); });
 document.addEventListener('click', e => { const c = e.target.closest('[data-cart]'); if (c) openFicha(c.dataset.cart); });
+
+/* ---------- Posibles clientes: lo que te va saliendo, para hacerle seguimiento ---------- */
+const LEAD_ST = {idea: '💡 Idea', contacto: '📨 Contactado', reunion: '📞 Reunión', propuesta: '📄 Propuesta enviada', negocia: '🤝 Negociando', perdido: '✖️ Descartado'};
+const LEADS = () => { const p = S.plan || (S.plan = {}); return (p.leads = p.leads || []); };
+const leadUid = () => Math.random().toString(36).slice(2, 9);
+function leadsSection(){
+  const hoy = O.today(), ls = LEADS().slice().sort((a, b) => (a.status === 'perdido') - (b.status === 'perdido') || (a.next || '9999') .localeCompare(b.next || '9999'));
+  const vivos = ls.filter(l => l.status !== 'perdido'), pot = vivos.reduce((s, l) => s + (+l.fee || 0), 0), toca = vivos.filter(l => l.next && l.next <= hoy).length;
+  const card = l => { const tarde = l.status !== 'perdido' && l.next && l.next <= hoy, ult = (l.log || [])[0];
+    return `<article class="lead${l.status === 'perdido' ? ' lost' : ''}" data-lead="${l.id}" tabindex="0">
+      <header><b>${esc(l.name || 'Sin nombre')}</b>${l.fee ? `<span class="lfee">${eur(l.fee)}<small>/mes</small></span>` : ''}</header>
+      <span class="lst s-${l.status}">${LEAD_ST[l.status] || LEAD_ST.idea}</span>
+      ${l.what ? `<p>${esc(l.what)}</p>` : ''}
+      ${ult ? `<p class="llog">🕓 ${esc(ult.d.slice(8, 10) + '/' + ult.d.slice(5, 7))} · ${esc(ult.t)}</p>` : ''}
+      <footer>${l.next ? `<span class="${tarde ? 'late' : ''}">${tarde ? '⏰ Toca seguimiento' : '📅 Seguimiento'} ${esc(O.dayLabel ? O.dayLabel(l.next) : l.next)}</span>` : '<span class="none">Sin fecha de seguimiento</span>'}${l.source ? `<span>vía ${esc(l.source)}</span>` : ''}</footer></article>`; };
+  return `<h3 class="rama leads-h">🌱 Posibles clientes <span>${vivos.length} en seguimiento${pot ? ` · ${eur(pot)}/mes si salen todos` : ''}${toca ? ` · <em>${toca} para hacer seguimiento</em>` : ''}</span>
+      <button type="button" class="btn" data-leadnew>+ Posible cliente</button></h3>
+    <div class="leads">${ls.map(card).join('') || '<div class="empty">Apunta aquí cada oportunidad que te salga (un contacto, una recomendación, alguien que te escribe…) para no perderle la pista.</div>'}</div>`;
+}
+const ldlg = document.createElement('dialog'); ldlg.id = 'leadDlg';
+ldlg.innerHTML = '<form method="dialog" class="sheet" id="leadForm"></form>'; document.body.appendChild(ldlg);
+const lform = ldlg.querySelector('form'); let leadId = null;
+const curLead = () => LEADS().find(l => l.id === leadId);
+function openLead(id){ leadId = id; if (!curLead()) return; ldraw(); ldlg.showModal(); }
+function ldraw(){
+  const l = curLead();
+  lform.innerHTML = `<h2>${esc(l.name || 'Posible cliente')}</h2>
+    <div class="row"><label>Nombre / empresa<input data-l="name" value="${esc(l.name || '')}" placeholder="Ej.: Tienda de zapatos de Ana" autocomplete="off"></label>
+      <label>Estado<select data-l="status">${Object.entries(LEAD_ST).map(([k, t]) => `<option value="${k}" ${l.status === k ? 'selected' : ''}>${t}</option>`).join('')}</select></label></div>
+    <div class="row"><label>Qué necesita / servicio<input data-l="what" value="${esc(l.what || '')}" placeholder="Meta Ads, web, emails…"></label>
+      <label>Facturación estimada sin IVA (€/mes)<input type="number" min="0" step="10" data-l="fee" value="${l.fee || ''}"></label></div>
+    <div class="row"><label>Contacto<input data-l="contact" value="${esc(l.contact || '')}" placeholder="Teléfono, email, Instagram…"></label>
+      <label>Cómo llegó<input data-l="source" value="${esc(l.source || '')}" placeholder="Recomendación, Instagram, evento…"></label>
+      <label>Próximo seguimiento<input type="date" data-l="next" value="${esc(l.next || '')}"></label></div>
+    <label>Notas<textarea rows="3" data-l="notes" placeholder="Lo que sabes de él, presupuesto, objeciones…">${esc(l.notes || '')}</textarea></label>
+    <h3 class="h3">Seguimiento</h3>
+    <div class="qrow"><input id="leadLogNew" placeholder="Qué has hecho hoy con él… (Intro)" autocomplete="off"></div>
+    <div class="llogs">${(l.log || []).map((g, i) => `<div class="llg"><span>${esc(g.d.slice(8, 10) + '/' + g.d.slice(5, 7))}</span><p>${esc(g.t)}</p><button type="button" class="x" data-lgdel="${i}" aria-label="Borrar">×</button></div>`).join('') || '<p class="vacio">Aún no hay seguimientos.</p>'}</div>
+    <div class="actions"><button type="button" class="btn danger" data-leaddel>Borrar</button><span class="sp"></span><button type="button" class="btn" data-leadwin>🎉 Pasar a cliente</button><button class="btn primary" value="ok">Listo</button></div>`;
+}
+lform.addEventListener('input', e => { const k = e.target.dataset.l, l = curLead(); if (!k || !l) return; l[k] = k === 'fee' ? (parseFloat(e.target.value) || 0) : e.target.value; O.save(); });
+lform.addEventListener('keydown', e => {
+  if (e.target.id !== 'leadLogNew' || e.key !== 'Enter') return; e.preventDefault();
+  const v = e.target.value.trim(), l = curLead(); if (!v || !l) return;
+  (l.log = l.log || []).unshift({d: O.today(), t: v}); O.save(); ldraw(); lform.querySelector('#leadLogNew').focus();
+});
+lform.addEventListener('click', e => {
+  const l = curLead(); if (!l) return;
+  const g = e.target.closest('[data-lgdel]'); if (g){ l.log.splice(+g.dataset.lgdel, 1); O.save(); ldraw(); return; }
+  if (e.target.closest('[data-leaddel]') && confirm(`¿Borrar «${l.name || 'este posible cliente'}»?`)){ S.plan.leads = LEADS().filter(x => x.id !== leadId); O.save(); ldlg.close('del'); return; }
+  if (e.target.closest('[data-leadwin]')){
+    if (!(l.name || '').trim()) return O.toast('Ponle nombre primero');
+    if (!confirm(`¿Crear «${l.name}» como cliente tuyo (actual)?`)) return;
+    const notas = [l.contact && 'Contacto: ' + l.contact, l.source && 'Vino por: ' + l.source, l.notes].filter(Boolean).join('\n');
+    S.clients.push({id: O.uid(), name: l.name.trim(), group: 'mine', keywords: '', estado: 'actual', fee: +l.fee || 0, since: O.today().slice(0, 7), notes: notas, services: l.what ? [{id: leadUid(), name: l.what, mode: 'manual', how: ''}] : []});
+    S.plan.leads = LEADS().filter(x => x.id !== leadId); O.save(); ldlg.close('ok'); O.toast(`🎉 ${l.name} ya es cliente`);
+  }
+});
+ldlg.addEventListener('close', () => { if (S.view === 'clientes') O.render(); });
+ldlg.addEventListener('click', e => { if (e.target === ldlg) ldlg.close(); });
+document.addEventListener('click', e => {
+  if (e.target.closest('[data-leadnew]')){ const l = {id: leadUid(), name: '', status: 'idea', at: Date.now(), log: []}; LEADS().unshift(l); O.save(); openLead(l.id); setTimeout(() => lform.querySelector('[data-l=name]').focus(), 50); return; }
+  const c = e.target.closest('[data-lead]'); if (c) openLead(c.dataset.lead);
+});
 
 function resumen(c){
   const sv = c.services || [];
