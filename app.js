@@ -437,13 +437,13 @@ const GROUP = {agency:{color:'#4F8CFF', label:'Agencia', cls:'g-ag'}, mine:{colo
 const groupOf = c => c ? (c.group === 'mine' ? GROUP.mine : GROUP.agency) : GROUP.none;
 // Cada cliente tiene su tono dentro de la familia de su grupo: verdes/amarillos para los míos, azules/turquesas para la agencia
 // Cada cliente tiene un color bien distinto, dentro de su familia: cálidos/verdes los míos, fríos/azules la agencia
-const PAL_MINE = ['#22C55E','#FACC15','#F97316','#A3E635','#14B8A6','#FB7185','#EAB308','#10B981','#F59E0B','#84CC16','#FDBA74','#2DD4BF'];
-const PAL_AG   = ['#3B82F6','#06B6D4','#6366F1','#38BDF8','#0EA5E9','#818CF8','#22D3EE','#60A5FA','#4F46E5','#67E8F9','#1D4ED8','#93C5FD'];
+// Un color distinto para cada cliente (todos los clientes juntos, por orden alfabético): 18 tonos bien separados
+const PAL_ALL = ['#EF4444','#06B6D4','#F59E0B','#7C3AED','#16A34A','#DB2777','#2563EB','#84CC16','#92400E','#C026D3','#0D9488','#F97316','#4F46E5','#4D7C0F','#0284C7','#BE123C','#475569','#1E3A8A'];   // ordenados para que los vecinos contrasten
 function clientColor(c){
   if (!c) return GROUP.none.color;
-  const fam = S.clients.filter(x => (x.group === 'mine') === (c.group === 'mine')).sort((a, b) => a.name.localeCompare(b.name));
-  const i = Math.max(0, fam.findIndex(x => x.id === c.id)), pal = c.group === 'mine' ? PAL_MINE : PAL_AG;
-  return pal[i % pal.length];
+  const all = S.clients.slice().sort((a, b) => a.name.localeCompare(b.name));
+  const i = Math.max(0, all.findIndex(x => x.id === c.id));
+  return PAL_ALL[i % PAL_ALL.length];
 }
 // Notas de cada tarea: solo en la app (se sincronizan con tu cuenta, nunca van a ClickUp)
 const URL_RE = /https?:\/\/[^\s<>"']*[^\s<>"'.,;:!?)\]]/g;
