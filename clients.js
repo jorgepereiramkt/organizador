@@ -231,7 +231,7 @@ function fichaCard(c){
   return `<article class="ficha" data-ficha="${c.id}" draggable="true" data-fdrag="${c.id}" style="--c:${O.clientColor(c)}" tabindex="0">
     <header><i></i><b>${esc(c.name)}</b>${tierBadge(c)}${c.hours ? `<span class="hrs">${c.hours} h/mes</span>` : ''}</header>
     ${c.group !== 'mine' && agPago(c) ? `<div class="ffee">${rng(agPago(c).a, agPago(c).b)}<small>/mes a la agencia</small></div>
-      ${estadoDe(c) === 'actual' ? `<div class="peso" title="Peso en lo que facturan tus clientes de agencia"><span style="width:${agPeso(c)}%"></span><b>${agPeso(c)}%</b></div>` : ''}` : ''}
+      ${estadoDe(c) === 'actual' ? `<div class="peso" title="Peso en lo que pagan tus clientes de agencia"><i><span style="width:${agPeso(c)}%"></span></i><b>${agPeso(c)}%</b></div>` : ''}` : ''}
     ${c.group === 'mine' && feeTxt(c) ? `<div class="ffee">${esGratis(c) ? '🎁 Gratis' : `${feeTxt(c)}<small>/mes sin IVA</small>`}</div>` : ''}
     ${sv.length ? `<ul>${sv.map(s => `<li>${esc(s.name)}</li>`).join('')}</ul>` : '<p class="vacio">Sin servicios todavía</p>'}
   </article>`;
