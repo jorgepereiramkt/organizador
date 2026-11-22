@@ -6,7 +6,7 @@
 <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' https://www.gstatic.com https://apis.google.com https://accounts.google.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://accounts.google.com; font-src https://fonts.gstatic.com; connect-src https://api.clickup.com https://script.google.com https://script.googleusercontent.com https://accounts.google.com https://firestore.googleapis.com https://identitytoolkit.googleapis.com https://securetoken.googleapis.com https://www.googleapis.com https://apis.google.com; frame-src https://organizador-jp.firebaseapp.com https://accounts.google.com; img-src 'self' data: https://lh3.googleusercontent.com https://www.google.com; manifest-src 'self'; base-uri 'none'; form-action 'self'; object-src 'none'">
 <meta name="referrer" content="no-referrer">
 <meta name="robots" content="noindex, nofollow">
-<link rel="manifest" href="manifest.json?v=20261122161401">
+<link rel="manifest" href="manifest.json?v=20261122161723">
 <link rel="icon" href="icon-192.png">
 <link rel="apple-touch-icon" href="icon-180.png">
 <meta name="theme-color" content="#0a0a0b">
@@ -216,9 +216,18 @@ a.btn{display:inline-flex;align-items:center;text-decoration:none;color:var(--te
 .ficha li{display:flex;gap:6px}
 .ficha .bar{height:5px;border-radius:9px;background:var(--surface-3);overflow:hidden}
 .ficha .bar span{display:block;height:100%;background:var(--ok)}
-.ficha,html[data-theme=light] .ficha{background:linear-gradient(135deg,color-mix(in srgb,var(--c) 30%,var(--surface)) 0%,color-mix(in srgb,var(--c) 10%,var(--surface)) 45%,var(--surface) 100%)!important;position:relative;overflow:hidden}
-.ficha::after{content:'';position:absolute;right:-30px;top:-30px;width:110px;height:110px;border-radius:50%;background:radial-gradient(circle,color-mix(in srgb,var(--c) 35%,transparent),transparent 70%);pointer-events:none}
-.ficha header i{box-shadow:0 0 0 3px color-mix(in srgb,var(--c) 25%,transparent)}
+.ficha,html[data-theme=light] .ficha{background:radial-gradient(120% 90% at 0% 0%,rgba(255,255,255,.28),transparent 55%),linear-gradient(150deg,color-mix(in srgb,var(--c) 92%,#fff) 0%,var(--c) 38%,color-mix(in srgb,var(--c) 55%,#0b0b12) 100%)!important;position:relative;overflow:hidden;min-height:150px;padding:16px 16px 14px!important;color:#fff;box-shadow:0 10px 28px -10px color-mix(in srgb,var(--c) 70%,transparent),inset 0 1px 0 rgba(255,255,255,.35)!important;border:0!important}
+.ficha::after{content:'';position:absolute;right:-40px;bottom:-50px;width:170px;height:170px;border-radius:50%;background:radial-gradient(circle,rgba(255,255,255,.22),transparent 65%);pointer-events:none}
+.ficha::before{content:'';position:absolute;inset:0;background:linear-gradient(180deg,transparent 40%,rgba(0,0,0,.18));pointer-events:none}
+.ficha>*{position:relative;z-index:1}
+.ficha header i{background:#fff!important;box-shadow:0 0 0 3px rgba(255,255,255,.3)}
+.ficha header b{font:700 17px var(--head);color:#fff;text-shadow:0 1px 2px rgba(0,0,0,.25)}
+.ficha .hrs{color:#fff!important;background:rgba(0,0,0,.2);padding:2px 8px;border-radius:999px}
+.ficha ul,.ficha li{color:rgba(255,255,255,.95)}
+.ficha small,.ficha .vacio{color:rgba(255,255,255,.78)!important}
+.ficha .bar{background:rgba(255,255,255,.25)!important}
+.ficha .bar span{background:#fff!important}
+.ficha:hover{transform:translateY(-2px);box-shadow:0 16px 34px -12px color-mix(in srgb,var(--c) 80%,transparent),inset 0 1px 0 rgba(255,255,255,.35)!important}
 .ficha[draggable=true]{cursor:grab}
 .apartados{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px;margin:-8px 0 24px}
 @media (max-width:760px){ .apartados{grid-template-columns:1fr} }
@@ -228,7 +237,7 @@ a.btn{display:inline-flex;align-items:center;text-decoration:none;color:var(--te
 .apart h4 span{color:var(--muted);font-weight:500}
 .apart h4 small{margin-left:auto;color:var(--faint);font:400 11.5px var(--body)}
 .fichas.mini{grid-template-columns:repeat(auto-fill,minmax(190px,1fr));margin:0;gap:8px}
-.fichas.mini .ficha{opacity:.8;padding:9px 11px}
+.fichas.mini .ficha{opacity:.75;min-height:64px;padding:10px 12px!important;filter:saturate(.7)}
 .fichas.mini .ficha ul,.fichas.mini .ficha .bar,.fichas.mini .ficha small,.fichas.mini .vacio{display:none}
 .cart{background:linear-gradient(135deg,color-mix(in srgb,var(--c) 26%,var(--surface-2)) 0%,var(--surface-2) 60%)}
 .ficha small{color:var(--faint);font-size:11.5px}
@@ -1025,12 +1034,12 @@ html[data-theme=light] .jplogo .lg-l{display:block}
 
 <div class="toast" id="toast"></div>
 
-<script src="app.js?v=20261122161401"></script>
-<script src="planner.js?v=20261122161401"></script>
-<script src="clients.js?v=20261122161401"></script>
-<script src="quick.js?v=20261122161401"></script>
-<script src="ia.js?v=20261122161401"></script>
-<script src="hours.js?v=20261122161401"></script>
-<script type="module" src="cloud.js?v=20261122161401"></script>
+<script src="app.js?v=20261122161723"></script>
+<script src="planner.js?v=20261122161723"></script>
+<script src="clients.js?v=20261122161723"></script>
+<script src="quick.js?v=20261122161723"></script>
+<script src="ia.js?v=20261122161723"></script>
+<script src="hours.js?v=20261122161723"></script>
+<script type="module" src="cloud.js?v=20261122161723"></script>
 </body>
 </html>
