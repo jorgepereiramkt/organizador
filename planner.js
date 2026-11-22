@@ -448,6 +448,11 @@ function wkSide(){
     ${sec('hoy', '📌 Para hoy', hoyTs, 'Marca tareas con «Hoy» en Clientes')}
     ${sec('sin', '🗂️ Sin fecha', sin, 'No hay tareas sin fecha')}</aside>`;
 }
+let wkScale = {H0: 480, H1: 1440, cum: [0]};
+const wkY = m => { const {H0, cum} = wkScale; return cum[Math.max(0, Math.min(cum.length - 1, Math.round(m) - H0))]; };
+const wkM = y => { const {H0, cum} = wkScale; let k = 0; while (k < cum.length - 1 && cum[k + 1] <= y) k++; return H0 + k; };
+// las notas de Google pueden venir en HTML: para mostrarlas se pasan a texto
+const plainDesc = h => String(h || '').replace(/<br\s*\/?>/gi, '\n').replace(/<\/(p|div|li|h\d)>/gi, '\n').replace(/<li[^>]*>/gi, '• ').replace(/<[^>]+>/g, '').replace(/&nbsp;/g, ' ').replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&quot;/g, '"').replace(/&#39;/g, "'").replace(/\n{3,}/g, '\n\n').trim();
 function weekView(){
   const days = weekDays(), m = O.fromIso(days[0]), dEnd = O.fromIso(days[6]);
   const rango = m.getMonth() === dEnd.getMonth() ? `${m.getDate()} – ${dEnd.getDate()} ${O.MESES[m.getMonth()]}` : `${m.getDate()} ${O.MESES[m.getMonth()]} – ${dEnd.getDate()} ${O.MESES[dEnd.getMonth()]}`;
@@ -467,32 +472,39 @@ function weekView(){
   const G0 = Math.min(8 * 60, ...all.map(i => i.start)) , G1 = Math.max(22 * 60, ...all.map(i => i.end));
   const H0 = Math.floor(G0 / 60) * 60, H1 = Math.min(24 * 60, Math.ceil(G1 / 60) * 60), PXM = 0.9;
   const now = new Date(), nowMin = now.getHours() * 60 + now.getMinutes(), hoy = O.today();
-  let hours = ''; for (let h = H0; h < H1; h += 60) hours += `<div class="wk-h" style="top:${(h - H0) * PXM}px"><span>${toHM(h)}</span></div>`;
-  const tpl = days.map(d => d < hoy ? 'minmax(74px,.55fr)' : d === hoy ? 'minmax(210px,2.2fr)' : 'minmax(118px,1fr)').join(' ');
+  // píxeles por minuto (se estiran donde un bloque de trabajo de hoy o de días futuros tiene más tareas de las que caben)
+  const ROWH = 33, w = new Array(H1 - H0).fill(PXM);
+  for (const {d, its} of per){ if (d < hoy) continue;
+    for (const b of its.filter(x => x.kind === 'work')){
+      const n = wkTasks(d, b, its).length, need = 34 + n * ROWH, have = (b.end - b.start) * PXM;
+      if (n && need > have){ const extra = (need - have) / (b.end - b.start); for (let m = Math.max(H0, b.start); m < Math.min(H1, b.end); m++) w[m - H0] = Math.max(w[m - H0], PXM + extra); }
+    } }
+  const cum = [0]; for (let k = 0; k < w.length; k++) cum.push(cum[k] + w[k]);
+  const Y = m => cum[Math.max(0, Math.min(cum.length - 1, Math.round(m) - H0))];
+  wkScale = {H0, H1, cum};
+  let hours = '', lines = ''; for (let h = H0; h < H1; h += 60){ hours += `<div class="wk-h" style="top:${Y(h)}px"><span>${toHM(h)}</span></div>`; lines += `<i class="wk-line" style="top:${Y(h)}px"></i>`; }
+  const tpl = days.map(d => d < hoy ? 'minmax(74px,.55fr)' : 'minmax(118px,1fr)').join(' ');
   const cols = per.map(({d, its}) => {
     const blocks = lanes(its.map(i => ({...i}))).map(i => {
-      const top = (i.start - H0) * PXM, h = Math.max(16, (i.end - i.start) * PXM - 2);
+      const top = Y(i.start), h = Math.max(16, Y(i.end) - Y(i.start) - 2);
       const w = 100 / i.ncol, left = i.col * w;
       let cls = 'ev', color = i.color || '#8E8E93', label = esc(i.title || ''), extra = '';
       let inner = '';
       if (i.kind === 'work'){ cls = 'work'; color = 'var(--accent)'; label = 'Trabajo';
         const ts = wkTasks(d, i, its); extra = ts.length ? ` · ${ts.filter(t => t.status === 'done').length}/${ts.length}` : '';
         if (d < hoy){ cls += ' wk-old'; inner = ts.length ? `<span class="wk-sum">✓ ${ts.filter(t => t.status === 'done').length}/${ts.length}</span>` : ''; }
-        else {
-        const cabe = Math.max(0, Math.floor((h - 30) / 19)), sobra = ts.length - cabe;
-        if (sobra > 0) cls += ' wk-many';
-        inner = `<div class="wk-ts">${ts.map(t => { const c = O.client(t.client);
-          return `<article class="card wk-t${t.status === 'done' ? ' done' : ''}" data-id="${t.id}" style="--c:${O.clientColor(c)}"><button class="chk" aria-label="Completar"></button><span class="tt">${esc(t.title)}</span></article>`; }).join('')}</div>${sobra > 0 ? `<button type="button" class="wk-more" data-wexp data-lbl="+${sobra} más">+${sobra} más</button>` : ''}`; } }
+        else inner = `<div class="wk-ts">${ts.map(t => { const c = O.client(t.client);
+          return `<article class="card wk-t${t.status === 'done' ? ' done' : ''}" data-id="${t.id}" style="--c:${O.clientColor(c)}"><button class="chk" aria-label="Completar"></button><span class="wk-tx"><span class="tt">${esc(t.title)}</span><span class="wk-cl">${c ? esc(c.name) : 'Sin cliente'}</span></span></article>`; }).join('')}</div>`; }
       else if (i.kind === 'routine'){ cls = 'rout'; color = ROUTC[i.id] || '#A3A3AD'; }
       else if (i.isCall){ cls = 'call'; color = '#A78BFA'; label = '📞 ' + label; }
       else if (i.kind === 'free'){ cls = 'free'; }
       const gAttr = i.gid && i.mine ? ` data-gid="${esc(i.gid)}" data-gcal="${esc(i.gcal)}" data-gday="${d}" data-gs="${i.start}" data-ge="${i.end}" data-gorig="${i.gstart}"` : '';
-      if (gAttr){ cls += ' g-ev'; if (i.desc && h > 40) inner = `<p class="wk-note">📝 ${esc(i.desc.split('\n')[0])}</p>`; }
+      if (gAttr){ cls += ' g-ev'; const nt = plainDesc(i.desc).split('\n').find(x => x.trim()); if (nt && h > 40) inner = `<p class="wk-note">📝 ${esc(nt)}</p>`; }
       const past = d < hoy || (d === hoy && i.end <= nowMin);
       return `<div class="wk-ev ${cls}${past ? ' past' : ''}"${gAttr} ${i.kind === 'work' ? `data-wbuild="${d}" data-field="slot" data-value="${i.at}" data-day="${d}"` : ''} style="--hh:${h}px;top:${top}px;height:${h}px;left:calc(${left}% + 1px);width:calc(${w}% - 3px);--c:${color}" title="${label.replace(/"/g, '')} · ${toHM(i.start)}–${toHM(i.end)}">
         <b>${label}</b>${h > 26 ? `<small>${toHM(i.start)} – ${toHM(i.end)}${extra}</small>` : ''}${inner}${gAttr ? '<i class="g-res"></i>' : ''}</div>`;
     }).join('');
-    const line = d === hoy && nowMin >= H0 && nowMin <= H1 ? `<i class="wk-now" style="top:${(nowMin - H0) * PXM}px"></i>` : '';
+    const line = d === hoy && nowMin >= H0 && nowMin <= H1 ? `<i class="wk-now" style="top:${Y(nowMin)}px"></i>` : '';
     return `<div class="wk-col${d === hoy ? ' today' : d < hoy ? ' old' : ''}" data-wday="${d}">${blocks}${line}</div>`;
   }).join('');
   const heads = per.map(({d, allDay}) => { const x = O.fromIso(d);
@@ -500,8 +512,8 @@ function weekView(){
       ${allDay.slice(0, 2).map(e => `<span class="wk-all" style="--c:${e.color || '#8E8E93'}">${esc(e.title)}</span>`).join('')}</button>`; }).join('');
   const msg = calError ? `<div class="note warnbox">${esc(calError)}</div>` : weekLoading ? '<div class="note">Cargando la semana…</div>' : '';
   return `${msg}${O.statsBar ? O.statsBar() : ''}<div class="wk-wrap"><div class="wk"><div class="wk-grid" style="grid-template-columns:52px ${tpl}"><div class="wk-corner"></div>${heads}
-    <div class="wk-hours" style="height:${(H1 - H0) * PXM}px">${hours}</div>
-    <div class="wk-cols" style="height:${(H1 - H0) * PXM}px;grid-template-columns:${tpl}" data-h0="${H0}" data-pxm="${PXM}">${cols}</div></div></div>${wkSide()}</div>`;
+    <div class="wk-hours" style="height:${Y(H1)}px">${hours}</div>
+    <div class="wk-cols" style="height:${Y(H1)}px;grid-template-columns:${tpl}">${lines}${cols}</div></div></div>${wkSide()}</div>`;
 }
 /* ---------- Contador: hechas esta semana / este mes y pendientes por urgencia ---------- */
 // Se apunta cada tarea hecha con su fecha (así se cuentan también las de ClickUp aunque ya no se descarguen)
@@ -556,11 +568,11 @@ function wkCreate(day, s, e){
 }
 function wkEditEvent(el){
   const ev = (weekEv[el.dataset.gday] || []).find(x => x.gid === el.dataset.gid && String(x.gstart) === el.dataset.gorig) || {};
-  evCur = {nuevo: false, day: el.dataset.gday, gid: el.dataset.gid, gcal: el.dataset.gcal, orig: el.dataset.gorig};
+  evCur = {nuevo: false, day: el.dataset.gday, gid: el.dataset.gid, gcal: el.dataset.gcal, orig: el.dataset.gorig, desc0: plainDesc(ev.desc), title0: ev.title || ''};
   evForm.innerHTML = `<h2>${esc(ev.title || 'Evento')}</h2>
     <label>Título<input name="title" value="${esc(ev.title || '')}" autocomplete="off"></label>
     <div class="row"><label>Día<input type="date" name="day" value="${el.dataset.gday}"></label><label>Empieza<input type="time" name="s" step="900" value="${toHM(+el.dataset.gs)}"></label><label>Acaba<input type="time" name="e" step="900" value="${toHM(+el.dataset.ge)}"></label></div>
-    <label>Notas<textarea name="desc" rows="5" placeholder="Apunta aquí lo que necesites…">${esc(ev.desc || '')}</textarea></label>
+    <label>Notas<textarea name="desc" rows="6" placeholder="Apunta aquí lo que necesites…">${esc(plainDesc(ev.desc))}</textarea></label>
     <p class="iahint">Los cambios se guardan en tu Google Calendar. Si el evento se repite, solo cambia este día.</p>
     <div class="actions"><button type="button" class="btn danger" data-evdel>Borrar</button><span class="sp"></span><button class="btn" value="cancel" formnovalidate>Cancelar</button><button class="btn primary" value="ok">Guardar</button></div>`;
   evDlg.showModal();
@@ -589,7 +601,10 @@ evDlg.addEventListener('close', async () => {
       O.toast('Creado en tu Google Calendar ✓'); wkReload(c.day);
     } else {
       const day = val('day') || c.day;
-      await bridge({a: 'update', cal: c.gcal, id: c.gid, orig: c.orig, title: val('title'), desc: val('desc'), start: msAt(day, s), end: msAt(day, en)});
+      const q = {a: 'update', cal: c.gcal, id: c.gid, orig: c.orig, start: msAt(day, s), end: msAt(day, en)};
+      if (val('title') !== c.title0) q.title = val('title');
+      if (val('desc') !== c.desc0) q.desc = val('desc');
+      await bridge(q);
       O.toast('Guardado en tu Google Calendar ✓'); wkReload(c.day, day);
     }
   } catch(err){ O.toast('Google Calendar: ' + err.message); }
@@ -604,18 +619,18 @@ document.addEventListener('pointerdown', e => {
     addEventListener('pointerup', ev => { if (Math.hypot(ev.clientX - sx, ev.clientY - sy) < 8) wkEditEvent(el); }, {once: true}); return;
   }
   e.preventDefault(); e.stopPropagation();
-  const cols = el.closest('.wk-cols'), PXM = +cols.dataset.pxm, H0 = +cols.dataset.h0, s0 = +el.dataset.gs, e0 = +el.dataset.ge, len = e0 - s0, y0 = e.clientY, x0 = e.clientX;
+  const s0 = +el.dataset.gs, e0 = +el.dataset.ge, len = e0 - s0, y0 = e.clientY, x0 = e.clientX, snap15 = m => Math.round(m / 15) * 15;
   let day = el.dataset.gday, s = s0, en = e0, moved = false;
   el.classList.add('dragging-ev');
   const mv = ev => {
     if (Math.hypot(ev.clientX - x0, ev.clientY - y0) > 5) moved = true; if (!moved) return;
-    const dm = Math.round((ev.clientY - y0) / PXM / 15) * 15;
-    if (res){ en = Math.max(s0 + 15, Math.min(24 * 60, e0 + dm)); el.style.height = (en - s0) * PXM - 2 + 'px'; }
+    const dy = ev.clientY - y0;
+    if (res){ en = Math.max(s0 + 15, Math.min(24 * 60, snap15(wkM(wkY(e0) + dy)))); el.style.height = wkY(en) - wkY(s0) - 2 + 'px'; }
     else {
-      s = Math.max(0, Math.min(24 * 60 - len, s0 + dm)); en = s + len;
+      s = Math.max(0, Math.min(24 * 60 - len, snap15(wkM(wkY(s0) + dy)))); en = s + len;
       const col = document.elementsFromPoint(ev.clientX, ev.clientY).find(x => x.classList && x.classList.contains('wk-col'));
       if (col && col.dataset.wday !== day){ day = col.dataset.wday; col.appendChild(el); }
-      el.style.top = (s - H0) * PXM + 'px'; el.style.left = '1px'; el.style.width = 'calc(100% - 3px)';
+      el.style.top = wkY(s) + 'px'; el.style.height = wkY(en) - wkY(s) - 2 + 'px'; el.style.left = '1px'; el.style.width = 'calc(100% - 3px)';
     }
     const sm = el.querySelector('small'); if (sm) sm.textContent = `${toHM(s)} – ${toHM(en)}`;
   };
@@ -641,8 +656,8 @@ function wkAddBlock(day, s, e){
 }
 document.addEventListener('pointerdown', e => {
   const col = e.target.closest('.wk-col'); if (!col || e.target.closest('.wk-ev') || e.button !== 0) return;
-  const cols = col.closest('.wk-cols'), H0 = +cols.dataset.h0, PXM = +cols.dataset.pxm, day = col.dataset.wday;
-  const atY = y => { const r = col.getBoundingClientRect(); return Math.max(H0, Math.min(24 * 60, H0 + Math.round((y - r.top) / PXM / 15) * 15)); };
+  const day = col.dataset.wday;
+  const atY = y => { const r = col.getBoundingClientRect(); return Math.max(wkScale.H0, Math.min(24 * 60, Math.round(wkM(y - r.top) / 15) * 15)); };
   const s0 = atY(e.clientY);
   if (wkGesture) return;
   if (e.pointerType === 'touch'){ // en el móvil: tocar un hueco crea un bloque de 1 h (arrastrar sigue siendo hacer scroll)
@@ -654,7 +669,7 @@ document.addEventListener('pointerdown', e => {
   e.preventDefault(); wkGesture = true;
   const g = document.createElement('div'); g.className = 'wk-ev work wk-new'; col.appendChild(g);
   let s = s0, en = s0 + 15;
-  const draw = () => { g.style.top = (s - H0) * PXM + 'px'; g.style.height = (en - s) * PXM + 'px'; g.style.left = '1px'; g.style.width = 'calc(100% - 3px)'; g.innerHTML = `<b>Trabajo</b><small>${toHM(s)} – ${toHM(en)}</small>`; };
+  const draw = () => { g.style.top = wkY(s) + 'px'; g.style.height = wkY(en) - wkY(s) + 'px'; g.style.left = '1px'; g.style.width = 'calc(100% - 3px)'; g.innerHTML = `<b>Trabajo</b><small>${toHM(s)} – ${toHM(en)}</small>`; };
   draw();
   const mv = ev => { const m = atY(ev.clientY); if (m >= s0){ s = s0; en = Math.max(s0 + 15, m); } else { s = m; en = s0 + 15; } draw(); };
   const fin = () => { removeEventListener('pointermove', mv); removeEventListener('pointerup', up); removeEventListener('pointercancel', fin); g.remove(); wkGesture = false; };

@@ -6,7 +6,7 @@
 <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' https://www.gstatic.com https://apis.google.com https://accounts.google.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://accounts.google.com; font-src https://fonts.gstatic.com; connect-src https://api.clickup.com https://script.google.com https://script.googleusercontent.com https://accounts.google.com https://firestore.googleapis.com https://identitytoolkit.googleapis.com https://securetoken.googleapis.com https://www.googleapis.com https://apis.google.com; frame-src https://organizador-jp.firebaseapp.com https://accounts.google.com; img-src 'self' data: https://lh3.googleusercontent.com https://www.google.com; manifest-src 'self'; base-uri 'none'; form-action 'self'; object-src 'none'">
 <meta name="referrer" content="no-referrer">
 <meta name="robots" content="noindex, nofollow">
-<link rel="manifest" href="manifest.json?v=20261122144920">
+<link rel="manifest" href="manifest.json?v=20261122145457">
 <link rel="icon" href="icon-192.png">
 <link rel="apple-touch-icon" href="icon-180.png">
 <meta name="theme-color" content="#0a0a0b">
@@ -389,7 +389,8 @@ a.btn{display:inline-flex;align-items:center;text-decoration:none;color:var(--te
 .wk-hours{position:relative}
 .wk-h{position:absolute;left:0;right:0;height:0}
 .wk-h span{position:absolute;top:-7px;right:8px;font-size:11px;color:var(--faint);font-variant-numeric:tabular-nums}
-.wk-cols{grid-column:2/-1;display:grid;grid-template-columns:repeat(7,minmax(118px,1fr));position:relative;background-image:repeating-linear-gradient(to bottom,var(--line) 0 1px,transparent 1px 54px)}
+.wk-cols{grid-column:2/-1;display:grid;grid-template-columns:repeat(7,minmax(118px,1fr));position:relative}
+.wk-line{position:absolute;left:0;right:0;height:1px;background:var(--line);pointer-events:none}
 .wk-col{position:relative;border-left:1px solid var(--line)}
 .wk-col.today{background:color-mix(in srgb,var(--accent) 4%,transparent)}
 .wk-ev{position:absolute;border-radius:7px;padding:3px 6px;overflow:hidden;background:color-mix(in srgb,var(--c) 26%,var(--surface));border-left:3px solid var(--c);font-size:11.5px;line-height:1.25;cursor:default}
@@ -430,9 +431,12 @@ a.btn{display:inline-flex;align-items:center;text-decoration:none;color:var(--te
 .wk-ts{display:flex;flex-direction:column;gap:2px;margin-top:3px}
 .wk-ev .card.wk-t{display:flex;align-items:center;gap:5px;padding:2px 4px!important;margin:0;min-height:0;border:0!important;border-left:3px solid var(--c)!important;border-radius:5px!important;background:var(--surface)!important;box-shadow:none!important;font-size:11px;line-height:1.2;cursor:grab}
 .wk-ev .card.wk-t .tt{flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-weight:500;font-size:11px!important;line-height:13px}
-.wk-ev .card.wk-t{height:13px;box-sizing:content-box;flex-shrink:0}
+.wk-ev .card.wk-t{height:auto;min-height:25px;box-sizing:border-box;flex-shrink:0;align-items:flex-start}
+.wk-tx{flex:1;min-width:0;display:flex;flex-direction:column}
+.wk-cl{font-size:10px;line-height:12px;color:var(--c);font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;filter:brightness(.8)}
+.wk-ev .card.wk-t .chk{margin-top:1px}
 .wk-ev.work{display:flex;flex-direction:column}
-.wk-ev.work .wk-ts{flex:1;min-height:0;overflow:hidden}
+.wk-ev.work .wk-ts{flex:1;min-height:0;overflow:hidden;gap:3px}
 .wk-more{align-self:flex-start;margin-top:2px;border:0;background:var(--accent);color:#fff;font:700 10.5px var(--body);padding:1px 7px;border-radius:999px;cursor:pointer}
 .wk-ev.work.open,.wk-ev.work.wk-many:hover{height:auto!important;min-height:var(--hh);z-index:6;box-shadow:0 8px 24px rgba(0,0,0,.18),inset 0 0 0 1.5px var(--accent)}
 .wk-ev.work.open .wk-ts,.wk-ev.work.wk-many:hover .wk-ts{overflow:visible}
@@ -978,12 +982,12 @@ html[data-theme=light] .jplogo .lg-l{display:block}
 
 <div class="toast" id="toast"></div>
 
-<script src="app.js?v=20261122144920"></script>
-<script src="planner.js?v=20261122144920"></script>
-<script src="clients.js?v=20261122144920"></script>
-<script src="quick.js?v=20261122144920"></script>
-<script src="ia.js?v=20261122144920"></script>
-<script src="hours.js?v=20261122144920"></script>
-<script type="module" src="cloud.js?v=20261122144920"></script>
+<script src="app.js?v=20261122145457"></script>
+<script src="planner.js?v=20261122145457"></script>
+<script src="clients.js?v=20261122145457"></script>
+<script src="quick.js?v=20261122145457"></script>
+<script src="ia.js?v=20261122145457"></script>
+<script src="hours.js?v=20261122145457"></script>
+<script type="module" src="cloud.js?v=20261122145457"></script>
 </body>
 </html>
