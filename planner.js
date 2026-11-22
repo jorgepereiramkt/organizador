@@ -161,6 +161,7 @@ async function fetchEvents(day){
         const tt = O.norm(e.title || '');
         const isCall = e.guests > 0 || !!e.meet || /<>|\breu\b|reunion|llamada|\bcall\b|meet|zoom|entrevista|☎|📞/.test(tt + (e.title || ''));
         return {title: e.title || '(sin título)', allDay: e.allDay, color: e.color, cal: e.cal, free: !!e.free, isCall,
+          gid: e.id, gcal: e.calId, mine: !!e.mine, desc: e.desc || '', gstart: e.start,
           start: e.allDay ? 0 : Math.max(0, minutesOfDay(new Date(e.start), day)), end: e.allDay ? 0 : Math.min(24 * 60, minutesOfDay(new Date(e.end), day))};
       });
       evCache[key] = evs; out.push(...evs); return;
@@ -394,7 +395,7 @@ O.views.dia = function(){
     }).join('') + '</section>';
   const msg = calError ? `<div class="note warnbox">${esc(calError)}</div>` : loading ? '<div class="note">Cargando calendario…</div>' : '';
   setTimeout(tickCd);
-  return `${msg}${head}<div class="planner"><div class="timeline">${tl}</div>${side}</div>`;
+  return `${msg}${O.statsBar()}${head}<div class="planner"><div class="timeline">${tl}</div>${side}</div>`;
 };
 O.views.dia.after = () => {
   if (S.diaMode === 'semana') return loadWeek();
@@ -467,7 +468,7 @@ function weekView(){
   const H0 = Math.floor(G0 / 60) * 60, H1 = Math.min(24 * 60, Math.ceil(G1 / 60) * 60), PXM = 0.9;
   const now = new Date(), nowMin = now.getHours() * 60 + now.getMinutes(), hoy = O.today();
   let hours = ''; for (let h = H0; h < H1; h += 60) hours += `<div class="wk-h" style="top:${(h - H0) * PXM}px"><span>${toHM(h)}</span></div>`;
-  const nTareas = (d, at) => Object.values(S.slots).filter(sl => sl.day === d && sl.at === at).length;
+  const tpl = days.map(d => d < hoy ? 'minmax(74px,.55fr)' : d === hoy ? 'minmax(210px,2.2fr)' : 'minmax(118px,1fr)').join(' ');
   const cols = per.map(({d, its}) => {
     const blocks = lanes(its.map(i => ({...i}))).map(i => {
       const top = (i.start - H0) * PXM, h = Math.max(16, (i.end - i.start) * PXM - 2);
@@ -476,28 +477,47 @@ function weekView(){
       let inner = '';
       if (i.kind === 'work'){ cls = 'work'; color = 'var(--accent)'; label = 'Trabajo';
         const ts = wkTasks(d, i, its); extra = ts.length ? ` · ${ts.filter(t => t.status === 'done').length}/${ts.length}` : '';
-        const cabe = Math.max(0, Math.floor((h - 30) / 17)), sobra = ts.length - cabe;
+        if (d < hoy){ cls += ' wk-old'; inner = ts.length ? `<span class="wk-sum">✓ ${ts.filter(t => t.status === 'done').length}/${ts.length}</span>` : ''; }
+        else {
+        const cabe = Math.max(0, Math.floor((h - 30) / 19)), sobra = ts.length - cabe;
         if (sobra > 0) cls += ' wk-many';
         inner = `<div class="wk-ts">${ts.map(t => { const c = O.client(t.client);
-          return `<article class="card wk-t${t.status === 'done' ? ' done' : ''}" data-id="${t.id}" style="--c:${O.clientColor(c)}"><button class="chk" aria-label="Completar"></button><span class="tt">${esc(t.title)}</span></article>`; }).join('')}</div>${sobra > 0 ? `<button type="button" class="wk-more" data-wexp data-lbl="+${sobra} más">+${sobra} más</button>` : ''}`; }
+          return `<article class="card wk-t${t.status === 'done' ? ' done' : ''}" data-id="${t.id}" style="--c:${O.clientColor(c)}"><button class="chk" aria-label="Completar"></button><span class="tt">${esc(t.title)}</span></article>`; }).join('')}</div>${sobra > 0 ? `<button type="button" class="wk-more" data-wexp data-lbl="+${sobra} más">+${sobra} más</button>` : ''}`; } }
       else if (i.kind === 'routine'){ cls = 'rout'; color = ROUTC[i.id] || '#A3A3AD'; }
       else if (i.isCall){ cls = 'call'; color = '#A78BFA'; label = '📞 ' + label; }
       else if (i.kind === 'free'){ cls = 'free'; }
+      const gAttr = i.gid && i.mine ? ` data-gid="${esc(i.gid)}" data-gcal="${esc(i.gcal)}" data-gday="${d}" data-gs="${i.start}" data-ge="${i.end}" data-gorig="${i.gstart}"` : '';
+      if (gAttr){ cls += ' g-ev'; if (i.desc && h > 40) inner = `<p class="wk-note">📝 ${esc(i.desc.split('\n')[0])}</p>`; }
       const past = d < hoy || (d === hoy && i.end <= nowMin);
-      return `<div class="wk-ev ${cls}${past ? ' past' : ''}" ${i.kind === 'work' ? `data-wbuild="${d}" data-field="slot" data-value="${i.at}" data-day="${d}"` : ''} style="--hh:${h}px;top:${top}px;height:${h}px;left:calc(${left}% + 1px);width:calc(${w}% - 3px);--c:${color}" title="${label.replace(/"/g, '')} · ${toHM(i.start)}–${toHM(i.end)}">
-        <b>${label}</b>${h > 26 ? `<small>${toHM(i.start)} – ${toHM(i.end)}${extra}</small>` : ''}${inner}</div>`;
+      return `<div class="wk-ev ${cls}${past ? ' past' : ''}"${gAttr} ${i.kind === 'work' ? `data-wbuild="${d}" data-field="slot" data-value="${i.at}" data-day="${d}"` : ''} style="--hh:${h}px;top:${top}px;height:${h}px;left:calc(${left}% + 1px);width:calc(${w}% - 3px);--c:${color}" title="${label.replace(/"/g, '')} · ${toHM(i.start)}–${toHM(i.end)}">
+        <b>${label}</b>${h > 26 ? `<small>${toHM(i.start)} – ${toHM(i.end)}${extra}</small>` : ''}${inner}${gAttr ? '<i class="g-res"></i>' : ''}</div>`;
     }).join('');
     const line = d === hoy && nowMin >= H0 && nowMin <= H1 ? `<i class="wk-now" style="top:${(nowMin - H0) * PXM}px"></i>` : '';
-    return `<div class="wk-col${d === hoy ? ' today' : ''}" data-wday="${d}">${blocks}${line}</div>`;
+    return `<div class="wk-col${d === hoy ? ' today' : d < hoy ? ' old' : ''}" data-wday="${d}">${blocks}${line}</div>`;
   }).join('');
   const heads = per.map(({d, allDay}) => { const x = O.fromIso(d);
-    return `<button type="button" class="wk-head${d === hoy ? ' today' : ''}" data-wopen="${d}"><small>${O.DIAS_L[x.getDay()].slice(0, 3).toUpperCase()}</small><b>${x.getDate()}</b>
+    return `<button type="button" class="wk-head${d === hoy ? ' today' : d < hoy ? ' old' : ''}" data-wopen="${d}"><small>${O.DIAS_L[x.getDay()].slice(0, 3).toUpperCase()}</small><b>${x.getDate()}</b>
       ${allDay.slice(0, 2).map(e => `<span class="wk-all" style="--c:${e.color || '#8E8E93'}">${esc(e.title)}</span>`).join('')}</button>`; }).join('');
   const msg = calError ? `<div class="note warnbox">${esc(calError)}</div>` : weekLoading ? '<div class="note">Cargando la semana…</div>' : '';
-  return `${msg}<div class="wk-wrap"><div class="wk"><div class="wk-grid"><div class="wk-corner"></div>${heads}
+  return `${msg}${O.statsBar ? O.statsBar() : ''}<div class="wk-wrap"><div class="wk"><div class="wk-grid" style="grid-template-columns:52px ${tpl}"><div class="wk-corner"></div>${heads}
     <div class="wk-hours" style="height:${(H1 - H0) * PXM}px">${hours}</div>
-    <div class="wk-cols" style="height:${(H1 - H0) * PXM}px" data-h0="${H0}" data-pxm="${PXM}">${cols}</div></div></div>${wkSide()}</div>`;
+    <div class="wk-cols" style="height:${(H1 - H0) * PXM}px;grid-template-columns:${tpl}" data-h0="${H0}" data-pxm="${PXM}">${cols}</div></div></div>${wkSide()}</div>`;
 }
+/* ---------- Contador: hechas esta semana / este mes y pendientes por urgencia ---------- */
+// Se apunta cada tarea hecha con su fecha (así se cuentan también las de ClickUp aunque ya no se descarguen)
+O.statsBar = function(){
+  const log = P().doneLog = P().doneLog || {};
+  let cambio = false;
+  for (const t of S.tasks) if (t.status === 'done' && t.doneAt && !O.isRegTask(t) && log[t.id] !== t.doneAt){ log[t.id] = t.doneAt; cambio = true; }
+  const lim = O.iso(O.addDays(new Date(), -70)); for (const k in log) if (log[k] < lim){ delete log[k]; cambio = true; }
+  if (cambio) setTimeout(O.save, 0);
+  const hoy = O.today(), lun = O.iso(monday(hoy)), mes = hoy.slice(0, 7);
+  const vals = Object.values(log), sem = vals.filter(d => d >= lun && d <= hoy).length, mesN = vals.filter(d => d.startsWith(mes)).length, hoyN = vals.filter(d => d === hoy).length;
+  const pend = O.visibleTasks().filter(t => t.status !== 'done' && !t.ia);
+  const byU = k => pend.filter(t => (O.URG[t.priority] ? t.priority : 'normal') === k).length;
+  return `<div class="stats"><div class="st-done"><span><b>${hoyN}</b><small>hechas hoy</small></span><span><b>${sem}</b><small>esta semana</small></span><span><b>${mesN}</b><small>este mes</small></span></div>
+    <div class="st-pend"><small>Pendientes</small>${Object.entries(O.URG).map(([k, u]) => `<span class="u-${k}" title="${u.label}">${u.icon} <b>${byU(k)}</b></span>`).join('')}<span class="st-tot">${pend.length} en total</span></div></div>`;
+};
 O.views.dia = function(){ return S.diaMode === 'semana' ? weekView() : diaView(); };
 O.views.dia.after = diaAfter;
 document.addEventListener('click', e => {
@@ -513,6 +533,104 @@ document.addEventListener('click', e => {
   if (b){ planDay = b.dataset.wbuild; lastEvents = weekEv[planDay] || []; openBuild(planDay); }
 });
 let wkJustMade = false, wkGesture = false;
+/* ---------- Eventos de Google desde la semana: crear, mover, estirar, editar y borrar ---------- */
+const evDlg = document.createElement('dialog'); evDlg.id = 'evDlg';
+evDlg.innerHTML = '<form method="dialog" class="sheet" id="evForm"></form>'; document.body.appendChild(evDlg);
+const evForm = evDlg.querySelector('form'); let evCur = null;
+const misCals = () => ((P().accounts.find(a => a.bridge) || {}).cals || []).filter(c => !/holiday|#/.test(c.id));
+const msAt = (day, min) => O.fromIso(day).getTime() + min * 60e3;
+const hmIn = v => toMin(v || '00:00');
+async function wkReload(...ds){ for (const d of ds) delete weekEv[d]; clearCache(); lastEvents = []; await loadWeek(); if (S.view === 'dia') O.render(); }
+function wkCreate(day, s, e){
+  evCur = {nuevo: true, day, s, e};
+  const cals = misCals();
+  evForm.innerHTML = `<h2>Nuevo bloque · ${toHM(s)} – ${toHM(e)}</h2>
+    <div class="modes evtype"><button type="button" class="chip" data-evt="work" aria-pressed="false">🧱 Trabajo (tareas)</button><button type="button" class="chip" data-evt="ev" aria-pressed="true">📅 Evento / bloque</button></div>
+    <div class="evfields"><label>Título<input name="title" placeholder="Ej.: Gestiones personales, Grabar reels, Médico…" autocomplete="off"></label>
+    <div class="row"><label>Empieza<input type="time" name="s" step="900" value="${toHM(s)}"></label><label>Acaba<input type="time" name="e" step="900" value="${toHM(e)}"></label></div>
+    <label>Notas<textarea name="desc" rows="4" placeholder="Lo que quieras apuntar para organizarte en este bloque…"></textarea></label>
+    ${cals.length > 1 ? `<label>Calendario<select name="cal">${cals.map(c => `<option value="${esc(c.id)}" ${c.on ? 'selected' : ''}>${esc(c.name)}</option>`).join('')}</select></label>` : ''}
+    <p class="iahint">Se crea en tu Google Calendar (cuenta personal).</p></div>
+    <div class="actions"><span class="sp"></span><button class="btn" value="cancel" formnovalidate>Cancelar</button><button class="btn primary" value="ok">Crear</button></div>`;
+  evDlg.showModal(); setTimeout(() => evForm.querySelector('[name=title]').focus(), 50);
+}
+function wkEditEvent(el){
+  const ev = (weekEv[el.dataset.gday] || []).find(x => x.gid === el.dataset.gid && String(x.gstart) === el.dataset.gorig) || {};
+  evCur = {nuevo: false, day: el.dataset.gday, gid: el.dataset.gid, gcal: el.dataset.gcal, orig: el.dataset.gorig};
+  evForm.innerHTML = `<h2>${esc(ev.title || 'Evento')}</h2>
+    <label>Título<input name="title" value="${esc(ev.title || '')}" autocomplete="off"></label>
+    <div class="row"><label>Día<input type="date" name="day" value="${el.dataset.gday}"></label><label>Empieza<input type="time" name="s" step="900" value="${toHM(+el.dataset.gs)}"></label><label>Acaba<input type="time" name="e" step="900" value="${toHM(+el.dataset.ge)}"></label></div>
+    <label>Notas<textarea name="desc" rows="5" placeholder="Apunta aquí lo que necesites…">${esc(ev.desc || '')}</textarea></label>
+    <p class="iahint">Los cambios se guardan en tu Google Calendar. Si el evento se repite, solo cambia este día.</p>
+    <div class="actions"><button type="button" class="btn danger" data-evdel>Borrar</button><span class="sp"></span><button class="btn" value="cancel" formnovalidate>Cancelar</button><button class="btn primary" value="ok">Guardar</button></div>`;
+  evDlg.showModal();
+}
+evForm.addEventListener('click', async e => {
+  const t = e.target.closest('[data-evt]');
+  if (t){ if (t.dataset.evt === 'work'){ const c = evCur; evCur = null; evDlg.close('cancel'); wkAddBlock(c.day, c.s, c.e); } return; }
+  if (e.target.closest('[data-evdel]')){
+    if (!confirm('¿Borrar este evento de tu Google Calendar?')) return;
+    const c = evCur; evCur = null; evDlg.close('cancel');
+    try { await bridge({a: 'delete', cal: c.gcal, id: c.gid, orig: c.orig}); O.toast('Evento borrado'); } catch(err){ O.toast('No se pudo borrar: ' + err.message); }
+    wkReload(c.day);
+  }
+});
+evDlg.addEventListener('close', async () => {
+  const c = evCur; evCur = null;
+  if (evDlg.returnValue !== 'ok' || !c) return;
+  const f = evForm, val = n => (f.querySelector(`[name=${n}]`) || {}).value;
+  const s = hmIn(val('s')), en = hmIn(val('e'));
+  if (en <= s) return O.toast('La hora de fin tiene que ser después del inicio');
+  try {
+    if (c.nuevo){
+      const cal = val('cal') || (misCals().find(x => x.on) || misCals()[0] || {}).id;
+      if (!cal) throw new Error('no hay calendario del puente');
+      await bridge({a: 'create', cal, title: (val('title') || '').trim() || 'Bloque', desc: val('desc') || '', start: msAt(c.day, s), end: msAt(c.day, en)});
+      O.toast('Creado en tu Google Calendar ✓'); wkReload(c.day);
+    } else {
+      const day = val('day') || c.day;
+      await bridge({a: 'update', cal: c.gcal, id: c.gid, orig: c.orig, title: val('title'), desc: val('desc'), start: msAt(day, s), end: msAt(day, en)});
+      O.toast('Guardado en tu Google Calendar ✓'); wkReload(c.day, day);
+    }
+  } catch(err){ O.toast('Google Calendar: ' + err.message); }
+});
+evDlg.addEventListener('click', e => { if (e.target === evDlg) evDlg.close('cancel'); });
+// Arrastrar un evento (cambiarlo de hora o de día) o estirarlo desde el borde de abajo
+document.addEventListener('pointerdown', e => {
+  const el = e.target.closest('.wk-ev.g-ev'); if (!el || e.button !== 0) return;
+  const res = !!e.target.closest('.g-res');
+  if (e.pointerType === 'touch' && !res){   // en el móvil: tocar abre la ficha (ahí se cambia la hora o el día)
+    const sx = e.clientX, sy = e.clientY;
+    addEventListener('pointerup', ev => { if (Math.hypot(ev.clientX - sx, ev.clientY - sy) < 8) wkEditEvent(el); }, {once: true}); return;
+  }
+  e.preventDefault(); e.stopPropagation();
+  const cols = el.closest('.wk-cols'), PXM = +cols.dataset.pxm, H0 = +cols.dataset.h0, s0 = +el.dataset.gs, e0 = +el.dataset.ge, len = e0 - s0, y0 = e.clientY, x0 = e.clientX;
+  let day = el.dataset.gday, s = s0, en = e0, moved = false;
+  el.classList.add('dragging-ev');
+  const mv = ev => {
+    if (Math.hypot(ev.clientX - x0, ev.clientY - y0) > 5) moved = true; if (!moved) return;
+    const dm = Math.round((ev.clientY - y0) / PXM / 15) * 15;
+    if (res){ en = Math.max(s0 + 15, Math.min(24 * 60, e0 + dm)); el.style.height = (en - s0) * PXM - 2 + 'px'; }
+    else {
+      s = Math.max(0, Math.min(24 * 60 - len, s0 + dm)); en = s + len;
+      const col = document.elementsFromPoint(ev.clientX, ev.clientY).find(x => x.classList && x.classList.contains('wk-col'));
+      if (col && col.dataset.wday !== day){ day = col.dataset.wday; col.appendChild(el); }
+      el.style.top = (s - H0) * PXM + 'px'; el.style.left = '1px'; el.style.width = 'calc(100% - 3px)';
+    }
+    const sm = el.querySelector('small'); if (sm) sm.textContent = `${toHM(s)} – ${toHM(en)}`;
+  };
+  const fin = () => { removeEventListener('pointermove', mv); removeEventListener('pointerup', up); removeEventListener('pointercancel', fin); el.classList.remove('dragging-ev'); };
+  const up = async () => {
+    fin(); wkJustMade = true; setTimeout(() => wkJustMade = false, 150);
+    if (!moved) return wkEditEvent(el);
+    if (day === el.dataset.gday && s === s0 && en === e0) return;
+    try { await bridge({a: 'update', cal: el.dataset.gcal, id: el.dataset.gid, orig: el.dataset.gorig, start: msAt(day, s), end: msAt(day, en)}); O.toast(`Movido a ${toHM(s)} – ${toHM(en)} ✓`); }
+    catch(err){ O.toast('No se pudo mover: ' + err.message); }
+    wkReload(el.dataset.gday, day);
+  };
+  addEventListener('pointermove', mv); addEventListener('pointerup', up); addEventListener('pointercancel', fin);
+}, true);
+
 function wkAddBlock(day, s, e){
   const blocks = P().dayBlocks = P().dayBlocks || {};
   if (!blocks[day]) blocks[day] = day >= MANUAL_FROM ? [] : buildDay(day, weekEv[day] || [], true).filter(i => i.kind === 'work').map(i => ({id: Math.random().toString(36).slice(2, 8), start: i.start, end: i.end}));
@@ -530,7 +648,7 @@ document.addEventListener('pointerdown', e => {
   if (e.pointerType === 'touch'){ // en el móvil: tocar un hueco crea un bloque de 1 h (arrastrar sigue siendo hacer scroll)
     const sx = e.clientX, sy = e.clientY; wkGesture = true;
     const fin = () => { removeEventListener('pointerup', up); removeEventListener('pointercancel', fin); wkGesture = false; };
-    const up = ev => { fin(); if (Math.hypot(ev.clientX - sx, ev.clientY - sy) < 8 && confirm(`¿Crear bloque de trabajo de 1 h a las ${toHM(s0)}?`)) wkAddBlock(day, s0, Math.min(24 * 60, s0 + 60)); };
+    const up = ev => { fin(); if (Math.hypot(ev.clientX - sx, ev.clientY - sy) < 8 ) wkCreate(day, s0, Math.min(24 * 60, s0 + 60)); };
     addEventListener('pointerup', up); addEventListener('pointercancel', fin); return;
   }
   e.preventDefault(); wkGesture = true;
@@ -540,7 +658,7 @@ document.addEventListener('pointerdown', e => {
   draw();
   const mv = ev => { const m = atY(ev.clientY); if (m >= s0){ s = s0; en = Math.max(s0 + 15, m); } else { s = m; en = s0 + 15; } draw(); };
   const fin = () => { removeEventListener('pointermove', mv); removeEventListener('pointerup', up); removeEventListener('pointercancel', fin); g.remove(); wkGesture = false; };
-  const up = () => { fin(); wkJustMade = true; setTimeout(() => wkJustMade = false, 100); if (en - s >= 15) wkAddBlock(day, s, en); };
+  const up = () => { fin(); wkJustMade = true; setTimeout(() => wkJustMade = false, 100); if (en - s >= 15) wkCreate(day, s, en); };
   addEventListener('pointermove', mv); addEventListener('pointerup', up); addEventListener('pointercancel', fin);
 });
 try { S.diaMode = localStorage.getItem('jp-diamode') || 'dia'; } catch(e){ S.diaMode = 'dia'; }
