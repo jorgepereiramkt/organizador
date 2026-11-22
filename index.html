@@ -6,7 +6,7 @@
 <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' https://www.gstatic.com https://apis.google.com https://accounts.google.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://accounts.google.com; font-src https://fonts.gstatic.com; connect-src https://api.clickup.com https://script.google.com https://script.googleusercontent.com https://accounts.google.com https://firestore.googleapis.com https://identitytoolkit.googleapis.com https://securetoken.googleapis.com https://www.googleapis.com https://apis.google.com; frame-src https://organizador-jp.firebaseapp.com https://accounts.google.com; img-src 'self' data: https://lh3.googleusercontent.com https://www.google.com; manifest-src 'self'; base-uri 'none'; form-action 'self'; object-src 'none'">
 <meta name="referrer" content="no-referrer">
 <meta name="robots" content="noindex, nofollow">
-<link rel="manifest" href="manifest.json?v=20261122170754">
+<link rel="manifest" href="manifest.json?v=20261122171310">
 <link rel="icon" href="icon-192.png">
 <link rel="apple-touch-icon" href="icon-180.png">
 <meta name="theme-color" content="#0a0a0b">
@@ -253,6 +253,24 @@ a.btn{display:inline-flex;align-items:center;text-decoration:none;color:var(--te
 .cmp.top{background:linear-gradient(135deg,#FFE27A,#F5B700);color:#3b2a00}
 .cmp.warn{background:rgba(0,0,0,.25)}
 .riesgo{margin:2px 2px 12px;padding:10px 14px;border-radius:14px;background:color-mix(in srgb,#F5B700 12%,var(--surface));border:1px solid color-mix(in srgb,#F5B700 30%,transparent);font-size:13.5px}
+.ia-cat{margin-bottom:26px}
+.ia-cat h3{display:flex;align-items:baseline;gap:10px;margin:0 2px 12px;font:700 18px var(--head)}
+.ia-cat h3 span{font:400 13px var(--body);color:var(--muted)}
+.ia-cat h3 .btn{margin-left:auto;height:34px;font-size:13px;align-self:center}
+.pgrid{border-radius:18px;min-height:120px;transition:background .15s}
+.pgrid.over{background:color-mix(in srgb,var(--accent) 7%,transparent);outline:1.5px dashed var(--accent)}
+.proj.prem,html[data-theme=light] .proj.prem{background:radial-gradient(120% 90% at 0% 0%,rgba(255,255,255,.28),transparent 55%),linear-gradient(150deg,color-mix(in srgb,var(--c) 92%,#fff) 0%,var(--c) 38%,color-mix(in srgb,var(--c) 55%,#0b0b12) 100%)!important;color:#fff;border:0!important;min-height:190px;position:relative;overflow:hidden;box-shadow:0 10px 28px -10px color-mix(in srgb,var(--c) 70%,transparent),inset 0 1px 0 rgba(255,255,255,.35)!important}
+.proj.prem::after{content:'';position:absolute;right:-40px;bottom:-50px;width:170px;height:170px;border-radius:50%;background:radial-gradient(circle,rgba(255,255,255,.2),transparent 65%);pointer-events:none}
+.proj.prem>*{position:relative;z-index:1}
+.proj.prem header b{color:#fff;font:700 17px var(--head);text-shadow:0 1px 2px rgba(0,0,0,.25)}
+.proj.prem .pst{background:rgba(255,255,255,.9)!important;color:#111!important}
+.proj.prem p,.proj.prem li,.proj.prem .more{color:rgba(255,255,255,.88)!important}
+.proj.prem .ilink{background:rgba(255,255,255,.22);color:#fff}
+.proj.prem .apath{color:rgba(255,255,255,.85)}
+.proj.prem .qidea input{background:rgba(255,255,255,.18)!important;border-color:transparent!important;color:#fff}
+.proj.prem .qidea input::placeholder{color:rgba(255,255,255,.7)}
+.proj.prem:hover{transform:translateY(-2px)}
+.proj.dragging{opacity:.4}
 .ingh{display:flex;align-items:baseline;gap:10px;margin:6px 2px 10px;font:700 14px var(--head)}
 .ingh span{font:400 12.5px var(--body);color:var(--muted)}
 .leads-h{display:flex;align-items:center;gap:10px;margin-top:30px}
@@ -1083,12 +1101,12 @@ html[data-theme=light] .jplogo .lg-l{display:block}
 
 <div class="toast" id="toast"></div>
 
-<script src="app.js?v=20261122170754"></script>
-<script src="planner.js?v=20261122170754"></script>
-<script src="clients.js?v=20261122170754"></script>
-<script src="quick.js?v=20261122170754"></script>
-<script src="ia.js?v=20261122170754"></script>
-<script src="hours.js?v=20261122170754"></script>
-<script type="module" src="cloud.js?v=20261122170754"></script>
+<script src="app.js?v=20261122171310"></script>
+<script src="planner.js?v=20261122171310"></script>
+<script src="clients.js?v=20261122171310"></script>
+<script src="quick.js?v=20261122171310"></script>
+<script src="ia.js?v=20261122171310"></script>
+<script src="hours.js?v=20261122171310"></script>
+<script type="module" src="cloud.js?v=20261122171310"></script>
 </body>
 </html>

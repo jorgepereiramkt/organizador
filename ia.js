@@ -6,6 +6,12 @@ const A = () => (S.ai = S.ai || {projects: []});
 const ST = {idea:'Idea', curso:'En curso', pausa:'En pausa', hecho:'Hecho'};
 const COLORS = {agency:['#3B82F6','#06B6D4','#6366F1','#38BDF8','#0EA5E9','#818CF8'], mine:['#22C55E','#FACC15','#F97316','#14B8A6','#FB7185','#A3E635']};
 const uid = () => Math.random().toString(36).slice(2, 10);
+// Tipos de herramienta (secciones). Si un proyecto no tiene tipo: los de la agencia van a «Agencia» y los tuyos a «Servicio a clientes».
+const CATS = [['propia', '🧠 Organización propia', 'herramientas para organizarte tú'], ['clientes', '🤝 Servicio a clientes', 'lo que das o automatizas para tus clientes'], ['agencia', '🏢 Agencia', 'herramientas para la agencia']];
+const catDe = p => CATS.some(([k]) => k === p.cat) ? p.cat : (p.group === 'agency' ? 'agencia' : 'clientes');
+// un color distinto por proyecto (como las fichas de clientes)
+const PPAL = ['#7C3AED','#06B6D4','#F59E0B','#DB2777','#16A34A','#2563EB','#EF4444','#0D9488','#C026D3','#F97316','#4F46E5','#84CC16','#92400E','#0284C7','#BE123C','#475569'];
+const pColor = p => { const all = A().projects.slice().sort((a, b) => (a.at || 0) - (b.at || 0) || a.id.localeCompare(b.id)); return PPAL[Math.max(0, all.findIndex(x => x.id === p.id)) % PPAL.length]; };
 
 // Enlaces cortos: en vez de la URL entera, «🔗 miro.com»
 const URL_RE = /https?:\/\/[^\s<>"']*[^\s<>"'.,;:!?)\]]/g;
@@ -20,13 +26,13 @@ O.views.ia = function(){
   if (S.iaMode === 'hechas') return autosView();
   O.setToolbar('Proyectos IA', 'en mente: ideas y proyectos que se te ocurren', '', 'Toca un proyecto para ver y apuntar ideas');
   const ps = A().projects;
-  const sec = (g, title, cls) => {
-    const list = ps.filter(p => p.group === g).sort((a, b) => (a.status === 'hecho') - (b.status === 'hecho') || (b.at || 0) - (a.at || 0));
-    return `<section class="ia-sec ${cls}"><h3>${title}<span>${list.length} proyecto${list.length === 1 ? '' : 's'}</span>
-      <button class="btn" data-pnew="${g}">+ Proyecto</button></h3>
-      <div class="ia-grid">${list.map(card).join('') || '<div class="empty">Aún no hay proyectos. Pulsa «+ Proyecto».</div>'}</div></section>`;
+  // por tipo de herramienta; dentro, tu propio orden (arrastrando) y lo hecho al final
+  const sec = ([k, title, sub]) => {
+    const list = ps.filter(p => catDe(p) === k).sort((a, b) => (a.status === 'hecho') - (b.status === 'hecho') || (a.ord ?? 1e9) - (b.ord ?? 1e9) || (b.at || 0) - (a.at || 0));
+    return `<section class="ia-cat"><h3>${title}<span>${list.length} · ${sub}</span><button class="btn" data-pnew="${k}">+ Proyecto</button></h3>
+      <div class="ia-grid pgrid" data-pcat="${k}">${list.map(card).join('') || '<div class="empty">Arrastra aquí un proyecto o pulsa «+ Proyecto».</div>'}</div></section>`;
   };
-  return `<div class="ia-wrap">${sec('agency', '🏢 Agencia', 'ia-ag')}${sec('mine', '🔒 Mío', 'ia-mine')}</div>`;
+  return `<div class="ia-wrap">${CATS.map(sec).join('')}</div>`;
 };
 O.views.ia.after = () => {
   const tb = $('#toolbar'); if (tb.querySelector('.modes')) return;
@@ -118,7 +124,7 @@ adlg.addEventListener('close', () => {
 adlg.addEventListener('click', e => { if (e.target === adlg) adlg.close(); });
 function card(p){
   const ideas = p.ideas || [], open = ideas.filter(i => !i.done);
-  return `<article class="proj" data-proj="${p.id}" style="--c:${p.color}">
+  return `<article class="proj prem" data-proj="${p.id}" draggable="true" style="--c:${pColor(p)}">
     <header><b>${esc(p.name)}</b><span class="pst s-${p.status}">${ST[p.status] || 'Idea'}</span></header>
     ${p.desc ? `<p>${linky(p.desc)}</p>` : ''}
     ${ideas.length ? `<ul>${ideas.slice(0, 4).map(i => `<li class="${i.done ? 'done' : ''}">💡 ${linky(i.text)}</li>`).join('')}</ul>` : ''}
@@ -128,12 +134,27 @@ function card(p){
   </article>`;
 }
 
+let pDrag = null;
+document.addEventListener('dragstart', e => { const c = e.target.closest && e.target.closest('[data-proj]'); if (!c) return; pDrag = c.dataset.proj; e.dataTransfer.effectAllowed = 'move'; c.classList.add('dragging'); });
+document.addEventListener('dragend', e => { const c = e.target.closest && e.target.closest('[data-proj]'); if (c) c.classList.remove('dragging'); document.querySelectorAll('[data-pcat].over').forEach(x => x.classList.remove('over')); });
+document.addEventListener('dragover', e => { if (!pDrag) return; const z = e.target.closest && e.target.closest('[data-pcat]'); if (!z) return; e.preventDefault(); document.querySelectorAll('[data-pcat].over').forEach(x => x !== z && x.classList.remove('over')); z.classList.add('over'); });
+document.addEventListener('drop', e => {
+  if (!pDrag) return; const z = e.target.closest && e.target.closest('[data-pcat]'); const id = pDrag; pDrag = null; if (!z) return; e.preventDefault();
+  const p = A().projects.find(x => x.id === id); if (!p) return;
+  p.cat = z.dataset.pcat; if (p.cat === 'agencia') p.group = 'agency'; else if (p.group === 'agency') p.group = 'mine';
+  const tgt = e.target.closest('[data-proj]'), other = tgt && tgt.dataset.proj !== id && A().projects.find(x => x.id === tgt.dataset.proj);
+  const fam = A().projects.filter(x => catDe(x) === p.cat && x !== p).sort((a, b) => (a.ord ?? 1e9) - (b.ord ?? 1e9) || (b.at || 0) - (a.at || 0));
+  if (other){ const r = tgt.getBoundingClientRect(); fam.splice(fam.indexOf(other) + (e.clientX > r.left + r.width / 2 ? 1 : 0), 0, p); } else fam.push(p);
+  fam.forEach((x, k) => x.ord = k);
+  O.save(); O.render();
+});
+
 // Nuevo proyecto
 document.addEventListener('click', e => {
   const n = e.target.closest('[data-pnew]'); if (!n) return;
-  const g = n.dataset.pnew, name = prompt('Nombre del proyecto:'); if (!name || !name.trim()) return;
-  const same = A().projects.filter(p => p.group === g).length;
-  const p = {id: uid(), name: name.trim(), group: g, status: 'idea', desc: '', ideas: [], color: COLORS[g][same % COLORS[g].length], at: Date.now()};
+  const cat = n.dataset.pnew, name = prompt('Nombre del proyecto:'); if (!name || !name.trim()) return;
+  const g = cat === 'agencia' ? 'agency' : 'mine';
+  const p = {id: uid(), name: name.trim(), group: g, cat, status: 'idea', desc: '', ideas: [], at: Date.now()};
   A().projects.push(p); O.save(); O.render(); openProj(p.id);
 });
 // Idea rápida desde la tarjeta
@@ -165,7 +186,7 @@ function draw(){
   form.innerHTML = `<h2>${esc(p.name)}</h2>
     <div class="row"><label>Nombre<input data-pf="name" value="${esc(p.name)}"></label>
       <label>Estado<select data-pf="status">${Object.entries(ST).map(([k, v]) => `<option value="${k}" ${p.status === k ? 'selected' : ''}>${v}</option>`).join('')}</select></label>
-      <label>Grupo<select data-pf="group"><option value="agency" ${p.group === 'agency' ? 'selected' : ''}>Agencia</option><option value="mine" ${p.group === 'mine' ? 'selected' : ''}>Mío</option></select></label></div>
+      <label>Tipo<select data-pf="cat">${CATS.map(([k, t]) => `<option value="${k}" ${catDe(p) === k ? 'selected' : ''}>${t}</option>`).join('')}</select></label></div>
     <label>De qué va (objetivo, qué se automatiza, herramientas…)<textarea rows="3" data-pf="desc">${esc(p.desc || '')}</textarea></label>
     <h3 class="h3">Ideas y notas</h3>
     <div class="qrow"><input id="ideaNew" placeholder="Nueva idea… (Intro)" autocomplete="off"></div>
@@ -177,7 +198,7 @@ function draw(){
 }
 form.addEventListener('input', e => {
   const t = e.target, cur = curP(); if (!cur) return;
-  if (t.dataset.pf){ cur[t.dataset.pf] = t.value; cur.at = Date.now(); O.save(); }
+  if (t.dataset.pf){ cur[t.dataset.pf] = t.value; if (t.dataset.pf === 'cat') cur.group = t.value === 'agencia' ? 'agency' : 'mine'; cur.at = Date.now(); O.save(); }
   if (t.dataset.itext !== undefined){ cur.ideas[+t.closest('.idea').dataset.i].text = t.value; O.save(); }
 });
 form.addEventListener('keydown', e => {
