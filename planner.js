@@ -476,13 +476,15 @@ function weekView(){
       let inner = '';
       if (i.kind === 'work'){ cls = 'work'; color = 'var(--accent)'; label = 'Trabajo';
         const ts = wkTasks(d, i, its); extra = ts.length ? ` · ${ts.filter(t => t.status === 'done').length}/${ts.length}` : '';
+        const cabe = Math.max(0, Math.floor((h - 30) / 17)), sobra = ts.length - cabe;
+        if (sobra > 0) cls += ' wk-many';
         inner = `<div class="wk-ts">${ts.map(t => { const c = O.client(t.client);
-          return `<article class="card wk-t${t.status === 'done' ? ' done' : ''}" data-id="${t.id}" style="--c:${O.clientColor(c)}"><button class="chk" aria-label="Completar"></button><span class="tt">${esc(t.title)}</span></article>`; }).join('')}</div>`; }
+          return `<article class="card wk-t${t.status === 'done' ? ' done' : ''}" data-id="${t.id}" style="--c:${O.clientColor(c)}"><button class="chk" aria-label="Completar"></button><span class="tt">${esc(t.title)}</span></article>`; }).join('')}</div>${sobra > 0 ? `<button type="button" class="wk-more" data-wexp data-lbl="+${sobra} más">+${sobra} más</button>` : ''}`; }
       else if (i.kind === 'routine'){ cls = 'rout'; color = ROUTC[i.id] || '#A3A3AD'; }
       else if (i.isCall){ cls = 'call'; color = '#A78BFA'; label = '📞 ' + label; }
       else if (i.kind === 'free'){ cls = 'free'; }
       const past = d < hoy || (d === hoy && i.end <= nowMin);
-      return `<div class="wk-ev ${cls}${past ? ' past' : ''}" ${i.kind === 'work' ? `data-wbuild="${d}" data-field="slot" data-value="${i.at}" data-day="${d}"` : ''} style="top:${top}px;height:${h}px;left:calc(${left}% + 1px);width:calc(${w}% - 3px);--c:${color}" title="${label.replace(/"/g, '')} · ${toHM(i.start)}–${toHM(i.end)}">
+      return `<div class="wk-ev ${cls}${past ? ' past' : ''}" ${i.kind === 'work' ? `data-wbuild="${d}" data-field="slot" data-value="${i.at}" data-day="${d}"` : ''} style="--hh:${h}px;top:${top}px;height:${h}px;left:calc(${left}% + 1px);width:calc(${w}% - 3px);--c:${color}" title="${label.replace(/"/g, '')} · ${toHM(i.start)}–${toHM(i.end)}">
         <b>${label}</b>${h > 26 ? `<small>${toHM(i.start)} – ${toHM(i.end)}${extra}</small>` : ''}${inner}</div>`;
     }).join('');
     const line = d === hoy && nowMin >= H0 && nowMin <= H1 ? `<i class="wk-now" style="top:${(nowMin - H0) * PXM}px"></i>` : '';
@@ -505,13 +507,16 @@ document.addEventListener('click', e => {
   if (w){ const n = +w.dataset.pweek; planDay = n === 0 ? O.today() : O.iso(O.addDays(O.fromIso(planDay), 7 * n)); lastEvents = []; O.render(); return; }
   const o = e.target.closest('[data-wopen]');
   if (o){ planDay = o.dataset.wopen; S.diaMode = 'dia'; lastEvents = weekEv[planDay] || []; O.render(); refresh(); return; }
+  const x = e.target.closest('[data-wexp]');
+  if (x){ const ev = x.closest('.wk-ev'); const on = ev.classList.toggle('open'); x.textContent = on ? 'Recoger' : x.dataset.lbl; return; }
   const b = !e.target.closest('.card') && !wkJustMade && e.target.closest('[data-wbuild]');
   if (b){ planDay = b.dataset.wbuild; lastEvents = weekEv[planDay] || []; openBuild(planDay); }
 });
-let wkJustMade = false;
+let wkJustMade = false, wkGesture = false;
 function wkAddBlock(day, s, e){
   const blocks = P().dayBlocks = P().dayBlocks || {};
   if (!blocks[day]) blocks[day] = day >= MANUAL_FROM ? [] : buildDay(day, weekEv[day] || [], true).filter(i => i.kind === 'work').map(i => ({id: Math.random().toString(36).slice(2, 8), start: i.start, end: i.end}));
+  if (blocks[day].some(b => b.start === s && b.end === e)) return;   // evita duplicados
   blocks[day].push({id: Math.random().toString(36).slice(2, 8), start: s, end: e});
   blocks[day].sort((a, b) => a.start - b.start);
   O.save(); O.render(); O.toast(`Bloque de trabajo ${toHM(s)} – ${toHM(e)}`);
@@ -521,21 +526,22 @@ document.addEventListener('pointerdown', e => {
   const cols = col.closest('.wk-cols'), H0 = +cols.dataset.h0, PXM = +cols.dataset.pxm, day = col.dataset.wday;
   const atY = y => { const r = col.getBoundingClientRect(); return Math.max(H0, Math.min(24 * 60, H0 + Math.round((y - r.top) / PXM / 15) * 15)); };
   const s0 = atY(e.clientY);
+  if (wkGesture) return;
   if (e.pointerType === 'touch'){ // en el móvil: tocar un hueco crea un bloque de 1 h (arrastrar sigue siendo hacer scroll)
-    const sx = e.clientX, sy = e.clientY;
-    const up = ev => { removeEventListener('pointerup', up); if (Math.hypot(ev.clientX - sx, ev.clientY - sy) < 8 && confirm(`¿Crear bloque de trabajo de 1 h a las ${toHM(s0)}?`)) wkAddBlock(day, s0, Math.min(24 * 60, s0 + 60)); };
-    addEventListener('pointerup', up); return;
+    const sx = e.clientX, sy = e.clientY; wkGesture = true;
+    const fin = () => { removeEventListener('pointerup', up); removeEventListener('pointercancel', fin); wkGesture = false; };
+    const up = ev => { fin(); if (Math.hypot(ev.clientX - sx, ev.clientY - sy) < 8 && confirm(`¿Crear bloque de trabajo de 1 h a las ${toHM(s0)}?`)) wkAddBlock(day, s0, Math.min(24 * 60, s0 + 60)); };
+    addEventListener('pointerup', up); addEventListener('pointercancel', fin); return;
   }
-  e.preventDefault();
+  e.preventDefault(); wkGesture = true;
   const g = document.createElement('div'); g.className = 'wk-ev work wk-new'; col.appendChild(g);
   let s = s0, en = s0 + 15;
   const draw = () => { g.style.top = (s - H0) * PXM + 'px'; g.style.height = (en - s) * PXM + 'px'; g.style.left = '1px'; g.style.width = 'calc(100% - 3px)'; g.innerHTML = `<b>Trabajo</b><small>${toHM(s)} – ${toHM(en)}</small>`; };
   draw();
   const mv = ev => { const m = atY(ev.clientY); if (m >= s0){ s = s0; en = Math.max(s0 + 15, m); } else { s = m; en = s0 + 15; } draw(); };
-  const up = () => { removeEventListener('pointermove', mv); removeEventListener('pointerup', up); g.remove();
-    wkJustMade = true; setTimeout(() => wkJustMade = false, 100);
-    if (en - s >= 15) wkAddBlock(day, s, en); };
-  addEventListener('pointermove', mv); addEventListener('pointerup', up);
+  const fin = () => { removeEventListener('pointermove', mv); removeEventListener('pointerup', up); removeEventListener('pointercancel', fin); g.remove(); wkGesture = false; };
+  const up = () => { fin(); wkJustMade = true; setTimeout(() => wkJustMade = false, 100); if (en - s >= 15) wkAddBlock(day, s, en); };
+  addEventListener('pointermove', mv); addEventListener('pointerup', up); addEventListener('pointercancel', fin);
 });
 try { S.diaMode = localStorage.getItem('jp-diamode') || 'dia'; } catch(e){ S.diaMode = 'dia'; }
 // al guardar bloques o refrescar el calendario, la semana se recarga

@@ -290,9 +290,12 @@ const snap = t => ({title:t.title, day:t.day, status:t.status, priority:t.priori
 const isAgency = id => { const c = client(id); return !!(c && c.group === 'agency'); };
 
 // Regla de oro: solo se sube a ClickUp lo que es de un cliente marcado como «Agencia». Lo tuyo nunca sale de la app.
+const subiendo = new Set();   // tareas que se están creando en ClickUp ahora mismo (evita crearlas dos veces)
 async function pushCreate(t){
   const c = client(t.client);
   if (!online() || t.cu || t.ia || !c || c.group !== 'agency') return;   // las de la IA esperan a que las revises
+  if (subiendo.has(t.id)) return;
+  const oldId = t.id; subiendo.add(oldId);
   const l = chooseList(c, t.title);
   if (!l) return toast('Ese cliente no tiene listas en ClickUp');
   await write(async () => {
@@ -300,9 +303,15 @@ async function pushCreate(t){
     if (t.day){ body.due_date = dueMs(t.day); body.due_date_time = false; }
     if (t.status !== 'todo'){ const s = await statusName(l.id, t.status); if (s) body.status = s; }
     const res = await cu(`/list/${l.id}/task`, {method:'POST', body});
-    t.id = res.id; t.url = res.url; t.cu = true; t.listId = l.id; t.listName = l.name; save(); render();
+    // la tarea puede haber sido reemplazada mientras tanto (sincronización con la nube o con ClickUp): se actualiza la que hay ahora
+    const cur = S.tasks.find(x => x.id === oldId) || t;
+    if (S.tasks.some(x => x.id === res.id && x !== cur)) S.tasks = S.tasks.filter(x => x !== cur);   // ClickUp ya la trajo: fuera la copia local
+    else Object.assign(cur, {id: res.id, url: res.url, cu: true, listId: l.id, listName: l.name});
+    if (t !== cur) Object.assign(t, {id: res.id, url: res.url, cu: true, listId: l.id, listName: l.name});
+    for (const m of [S.slots, (S.plan && S.plan.tnotes) || {}, (S.plan && S.plan.proc) || {}]) if (m[oldId] !== undefined){ m[res.id] = m[oldId]; delete m[oldId]; }
+    save(); render();
     toast(`Guardada en ClickUp · ${c.name} › ${l.name}`);
-  });
+  }).finally(() => subiendo.delete(oldId));
 }
 // Llamar después de cambiar una tarea: compara con cómo estaba y manda a ClickUp solo lo que toca
 async function afterChange(t, before){
