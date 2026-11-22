@@ -35,6 +35,12 @@ try { Object.assign(tokens, JSON.parse(sessionStorage.getItem('jp-gcal-tokens') 
 const saveTokens = () => { try { sessionStorage.setItem('jp-gcal-tokens', JSON.stringify(tokens)); } catch(e){} };
 const tokenOk = email => email === 'puente' ? !!(S.plan && S.plan.bridge) : !!(tokens[email] && tokens[email].exp > Date.now() + 60e3);
 /* ---------- Puente de Google (Apps Script en tu cuenta): lee calendarios y buzón sin pedir permisos cada hora ---------- */
+// colores de evento de Google Calendar (los mismos 11 que en Google)
+const GCOL = {'1':'#7986CB','2':'#33B679','3':'#8E24AA','4':'#E67C73','5':'#F6BF26','6':'#F4511E','7':'#039BE5','8':'#616161','9':'#3F51B5','10':'#0B8043','11':'#D50000'};
+const GCOLN = {'1':'Lavanda','2':'Salvia','3':'Uva','4':'Flamenco','5':'Plátano','6':'Mandarina','7':'Pavo real','8':'Grafito','9':'Arándano','10':'Albahaca','11':'Tomate'};
+// colores para lo que es solo de la app (bloques de trabajo, comida, cena…)
+const APPCOL = ['#FF6B3D','#F59E0B','#16A34A','#0D9488','#06B6D4','#2563EB','#4F46E5','#7C3AED','#C026D3','#DB2777','#EF4444','#475569'];
+const swatches = (cur, attr, cols) => `<div class="swatches">${Object.entries(cols).map(([k, c]) => `<button type="button" class="sw${String(cur) === String(k) ? ' on' : ''}" ${attr}="${k}" style="background:${c}" title="${GCOLN[k] || ''}"></button>`).join('')}</div>`;
 async function bridge(params){
   const url = P().bridge; if (!url) throw new Error('sin puente');
   const r = await fetch(url + (url.includes('?') ? '&' : '?') + new URLSearchParams(params), {redirect: 'follow'});
@@ -161,7 +167,7 @@ async function fetchEvents(day){
         const tt = O.norm(e.title || '');
         const isCall = e.guests > 0 || !!e.meet || /<>|\breu\b|reunion|llamada|\bcall\b|meet|zoom|entrevista|☎|📞/.test(tt + (e.title || ''));
         return {title: e.title || '(sin título)', allDay: e.allDay, color: e.color, cal: e.cal, free: !!e.free, isCall,
-          gid: e.id, gcal: e.calId, mine: !!e.mine, desc: e.desc || '', gstart: e.start,
+          gid: e.id, gcal: e.calId, mine: !!e.mine, desc: e.desc || '', gstart: e.start, rec: !!e.rec, ecolor: e.ecolor || '', ...(GCOL[e.ecolor] ? {color: GCOL[e.ecolor]} : {}),
           start: e.allDay ? 0 : Math.max(0, minutesOfDay(new Date(e.start), day)), end: e.allDay ? 0 : Math.min(24 * 60, minutesOfDay(new Date(e.end), day))};
       });
       evCache[key] = evs; out.push(...evs); return;
@@ -466,6 +472,9 @@ function weekView(){
   const per = days.map(d => {
     const evs = weekEv[d] || [];
     const its = buildDay(d, evs).filter(i => i.end > i.start);
+    // ☀️ Arranque del día: cada día a las 08:30 (con su lista para marcar)
+    const mi = P().morning || [], md = new Set((P().morningDone || {})[d] || []);
+    if (mi.length) its.push({kind: 'morning', start: 510, end: 540, title: `☀️ Arranque ${md.size}/${mi.length}`, morning: true});
     return {d, allDay: evs.filter(e => e.allDay), its};
   });
   const all = per.flatMap(p => p.its);
@@ -490,18 +499,21 @@ function weekView(){
       const w = 100 / i.ncol, left = i.col * w;
       let cls = 'ev', color = i.color || '#8E8E93', label = esc(i.title || ''), extra = '';
       let inner = '';
-      if (i.kind === 'work'){ cls = 'work'; color = 'var(--accent)'; label = 'Trabajo';
+      const kcol = (P().kcolors || {});
+      if (i.kind === 'work'){ cls = 'work'; color = kcol.work || 'var(--accent)'; label = 'Trabajo';
         const ts = wkTasks(d, i, its); extra = ts.length ? ` · ${ts.filter(t => t.status === 'done').length}/${ts.length}` : '';
         if (d < hoy){ cls += ' wk-old'; inner = ts.length ? `<span class="wk-sum">✓ ${ts.filter(t => t.status === 'done').length}/${ts.length}</span>` : ''; }
         else inner = `<div class="wk-ts">${ts.map((t, k) => { const c = O.client(t.client);
           return `<article class="card wk-t${t.status === 'done' ? ' done' : ''}" data-id="${t.id}" style="--c:${O.clientColor(c)}"><span class="wk-n">#${k + 1}</span><button class="chk" aria-label="Completar"></button><span class="wk-tx"><span class="tt">${esc(t.title)}</span><span class="wk-cl">${c ? esc(c.name) : 'Sin cliente'}</span></span></article>`; }).join('')}</div>`; }
-      else if (i.kind === 'routine'){ cls = 'rout'; color = ROUTC[i.id] || '#A3A3AD'; }
+      else if (i.kind === 'routine'){ cls = 'rout'; color = kcol['r:' + i.id] || ROUTC[i.id] || '#A3A3AD'; }
+      else if (i.kind === 'morning'){ cls = 'morn'; color = kcol.morning || '#FFC93D'; }
       else if (i.isCall){ cls = 'call'; color = '#A78BFA'; label = '📞 ' + label; }
       else if (i.kind === 'free'){ cls = 'free'; }
       const gAttr = i.gid && i.mine ? ` data-gid="${esc(i.gid)}" data-gcal="${esc(i.gcal)}" data-gday="${d}" data-gs="${i.start}" data-ge="${i.end}" data-gorig="${i.gstart}"` : '';
       if (gAttr){ cls += ' g-ev'; const nt = plainDesc(i.desc).split('\n').find(x => x.trim()); if (nt && h > 40) inner = `<p class="wk-note">📝 ${esc(nt)}</p>`; }
       const past = d < hoy || (d === hoy && i.end <= nowMin);
-      return `<div class="wk-ev ${cls}${past ? ' past' : ''}"${gAttr} ${i.kind === 'work' ? `data-wbuild="${d}" data-field="slot" data-value="${i.at}" data-day="${d}"` : ''} style="--hh:${h}px;top:${top}px;height:${h}px;left:calc(${left}% + 1px);width:calc(${w}% - 3px);--c:${color}" title="${label.replace(/"/g, '')} · ${toHM(i.start)}–${toHM(i.end)}">
+      const xAttr = i.kind === 'morning' ? ` data-wmorn="${d}"` : i.kind === 'routine' ? ` data-wrout="r:${esc(i.id)}" data-wname="${esc(i.title)}"` : '';
+      return `<div class="wk-ev ${cls}${past ? ' past' : ''}"${gAttr}${xAttr} ${i.kind === 'work' ? `data-wbuild="${d}" data-field="slot" data-value="${i.at}" data-day="${d}"` : ''} style="--hh:${h}px;top:${top}px;height:${h}px;left:calc(${left}% + 1px);width:calc(${w}% - 3px);--c:${color}" title="${label.replace(/"/g, '')} · ${toHM(i.start)}–${toHM(i.end)}">
         <b>${label}</b>${h > 26 ? `<small>${toHM(i.start)} – ${toHM(i.end)}${extra}</small>` : ''}${inner}${gAttr ? '<i class="g-res"></i>' : ''}</div>`;
     }).join('');
     const line = d === hoy && nowMin >= H0 && nowMin <= H1 ? `<i class="wk-now" style="top:${Y(nowMin)}px"></i>` : '';
@@ -541,10 +553,41 @@ document.addEventListener('click', e => {
   if (o){ planDay = o.dataset.wopen; S.diaMode = 'dia'; lastEvents = weekEv[planDay] || []; O.render(); refresh(); return; }
   const x = e.target.closest('[data-wexp]');
   if (x){ const ev = x.closest('.wk-ev'); const on = ev.classList.toggle('open'); x.textContent = on ? 'Recoger' : x.dataset.lbl; return; }
+  const mo = e.target.closest('[data-wmorn]'); if (mo){ openMorning(mo.dataset.wmorn); return; }
+  const rc = e.target.closest('[data-wrout]'); if (rc){ openKColor(rc.dataset.wrout, rc.dataset.wname); return; }
   const b = !e.target.closest('.card') && !wkJustMade && e.target.closest('[data-wbuild]');
   if (b){ planDay = b.dataset.wbuild; lastEvents = weekEv[planDay] || []; openBuild(planDay); }
 });
 let wkJustMade = false, wkGesture = false;
+const miniDlg = document.createElement('dialog'); miniDlg.id = 'miniDlg';
+miniDlg.innerHTML = '<form method="dialog" class="sheet" id="miniForm"></form>'; document.body.appendChild(miniDlg);
+const miniForm = miniDlg.querySelector('form'); let miniDay = null, miniKey = null;
+function openMorning(day){
+  miniDay = day; miniKey = 'morning'; const d = O.fromIso(day), mi = P().morning || [], md = new Set((P().morningDone || {})[day] || []);
+  miniForm.innerHTML = `<h2>☀️ Arranque del día · ${O.DIAS_L[d.getDay()]} ${d.getDate()}</h2>
+    <div class="mlist">${mi.map((t, k) => `<label class="mitem"><input type="checkbox" data-mk="${k}" ${md.has(k) ? 'checked' : ''}> ${esc(t)}</label>`).join('')}</div>
+    <label>Color</label>${swatches((P().kcolors || {}).morning || '', 'data-kcol', Object.fromEntries(APPCOL.map(c => [c, c])))}
+    <div class="actions"><button type="button" class="btn" data-mall>Marcar todo</button><span class="sp"></span><button class="btn primary" value="ok">Listo</button></div>`;
+  miniDlg.showModal();
+}
+function openKColor(key, name){
+  miniKey = key; miniDay = null;
+  miniForm.innerHTML = `<h2>${esc(name)}</h2><label>Color (en todos los días)</label>${swatches((P().kcolors || {})[key] || '', 'data-kcol', Object.fromEntries(APPCOL.map(c => [c, c])))}
+    <div class="actions"><span class="sp"></span><button class="btn primary" value="ok">Listo</button></div>`;
+  miniDlg.showModal();
+}
+miniForm.addEventListener('change', e => {
+  const k = e.target.dataset.mk; if (k === undefined || !miniDay) return;
+  const p = P(), set = new Set((p.morningDone = p.morningDone || {})[miniDay] || []);
+  e.target.checked ? set.add(+k) : set.delete(+k); p.morningDone[miniDay] = [...set]; O.save();
+});
+miniForm.addEventListener('click', e => {
+  const c = e.target.closest('[data-kcol]');
+  if (c){ const kc = P().kcolors = P().kcolors || {}; kc[miniKey] = c.dataset.kcol; O.save(); miniForm.querySelectorAll('[data-kcol]').forEach(b => b.classList.toggle('on', b === c)); return; }
+  if (e.target.closest('[data-mall]') && miniDay){ const p = P(); p.morningDone = p.morningDone || {}; p.morningDone[miniDay] = (p.morning || []).map((_, i) => i); O.save(); miniForm.querySelectorAll('[data-mk]').forEach(x => x.checked = true); }
+});
+miniDlg.addEventListener('close', () => { if (S.view === 'dia') O.render(); });
+miniDlg.addEventListener('click', e => { if (e.target === miniDlg) miniDlg.close(); });
 /* ---------- Eventos de Google desde la semana: crear, mover, estirar, editar y borrar ---------- */
 const evDlg = document.createElement('dialog'); evDlg.id = 'evDlg';
 evDlg.innerHTML = '<form method="dialog" class="sheet" id="evForm"></form>'; document.body.appendChild(evDlg);
@@ -568,22 +611,28 @@ function wkCreate(day, s, e){
 }
 function wkEditEvent(el){
   const ev = (weekEv[el.dataset.gday] || []).find(x => x.gid === el.dataset.gid && String(x.gstart) === el.dataset.gorig) || {};
-  evCur = {nuevo: false, day: el.dataset.gday, gid: el.dataset.gid, gcal: el.dataset.gcal, orig: el.dataset.gorig, desc0: plainDesc(ev.desc), title0: ev.title || ''};
+  evCur = {nuevo: false, day: el.dataset.gday, gid: el.dataset.gid, gcal: el.dataset.gcal, orig: el.dataset.gorig, desc0: plainDesc(ev.desc), title0: ev.title || '', color0: ev.ecolor || '', color: ev.ecolor || ''};
   evForm.innerHTML = `<h2>${esc(ev.title || 'Evento')}</h2>
     <label>Título<input name="title" value="${esc(ev.title || '')}" autocomplete="off"></label>
     <div class="row"><label>Día<input type="date" name="day" value="${el.dataset.gday}"></label><label>Empieza<input type="time" name="s" step="900" value="${toHM(+el.dataset.gs)}"></label><label>Acaba<input type="time" name="e" step="900" value="${toHM(+el.dataset.ge)}"></label></div>
     <label>Notas<textarea name="desc" rows="6" placeholder="Apunta aquí lo que necesites…">${esc(plainDesc(ev.desc))}</textarea></label>
-    <p class="iahint">Los cambios se guardan en tu Google Calendar. Si el evento se repite, solo cambia este día.</p>
-    <div class="actions"><button type="button" class="btn danger" data-evdel>Borrar</button><span class="sp"></span><button class="btn" value="cancel" formnovalidate>Cancelar</button><button class="btn primary" value="ok">Guardar</button></div>`;
+    <label>Color</label>${swatches(ev.ecolor || '', 'data-gcol', GCOL)}
+    <p class="iahint">Los cambios se guardan en tu Google Calendar.${ev.rec ? ' Este evento se repite: los cambios de hora y color son solo para este día.' : ''}</p>
+    <div class="actions">${ev.rec ? '<button type="button" class="btn danger" data-evdel>Borrar solo este</button><button type="button" class="btn danger" data-evdel="all">Borrar todos</button>' : '<button type="button" class="btn danger" data-evdel>Borrar</button>'}<span class="sp"></span><button class="btn" value="cancel" formnovalidate>Cancelar</button><button class="btn primary" value="ok">Guardar</button></div>`;
   evDlg.showModal();
 }
 evForm.addEventListener('click', async e => {
   const t = e.target.closest('[data-evt]');
   if (t){ if (t.dataset.evt === 'work'){ const c = evCur; evCur = null; evDlg.close('cancel'); wkAddBlock(c.day, c.s, c.e); } return; }
-  if (e.target.closest('[data-evdel]')){
-    if (!confirm('¿Borrar este evento de tu Google Calendar?')) return;
+  const sw = e.target.closest('[data-gcol]');
+  if (sw && evCur){ evCur.color = sw.dataset.gcol; evForm.querySelectorAll('[data-gcol]').forEach(b => b.classList.toggle('on', b === sw)); return; }
+  const del = e.target.closest('[data-evdel]');
+  if (del){
+    const todos = del.dataset.evdel === 'all';
+    if (!confirm(todos ? '¿Borrar TODOS los eventos de esta serie (los de todos los días) de tu Google Calendar?' : '¿Borrar este evento (solo este día) de tu Google Calendar?')) return;
     const c = evCur; evCur = null; evDlg.close('cancel');
-    try { await bridge({a: 'delete', cal: c.gcal, id: c.gid, orig: c.orig}); O.toast('Evento borrado'); } catch(err){ O.toast('No se pudo borrar: ' + err.message); }
+    try { await bridge({a: 'delete', cal: c.gcal, id: c.gid, orig: c.orig, ...(todos ? {all: '1'} : {})}); O.toast(todos ? 'Serie borrada' : 'Evento borrado'); } catch(err){ O.toast('No se pudo borrar: ' + err.message); }
+    if (todos){ for (const k in weekEv) delete weekEv[k]; }
     wkReload(c.day);
   }
 });
@@ -604,6 +653,7 @@ evDlg.addEventListener('close', async () => {
       const q = {a: 'update', cal: c.gcal, id: c.gid, orig: c.orig, start: msAt(day, s), end: msAt(day, en)};
       if (val('title') !== c.title0) q.title = val('title');
       if (val('desc') !== c.desc0) q.desc = val('desc');
+      if (c.color && c.color !== c.color0) q.color = c.color;
       await bridge(q);
       O.toast('Guardado en tu Google Calendar ✓'); wkReload(c.day, day);
     }
@@ -779,7 +829,7 @@ const bdlg = document.createElement('dialog');
 bdlg.id = 'buildDlg';
 bdlg.innerHTML = `<div class="sheet bsheet">
   <div class="bhead"><h2>Montar bloques · <span id="bdTitle"></span></h2><span class="sp"></span>
-    <button type="button" class="btn" data-bauto>Propuesta automática</button><button type="button" class="btn" data-bclear>Vaciar</button>
+    <button type="button" class="btn" data-bcolor>🎨 Color</button><button type="button" class="btn" data-bauto>Propuesta automática</button><button type="button" class="btn" data-bclear>Vaciar</button>
     <button type="button" class="btn primary" data-bclose>Listo</button></div>
   <p class="iahint">Arrastra un bloque desde la izquierda a la hora que quieras (o tócalo para añadirlo en el primer hueco). Muévelo arrastrando y estíralo desde el borde de abajo.</p>
   <div class="bwrap"><div class="bpal">${[[30,'30 min'],[45,'45 min'],[60,'1 h'],[90,'1 h 30'],[120,'2 h']].map(([m, l]) => `<button type="button" class="bchip" data-bdur="${m}">＋ ${l}</button>`).join('')}</div>
@@ -906,6 +956,7 @@ bdlg.addEventListener('click', e => {
     O.save(); drawGrid();
   }
   if (e.target.closest('[data-bclose]')) bdlg.close();
+  if (e.target.closest('[data-bcolor]')) openKColor('work', 'Bloques de trabajo');
 });
 bdlg.addEventListener('close', () => { if (S.view === 'dia') O.render(); });
 document.addEventListener('click', e => { if (e.target.closest('[data-buildday]')) openBuild(planDay); });
