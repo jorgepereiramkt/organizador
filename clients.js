@@ -42,7 +42,7 @@ O.views.clientes = function(){
     }
   }
   // Pausados y antiguos (de cualquier grupo): no salen en Tareas, Día, Semana, Horas ni al añadir tareas
-  html += `<h3 class="rama">Apartados <span>no aparecen en el resto de la app · arrástralos arriba para recuperarlos</span></h3><div class="apartados">${ESTADOS.slice(1).map(([k, t, s]) => { const xs = resto.filter(c => estadoDe(c) === k);
+  html += `<h3 class="rama">Apartados <span>pausados y antiguos no aparecen en el resto de la app; los internos sí (solo se ocultan aquí) · arrástralos arriba para recuperarlos</span></h3><div class="apartados">${ESTADOS.slice(1).map(([k, t, s]) => { const xs = resto.filter(c => estadoDe(c) === k);
     return `<section class="apart" data-cestado="${k}"><h4>${t}<span>${xs.length}</span><small>${s}</small></h4>
       <div class="fichas mini">${xs.map(fichaCard).join('') || '<div class="empty">Arrastra aquí una ficha</div>'}</div></section>`; }).join('')}</div>`;
   return html + leadsSection();
@@ -64,7 +64,8 @@ $('#toolbar').addEventListener('click', e => {
 });
 
 /* ---------- Cartera: tus clientes (los que te dan ingresos) por estado ---------- */
-const ESTADOS = [['actual', '🟢 Actuales', 'Te pagan ahora'], ['pausa', '⏸️ Pausados', 'Parados por ahora'], ['antiguo', '🗄️ Antiguos', 'Ya no trabajáis juntos']];
+const ESTADOS = [['actual', '🟢 Actuales', 'Te pagan ahora'], ['pausa', '⏸️ Pausados', 'Parados por ahora'], ['antiguo', '🗄️ Antiguos', 'Ya no trabajáis juntos'], ['interno', '🙈 Internos', 'Salen en el resto de la app, no en Fichas']];
+const CART_ESTADOS = ESTADOS.slice(0, 3);
 const estadoDe = c => ESTADOS.some(([k]) => k === c.estado) ? c.estado : 'actual';
 const TIERS = {S: 'Tier S · top', A: 'Tier A', B: 'Tier B', C: 'Tier C'};
 const tierBadge = c => c.tier && TIERS[c.tier] ? `<span class="tier t-${c.tier}" title="${TIERS[c.tier]}">${c.tier}</span>` : '';
@@ -142,8 +143,8 @@ function cartera(){
   const fij = act.filter(c => ingresoDe(c) === 'fijo'), mix = act.filter(c => ingresoDe(c) === 'mixto'), vari = act.filter(c => ingresoDe(c) === 'variable');
   return `<div class="cart-sum"><div><b>${sumTxt(fij)}</b><small>💶 fijos al mes (${fij.length})</small></div><div><b>${sumTxt(mix)}</b><small>💶➕📈 fijo + variable (${mix.length})</small></div><div><b>${sumTxt(vari)}</b><small>📈 variables al mes (${vari.length})</small></div><div><b>${sumTxt(act)}</b><small>al mes sin IVA con ${act.length} cliente${act.length === 1 ? '' : 's'} actual${act.length === 1 ? '' : 'es'}</small></div>
       <div><b>${anyo(act)}</b><small>al año a este ritmo</small></div>
-      ${ESTADOS.slice(1).map(([k, t]) => `<div><b>${mios.filter(c => estadoDe(c) === k).length}</b><small>${t.slice(3).toLowerCase()}</small></div>`).join('')}</div>
-    <div class="cart-board">${ESTADOS.map(([k, t, sub]) => { const cs = mios.filter(c => estadoDe(c) === k).sort((a, b) => (+b.fee || 0) - (+a.fee || 0) || a.name.localeCompare(b.name));
+      ${CART_ESTADOS.slice(1).map(([k, t]) => `<div><b>${mios.filter(c => estadoDe(c) === k).length}</b><small>${t.slice(3).toLowerCase()}</small></div>`).join('')}</div>
+    <div class="cart-board">${CART_ESTADOS.map(([k, t, sub]) => { const cs = mios.filter(c => estadoDe(c) === k).sort((a, b) => (+b.fee || 0) - (+a.fee || 0) || a.name.localeCompare(b.name));
       const tot = cs.reduce((s, c) => s + fmax(c), 0);
       return `<section class="cart-col" data-cestado="${k}"><h3>${t}<span>${cs.length}${tot ? ` · ${sumTxt(cs)}/mes` : ''}</span></h3><small class="sub">${sub}</small>
         <div class="cart-list">${cs.map(card).join('') || '<div class="empty">Arrastra aquí</div>'}</div></section>`; }).join('')}</div>`;
@@ -292,7 +293,7 @@ function draw(){
   for (const n of [...desdeCU, ...SUGERIDOS]){ const k = n.toLowerCase(); if (!vistos.has(k)){ vistos.add(k); sugeridos.push(n); } }
   sugeridos.splice(14);
   form.innerHTML = `
-    <h2><span class="dot" style="background:${O.clientColor(c)}"></span> ${esc(c.name)} <span class="badge">${ag ? 'Agencia' : '🔒 Mío'}</span></h2>
+    <h2><label class="cpick" title="Elegir color"><input type="color" data-f="ccustom" value="${O.clientColor(c)}"><span class="dot" style="background:${O.clientColor(c)}"></span></label> ${esc(c.name)} <span class="badge">${ag ? 'Agencia' : '🔒 Mío'}</span></h2>
     ${ag ? `<label>Cuánto paga a la agencia (€/mes sin IVA) · una cifra o un rango<input type="text" inputmode="decimal" data-ag value="${esc(c.agFeeTxt || '')}" placeholder="Ej.: 2500 o 2000-3000"></label>` : ''}
     <label>${ag ? 'Horas al mes con este cliente' : 'Horas al mes que le dedicas (aprox.) · para ver cuánto ganas por hora'}<input type="number" min="0" step="0.5" data-f="hours" value="${c.hours || ''}" placeholder="${ag ? 'normalmente entre 8 y 20' : 'Ej.: 10'}"></label>
     ${ag ? `<div class="row"><label>Estado<select data-f="estado">${ESTADOS.map(([k, t]) => `<option value="${k}" ${estadoDe(c) === k ? 'selected' : ''}>${t}</option>`).join('')}</select></label>
@@ -320,6 +321,7 @@ form.addEventListener('change', e => { if (e.target.dataset.f === 'ingreso'){ fi
 form.addEventListener('input', e => {
   const t = e.target;
   if (t.dataset.ag !== undefined) cur.agFeeTxt = t.value;
+  if (t.dataset.f === 'ccustom'){ const d = form.querySelector('.cpick .dot'); if (d) d.style.background = t.value; }
   if (t.dataset.m){ if (fix0(cur)) {} cur[t.dataset.m] = t.value; recalcFee(cur);
     const tot = form.querySelector('[data-feetot]'); if (tot) tot.textContent = feeTxt(cur) || '—';
     const pctAhora = /%/.test(cur.varTxt || ''); if (t.dataset.m === 'varTxt' && pctAhora !== !!form.querySelector('[data-m=varOn]')) { O.save(); const pos = t.selectionStart; draw(); const n = form.querySelector('[data-m=varTxt]'); n.focus(); n.setSelectionRange(pos, pos); return; } }

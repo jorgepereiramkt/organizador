@@ -58,7 +58,7 @@ const DEMO_IDS = new Set(['mio-1','mio-2','ag-a','ag-b','ag-int']);
 let lastSent = '', cloudTimer = null;
 function cloudData(){
   return JSON.parse(JSON.stringify({
-    clients: S.clients.map(({id,name,group,color,keywords,listId,auto,services,hours,notes,estado,fee,feeMin,feeMax,since,ord,tier,ingreso,fixTxt,varTxt,varOn,varBase,agFeeTxt}) => ({id,name,group,color,keywords,listId,auto,services,hours,notes,estado,fee,feeMin,feeMax,since,ord,tier,ingreso,fixTxt,varTxt,varOn,varBase,agFeeTxt})),
+    clients: S.clients.map(({id,name,group,color,keywords,listId,auto,services,hours,notes,estado,fee,feeMin,feeMax,since,ord,tier,ingreso,fixTxt,varTxt,varOn,varBase,agFeeTxt,ccustom}) => ({id,name,group,color,keywords,listId,auto,services,hours,notes,estado,fee,feeMin,feeMax,since,ord,tier,ingreso,fixTxt,varTxt,varOn,varBase,agFeeTxt,ccustom})),
     tasks: S.tasks.filter(t => !t.cu && !t.demo),
     token: S.cu.token || '', hidden: S.cu.hidden || [], plan: S.plan || null, slots: S.slots || {}, hours: S.hours || null, ai: S.ai || null,
     picks: Object.fromEntries(S.tasks.filter(t => t.cu && t.today && t.today >= today()).map(t => [t.id, t.today])) }));
@@ -443,6 +443,7 @@ const groupOf = c => c ? (c.group === 'mine' ? GROUP.mine : GROUP.agency) : GROU
 const PAL_ALL = ['#EF4444','#06B6D4','#F59E0B','#7C3AED','#16A34A','#DB2777','#2563EB','#84CC16','#92400E','#C026D3','#0D9488','#F97316','#4F46E5','#4D7C0F','#0284C7','#BE123C','#475569','#1E3A8A'];   // ordenados para que los vecinos contrasten
 function clientColor(c){
   if (!c) return GROUP.none.color;
+  if (c.ccustom) return c.ccustom;   // el que eliges tú en la ficha o en ⚙
   const all = S.clients.slice().sort((a, b) => a.name.localeCompare(b.name));
   const i = Math.max(0, all.findIndex(x => x.id === c.id));
   return PAL_ALL[i % PAL_ALL.length];
@@ -836,7 +837,7 @@ $('#mic').addEventListener('click', () => {
 const st = $('#st'), clList = $('#clList');
 function renderClients(){
   const row = c => `<div class="cl-row" data-id="${c.id}">
-    <input type="color" value="${c.color}" data-k="color" aria-label="Color">
+    <input type="color" value="${clientColor(c)}" data-k="ccustom" aria-label="Color">
     <input value="${esc(c.name)}" data-k="name" aria-label="Nombre">
     ${c.auto ? `<span class="lock" style="grid-column:auto">Agencia</span>`
       : `<select data-k="group"><option value="mine" ${c.group==='mine'?'selected':''}>Mío</option><option value="agency" ${c.group==='agency'?'selected':''}>Agencia</option></select>`}

@@ -6,7 +6,7 @@
 <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' https://www.gstatic.com https://apis.google.com https://accounts.google.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://accounts.google.com; font-src https://fonts.gstatic.com; connect-src https://api.clickup.com https://script.google.com https://script.googleusercontent.com https://accounts.google.com https://firestore.googleapis.com https://identitytoolkit.googleapis.com https://securetoken.googleapis.com https://www.googleapis.com https://apis.google.com; frame-src https://organizador-jp.firebaseapp.com https://accounts.google.com; img-src 'self' data: https://lh3.googleusercontent.com https://www.google.com; manifest-src 'self'; base-uri 'none'; form-action 'self'; object-src 'none'">
 <meta name="referrer" content="no-referrer">
 <meta name="robots" content="noindex, nofollow">
-<link rel="manifest" href="manifest.json?v=20261122171705">
+<link rel="manifest" href="manifest.json?v=20261122172539">
 <link rel="icon" href="icon-192.png">
 <link rel="apple-touch-icon" href="icon-180.png">
 <meta name="theme-color" content="#0a0a0b">
@@ -229,7 +229,7 @@ a.btn{display:inline-flex;align-items:center;text-decoration:none;color:var(--te
 .ficha .bar span{background:#fff!important}
 .ficha:hover{transform:translateY(-2px);box-shadow:0 16px 34px -12px color-mix(in srgb,var(--c) 80%,transparent),inset 0 1px 0 rgba(255,255,255,.35)!important}
 .ficha[draggable=true]{cursor:grab}
-.apartados{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px;margin:-8px 0 24px}
+.apartados{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:14px;margin:-8px 0 24px}
 @media (max-width:760px){ .apartados{grid-template-columns:1fr} }
 .apart{border:1.5px dashed var(--line);border-radius:18px;padding:10px 12px;min-height:90px;transition:background .15s,border-color .15s}
 .apart.over,.fichas.over{border-color:var(--accent);background:color-mix(in srgb,var(--accent) 7%,transparent);outline:1.5px dashed var(--accent);border-radius:18px}
@@ -271,6 +271,9 @@ a.btn{display:inline-flex;align-items:center;text-decoration:none;color:var(--te
 .proj.prem .qidea input::placeholder{color:rgba(255,255,255,.7)}
 .proj.prem:hover{transform:translateY(-2px)}
 .proj.dragging{opacity:.4}
+.cpick{position:relative;display:inline-grid;place-items:center;cursor:pointer}
+.cpick input{position:absolute;inset:0;opacity:0;cursor:pointer;width:100%;height:100%}
+.cpick .dot{width:18px!important;height:18px!important;box-shadow:0 0 0 3px color-mix(in srgb,currentColor 15%,transparent)}
 .ingh{display:flex;align-items:baseline;gap:10px;margin:6px 2px 10px;font:700 14px var(--head)}
 .ingh span{font:400 12.5px var(--body);color:var(--muted)}
 .leads-h{display:flex;align-items:center;gap:10px;margin-top:30px}
@@ -1101,12 +1104,12 @@ html[data-theme=light] .jplogo .lg-l{display:block}
 
 <div class="toast" id="toast"></div>
 
-<script src="app.js?v=20261122171705"></script>
-<script src="planner.js?v=20261122171705"></script>
-<script src="clients.js?v=20261122171705"></script>
-<script src="quick.js?v=20261122171705"></script>
-<script src="ia.js?v=20261122171705"></script>
-<script src="hours.js?v=20261122171705"></script>
-<script type="module" src="cloud.js?v=20261122171705"></script>
+<script src="app.js?v=20261122172539"></script>
+<script src="planner.js?v=20261122172539"></script>
+<script src="clients.js?v=20261122172539"></script>
+<script src="quick.js?v=20261122172539"></script>
+<script src="ia.js?v=20261122172539"></script>
+<script src="hours.js?v=20261122172539"></script>
+<script type="module" src="cloud.js?v=20261122172539"></script>
 </body>
 </html>
