@@ -141,7 +141,7 @@ O.views.clientes = function(){
      <button class="chip" data-hm="0">Este mes</button>
      <button class="icon" data-hm="1" aria-label="Mes siguiente"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m9 18 6-6-6-6"/></svg></button>`, '');
   const reg = H().reg[month];
-  if (O.online() && (!reg || Date.now() - reg.at > 10 * 60e3)) setTimeout(() => loadRegistered(month), 50);
+  if (O.online() && (!reg || !reg.byDay || Date.now() - reg.at > 10 * 60e3)) setTimeout(() => loadRegistered(month), 50);
   const hoyD = O.today(), hoyP = isCur ? (H().log[hoyD] || proposal(hoyD)) : {};
   const cs = agencyClients(), refDay = isCur ? hoyD : (month < monthOf(hoyD) ? wd[wd.length - 1] : wd[0]);
   let tP = 0, tG = 0, tX = 0;
