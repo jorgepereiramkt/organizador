@@ -72,6 +72,7 @@ const rng = (a, b) => a === b ? `${eurN(b)} €` : `${eurN(a)}–${eurN(b)} €`
 // lee «900», «650-1300» o «10%» → {pct} o {a, b}
 function parseMoney(txt){
   const t = String(txt || '').trim(); if (!t) return null;
+  if (/gratis|free|sin coste|0\s*€?$/i.test(t) && !/[1-9]/.test(t)) return {a: 0, b: 0, free: true};
   if (/%/.test(t)){ const n = parseFloat(t.replace(',', '.').match(/\d+(\.\d+)?/)?.[0]); return isNaN(n) ? null : {pct: n}; }
   const v = (t.replace(/\./g, '').replace(',', '.').match(/\d+(\.\d+)?/g) || []).map(Number).slice(0, 2).sort((x, y) => x - y);
   return v.length ? {a: v[0], b: v[v.length - 1]} : null;
@@ -87,7 +88,9 @@ function recalcFee(c){
   const a = (tipo !== 'variable' ? fx.a : 0) + (tipo !== 'fijo' ? v.a : 0), b = (tipo !== 'variable' ? fx.b : 0) + (tipo !== 'fijo' ? v.b : 0);
   if (!a && !b){ delete c.feeMin; delete c.feeMax; c.fee = 0; } else { c.feeMin = a; c.feeMax = b; c.fee = (a + b) / 2; }
 }
+const esGratis = c => { const f = parseMoney(c.fixTxt), v = parseMoney(c.varTxt); return !!((f && f.free) || (v && v.free)) && !fmax(c); };
 const feeTxt = c => {
+  if (esGratis(c)) return 'Gratis';
   const tipo = ingresoDe(c), v = varPart(c), f = parseMoney(c.fixTxt);
   if (!c.fixTxt && !c.varTxt) return !fmax(c) ? '' : rng(fmin(c), fmax(c));   // datos antiguos
   const fijo = f && f.a !== undefined ? rng(f.a, f.b) : '';
@@ -114,7 +117,7 @@ function cartera(){
   const pend = c => S.tasks.filter(t => t.client === c.id && t.status !== 'done' && !t.ia);
   const card = c => { const p = pend(c), urg = p.filter(t => t.priority === 'super' || t.priority === 'alta').length, sv = c.services || [];
     return `<article class="cart" draggable="true" data-cart="${c.id}" style="--c:${O.clientColor(c)}" tabindex="0">
-      <header><span class="clp">${esc(c.name)}</span>${tierBadge(c)}${fmax(c) ? `<b class="fee">${feeTxt(c)}<small>/mes s/IVA</small></b>` : '<b class="fee none">— €/mes</b>'}</header>
+      <header><span class="clp">${esc(c.name)}</span>${tierBadge(c)}${esGratis(c) ? '<b class="fee">🎁 Gratis</b>' : fmax(c) ? `<b class="fee">${feeTxt(c)}<small>/mes s/IVA</small></b>` : '<b class="fee none">— €/mes</b>'}</header>
       ${sv.length ? `<div class="csv">${sv.map(s => `<span>${MODES[s.mode || 'manual'].icon} ${esc(s.name)}</span>`).join('')}</div>` : '<p class="vacio">Sin servicios</p>'}
       <footer><span>${p.length ? `${p.length} pendiente${p.length > 1 ? 's' : ''}${urg ? ` · <em>${urg} urgente${urg > 1 ? 's' : ''}</em>` : ''}` : 'Sin pendientes ✓'}</span>${c.since ? `<span>desde ${esc(c.since)}</span>` : ''}</footer>
       ${c.notes ? `<p class="cnote">${esc(c.notes.split('\n')[0])}</p>` : ''}</article>`; };
@@ -223,7 +226,7 @@ function fichaCard(c){
   const sv = c.services || [];
   return `<article class="ficha" data-ficha="${c.id}" draggable="true" data-fdrag="${c.id}" style="--c:${O.clientColor(c)}" tabindex="0">
     <header><i></i><b>${esc(c.name)}</b>${tierBadge(c)}${c.hours ? `<span class="hrs">${c.hours} h/mes</span>` : ''}</header>
-    ${c.group === 'mine' && fmax(c) ? `<div class="ffee">${feeTxt(c)}<small>/mes sin IVA</small></div>` : ''}
+    ${c.group === 'mine' && feeTxt(c) ? `<div class="ffee">${esGratis(c) ? '🎁 Gratis' : `${feeTxt(c)}<small>/mes sin IVA</small>`}</div>` : ''}
     ${sv.length ? `<ul>${sv.map(s => `<li>${esc(s.name)}</li>`).join('')}</ul>` : '<p class="vacio">Sin servicios todavía</p>'}
   </article>`;
 }
@@ -253,7 +256,7 @@ function moneyFields(c){
   const fix = c.fixTxt ?? (tipo === 'fijo' ? old : ''), vr = c.varTxt ?? (tipo === 'variable' ? old : '');
   const esPct = /%/.test(vr);
   return `<div class="money">
-    ${tipo !== 'variable' ? `<label>${tipo === 'mixto' ? 'Parte fija' : 'Cuota fija'} (€/mes sin IVA)<input type="text" inputmode="decimal" data-m="fixTxt" value="${esc(fix)}" placeholder="Ej.: 900 o 650-1300"></label>` : ''}
+    ${tipo !== 'variable' ? `<label>${tipo === 'mixto' ? 'Parte fija' : 'Cuota fija'} (€/mes sin IVA)<input type="text" inputmode="decimal" data-m="fixTxt" value="${esc(fix)}" placeholder="Ej.: 900, 650-1300 o gratis"></label>` : ''}
     ${tipo !== 'fijo' ? `<label>${tipo === 'mixto' ? 'Parte variable' : 'Variable'} · en € o en %<input type="text" data-m="varTxt" value="${esc(vr)}" placeholder="Ej.: 200-600 o 10%"></label>
       ${esPct ? `<label>% sobre qué<input data-m="varOn" value="${esc(c.varOn || '')}" placeholder="ventas, inversión en anuncios…"></label>
       <label>Base estimada (€/mes)<input type="text" inputmode="decimal" data-m="varBase" value="${esc(c.varBase || '')}" placeholder="Ej.: 5000 o 3000-8000"></label>` : ''}` : ''}
