@@ -25,9 +25,18 @@ O.views.clientes = function(){
     if (!cs.length && S.group !== 'all' && S.group !== g) continue;
     resto.push(...cs.filter(c => estadoDe(c) !== 'actual'));
     cs = cs.filter(c => estadoDe(c) === 'actual');
-    html += `<h3 class="rama">${titulo} <span>${cs.length} · ${sub} · arrastra una ficha abajo para apartarla</span></h3><div class="fichas" data-cestado="actual">`;
-    html += cs.map(fichaCard).join('') || `<div class="empty">${g === 'mine' ? 'Crea tus clientes en ⚙ → «+ Cliente».' : 'Aparecen al conectar ClickUp.'}</div>`;
-    html += '</div>';
+    html += `<h3 class="rama">${titulo} <span>${cs.length} · ${sub} · arrastra una ficha abajo para apartarla</span></h3>`;
+    if (g === 'mine'){
+      // tus clientes en dos secciones: ingresos fijos y variables (arrastra para cambiar)
+      for (const [k, t, s] of [['fijo', '💶 Ingresos fijos', 'cuota estable cada mes'], ['variable', '📈 Ingresos variables', 'cambia según el mes o el proyecto']]){
+        const xs = cs.filter(c => ingresoDe(c) === k);
+        html += `<div class="ingh">${t}<span>${xs.length} · ${sumTxt(xs)}/mes · ${s}</span></div><div class="fichas" data-cestado="actual" data-ingreso="${k}">`;
+        html += xs.map(fichaCard).join('') || '<div class="empty">Arrastra aquí una ficha</div>';
+        html += '</div>';
+      }
+    } else {
+      html += '<div class="fichas" data-cestado="actual">' + (cs.map(fichaCard).join('') || '<div class="empty">Aparecen al conectar ClickUp.</div>') + '</div>';
+    }
   }
   // Pausados y antiguos (de cualquier grupo): no salen en Tareas, Día, Semana, Horas ni al añadir tareas
   html += `<h3 class="rama">Apartados <span>no aparecen en el resto de la app · arrástralos arriba para recuperarlos</span></h3><div class="apartados">${ESTADOS.slice(1).map(([k, t, s]) => { const xs = resto.filter(c => estadoDe(c) === k);
@@ -67,6 +76,8 @@ function setFee(c, txt){
   if (!v.length){ delete c.feeMin; delete c.feeMax; c.fee = 0; return; }
   c.feeMin = v[0]; c.feeMax = v[v.length - 1]; c.fee = (c.feeMin + c.feeMax) / 2;   // «fee» = la media, para ordenar
 }
+// tipo de ingreso: fijo (cuota) o variable (cambia cada mes); si no lo eliges, un rango cuenta como variable
+const ingresoDe = c => c.ingreso === 'fijo' || c.ingreso === 'variable' ? c.ingreso : (fmin(c) !== fmax(c) ? 'variable' : 'fijo');
 const eur = n => (Math.round(n) || 0).toLocaleString('es-ES') + ' €';
 function cartera(){
   O.setToolbar('Clientes', 'tu cartera: arrastra cada cliente a su estado', '', 'Toca un cliente para editar ingresos y servicios');
@@ -80,7 +91,8 @@ function cartera(){
       ${sv.length ? `<div class="csv">${sv.map(s => `<span>${MODES[s.mode || 'manual'].icon} ${esc(s.name)}</span>`).join('')}</div>` : '<p class="vacio">Sin servicios</p>'}
       <footer><span>${p.length ? `${p.length} pendiente${p.length > 1 ? 's' : ''}${urg ? ` · <em>${urg} urgente${urg > 1 ? 's' : ''}</em>` : ''}` : 'Sin pendientes ✓'}</span>${c.since ? `<span>desde ${esc(c.since)}</span>` : ''}</footer>
       ${c.notes ? `<p class="cnote">${esc(c.notes.split('\n')[0])}</p>` : ''}</article>`; };
-  return `<div class="cart-sum"><div><b>${sumTxt(act)}</b><small>al mes sin IVA con ${act.length} cliente${act.length === 1 ? '' : 's'} actual${act.length === 1 ? '' : 'es'}</small></div>
+  const fij = act.filter(c => ingresoDe(c) === 'fijo'), vari = act.filter(c => ingresoDe(c) === 'variable');
+  return `<div class="cart-sum"><div><b>${sumTxt(fij)}</b><small>💶 fijos al mes (${fij.length})</small></div><div><b>${sumTxt(vari)}</b><small>📈 variables al mes (${vari.length})</small></div><div><b>${sumTxt(act)}</b><small>al mes sin IVA con ${act.length} cliente${act.length === 1 ? '' : 's'} actual${act.length === 1 ? '' : 'es'}</small></div>
       <div><b>${anyo(act)}</b><small>al año a este ritmo</small></div>
       ${ESTADOS.slice(1).map(([k, t]) => `<div><b>${mios.filter(c => estadoDe(c) === k).length}</b><small>${t.slice(3).toLowerCase()}</small></div>`).join('')}</div>
     <div class="cart-board">${ESTADOS.map(([k, t, sub]) => { const cs = mios.filter(c => estadoDe(c) === k).sort((a, b) => (+b.fee || 0) - (+a.fee || 0) || a.name.localeCompare(b.name));
@@ -104,7 +116,9 @@ document.addEventListener('drop', e => { if (!cartDrag) return; const col = e.ta
     fam.splice(fam.indexOf(other) + (after ? 1 : 0), 0, c);
     fam.forEach((x, k) => x.ord = k);
   }
-  const antes = c.estado; c.estado = col.dataset.cestado;
+  const antes = c.estado, antesIng = ingresoDe(c); c.estado = col.dataset.cestado;
+  if (col.dataset.ingreso && c.group === 'mine') c.ingreso = col.dataset.ingreso;
+  if (col.dataset.ingreso && antesIng !== col.dataset.ingreso && (antes || 'actual') === 'actual'){ O.save(); O.render(); return O.toast(`${c.name} → ${col.dataset.ingreso === 'fijo' ? 'ingresos fijos' : 'ingresos variables'}`); }
   if (other && (antes || 'actual') === c.estado){ O.save(); O.render(); return; } O.save(); O.render();
   O.toast(`${c.name} → ${(ESTADOS.find(([k]) => k === c.estado) || [, ''])[1]}`); });
 document.addEventListener('click', e => { const c = e.target.closest('[data-cart]'); if (c) openFicha(c.dataset.cart); });
@@ -222,6 +236,7 @@ function draw(){
     ${!ag ? `<div class="row"><label>Estado<select data-f="estado">${ESTADOS.map(([k, t]) => `<option value="${k}" ${estadoDe(c) === k ? 'selected' : ''}>${t}</option>`).join('')}</select></label>
       <label>Tier<select data-f="tier"><option value="">—</option>${Object.entries(TIERS).map(([k, t]) => `<option value="${k}" ${c.tier === k ? 'selected' : ''}>${t}</option>`).join('')}</select></label></div>
       <div class="row"><label>Facturación sin IVA (€/mes) · una cifra o un rango<input type="text" inputmode="numeric" data-fee value="${fmax(c) ? (fmin(c) === fmax(c) ? fmax(c) : fmin(c) + '-' + fmax(c)) : ''}" placeholder="Ej.: 900 o 650-1300"></label>
+      <label>Tipo de ingreso<select data-f="ingreso">${[['fijo', '💶 Fijo'], ['variable', '📈 Variable']].map(([k, t]) => `<option value="${k}" ${ingresoDe(c) === k ? 'selected' : ''}>${t}</option>`).join('')}</select></label>
       <label>Cliente desde<input type="month" data-f="since" value="${esc(c.since || '')}"></label></div>` : ''}
     <label>Notas (contacto, objetivos, cosas a recordar)<textarea rows="2" data-f="notes">${esc(c.notes || '')}</textarea></label>
     <h3 class="h3">Servicios</h3>
