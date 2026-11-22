@@ -20,8 +20,8 @@ O.views.clientes = function(){
   const grupos = [['mine', 'Mis clientes', '🔒 Solo en la app'], ['agency', 'Agencia', 'ClickUp']];
   let html = '', resto = [];
   for (const [g, titulo, sub] of grupos){
-    let cs = S.clients.filter(c => (g === 'mine') === (c.group === 'mine'))
-      .filter(c => S.group === 'all' || S.group === g);
+    let cs = O.byClientOrder(S.clients.filter(c => (g === 'mine') === (c.group === 'mine'))
+      .filter(c => S.group === 'all' || S.group === g));
     if (!cs.length && S.group !== 'all' && S.group !== g) continue;
     resto.push(...cs.filter(c => estadoDe(c) !== 'actual'));
     cs = cs.filter(c => estadoDe(c) === 'actual');
@@ -81,7 +81,17 @@ document.addEventListener('dragend', e => { const c = e.target.closest && e.targ
 document.addEventListener('dragover', e => { if (!cartDrag) return; const col = e.target.closest && e.target.closest('[data-cestado]'); if (!col) return; e.preventDefault();
   document.querySelectorAll('[data-cestado].over').forEach(x => x !== col && x.classList.remove('over')); col.classList.add('over'); });
 document.addEventListener('drop', e => { if (!cartDrag) return; const col = e.target.closest && e.target.closest('[data-cestado]'); const id = cartDrag; cartDrag = null; if (!col) return; e.preventDefault();
-  const c = O.client(id); if (!c) return; c.estado = col.dataset.cestado; O.save(); O.render();
+  const c = O.client(id); if (!c) return;
+  // soltar encima de otra ficha del mismo grupo: se coloca delante de ella (tu propio orden)
+  const tgt = e.target.closest('[data-fdrag]'), other = tgt && tgt.dataset.fdrag !== id && O.client(tgt.dataset.fdrag);
+  if (other && other.group === c.group){
+    const fam = O.byClientOrder(S.clients.filter(x => x.group === c.group)).filter(x => x !== c);
+    const r = tgt.getBoundingClientRect(), after = e.clientX > r.left + r.width / 2;
+    fam.splice(fam.indexOf(other) + (after ? 1 : 0), 0, c);
+    fam.forEach((x, k) => x.ord = k);
+  }
+  const antes = c.estado; c.estado = col.dataset.cestado;
+  if (other && (antes || 'actual') === c.estado){ O.save(); O.render(); return; } O.save(); O.render();
   O.toast(`${c.name} → ${(ESTADOS.find(([k]) => k === c.estado) || [, ''])[1]}`); });
 document.addEventListener('click', e => { const c = e.target.closest('[data-cart]'); if (c) openFicha(c.dataset.cart); });
 
@@ -91,14 +101,10 @@ function resumen(c){
   return {total: sv.length, auto: n('auto'), mixto: n('mixto'), manual: n('manual')};
 }
 function fichaCard(c){
-  const r = resumen(c), sv = c.services || [];
-  const pct = r.total ? Math.round((r.auto + r.mixto / 2) / r.total * 100) : 0;
+  const sv = c.services || [];
   return `<article class="ficha" data-ficha="${c.id}" draggable="true" data-fdrag="${c.id}" style="--c:${O.clientColor(c)}" tabindex="0">
     <header><i></i><b>${esc(c.name)}</b>${c.hours ? `<span class="hrs">${c.hours} h/mes</span>` : ''}</header>
-    ${sv.length ? `<ul>${sv.map(s => `<li><span title="${MODES[s.mode || 'manual'].label}">${MODES[s.mode || 'manual'].icon}</span>${esc(s.name)}</li>`).join('')}</ul>
-      <div class="bar" title="${pct}% automatizado"><span style="width:${pct}%"></span></div>
-      <small>${r.auto} auto · ${r.mixto} mixto · ${r.manual} manual</small>`
-      : '<p class="vacio">Sin servicios todavía</p>'}
+    ${sv.length ? `<ul>${sv.map(s => `<li>${esc(s.name)}</li>`).join('')}</ul>` : '<p class="vacio">Sin servicios todavía</p>'}
   </article>`;
 }
 document.addEventListener('click', e => {

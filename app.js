@@ -58,7 +58,7 @@ const DEMO_IDS = new Set(['mio-1','mio-2','ag-a','ag-b','ag-int']);
 let lastSent = '', cloudTimer = null;
 function cloudData(){
   return JSON.parse(JSON.stringify({
-    clients: S.clients.map(({id,name,group,color,keywords,listId,auto,services,hours,notes,estado,fee,since}) => ({id,name,group,color,keywords,listId,auto,services,hours,notes,estado,fee,since})),
+    clients: S.clients.map(({id,name,group,color,keywords,listId,auto,services,hours,notes,estado,fee,since,ord}) => ({id,name,group,color,keywords,listId,auto,services,hours,notes,estado,fee,since,ord})),
     tasks: S.tasks.filter(t => !t.cu && !t.demo),
     token: S.cu.token || '', hidden: S.cu.hidden || [], plan: S.plan || null, slots: S.slots || {}, hours: S.hours || null, ai: S.ai || null,
     picks: Object.fromEntries(S.tasks.filter(t => t.cu && t.today && t.today >= today()).map(t => [t.id, t.today])) }));
@@ -421,7 +421,9 @@ function dayLabel(s){
 /* ---------- Render ---------- */
 const main = $('#main'), toolbar = $('#toolbar');
 const isApartado = c => !!c && (c.estado === 'pausa' || c.estado === 'antiguo');
-function visibleClients(){ return S.clients.filter(c => (S.group === 'all' || c.group === S.group) && !isApartado(c)); }
+// orden que eliges arrastrando las fichas (si no, alfabético)
+const byClientOrder = cs => cs.slice().sort((a, b) => (a.ord ?? 1e9) - (b.ord ?? 1e9) || a.name.localeCompare(b.name));
+function visibleClients(){ return byClientOrder(S.clients.filter(c => (S.group === 'all' || c.group === S.group) && !isApartado(c))); }
 // Tareas de ClickUp con ⭐: solo sirven para registrar horas, no salen en los paneles de tareas
 const isRegTask = t => !!(t.cu && /\u2B50|tarea principal/i.test(t.title || ''));   // cualquier tarea con ⭐
 function visibleTasks(){
@@ -985,5 +987,5 @@ if (online()) sync(true);
 // Mantener PC y móvil al día: cada 60 s con la app abierta y al volver a ella
 setInterval(() => { if (document.visibilityState === 'visible') sync(true); }, 60000);
 document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') sync(true); });
-window.__org = {S, isApartado, GROUP, clientColor, URG, urgRank, parse, pushCreate, uid, maxOrder, clientLists, online, PALETA, cu, listInfo, norm, isRegTask, applyCloud, cloudEmpty, cloudReady, wipeLocal, toast, views, render, save, card, setToolbar, visibleTasks, client, task, esc, iso, fromIso, addDays, today, dayLabel, DIAS_L, MESES, pad, byOrder};
+window.__org = {S, isApartado, byClientOrder, GROUP, clientColor, URG, urgRank, parse, pushCreate, uid, maxOrder, clientLists, online, PALETA, cu, listInfo, norm, isRegTask, applyCloud, cloudEmpty, cloudReady, wipeLocal, toast, views, render, save, card, setToolbar, visibleTasks, client, task, esc, iso, fromIso, addDays, today, dayLabel, DIAS_L, MESES, pad, byOrder};
 })();
