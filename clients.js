@@ -26,6 +26,8 @@ O.views.clientes = function(){
     resto.push(...cs.filter(c => estadoDe(c) !== 'actual'));
     cs = cs.filter(c => estadoDe(c) === 'actual');
     const agTot = g !== 'mine' ? cs.reduce((s, c) => { const m = agPago(c); return m ? [s[0] + m.a, s[1] + m.b] : s; }, [0, 0]) : null;
+    if (g === 'mine'){ const act = misActuales(), tot = act.reduce((s, x) => s + media(x), 0), top = act.slice().sort((a, b) => media(b) - media(a))[0];
+      if (top && tot) html += `<div class="riesgo">👑 <b>${esc(top.name)}</b> es el <b>${Math.round(media(top) / tot * 100)}%</b> de tus ingresos: si lo pierdes, necesitas ${act.filter(x => x !== top && media(x)).length ? `unos <b>${(media(top) / (act.filter(x => x !== top && media(x)).reduce((s, x) => s + media(x), 0) / act.filter(x => x !== top && media(x)).length)).toFixed(1).replace('.', ',')}</b> clientes de tu media para compensarlo` : 'otro igual'}.</div>`; }
     html += `<h3 class="rama">${titulo} <span>${cs.length} · ${sub}${agTot && agTot[1] ? ` · <b>${rng(agTot[0], agTot[1])}/mes</b> a la agencia entre todos` : ''} · arrastra una ficha abajo para apartarla</span></h3>`;
     if (g === 'mine'){
       // tus clientes en dos secciones: ingresos fijos y variables (arrastra para cambiar)
@@ -92,6 +94,18 @@ function recalcFee(c){
 const agPago = c => { const m = parseMoney(c.agFeeTxt); return m && m.a !== undefined ? m : null; };
 const agMedia = c => { const m = agPago(c); return m ? (m.a + m.b) / 2 : 0; };
 const agPeso = c => { const tot = S.clients.filter(x => x.group !== 'mine' && estadoDe(x) === 'actual').reduce((s, x) => s + agMedia(x), 0); return tot ? Math.round(agMedia(c) / tot * 100) : 0; };
+// Comparativa: cuántos clientes como este necesitas para igualar al que más te paga, y qué parte de tus ingresos es
+const misActuales = () => S.clients.filter(x => x.group === 'mine' && estadoDe(x) === 'actual');
+const media = c => (fmin(c) + fmax(c)) / 2;
+function compara(c){
+  const act = misActuales(), top = act.slice().sort((a, b) => media(b) - media(a))[0], tot = act.reduce((s, x) => s + media(x), 0);
+  if (!top || !media(top) || estadoDe(c) !== 'actual') return '';
+  const m = media(c), pct = tot ? Math.round(m / tot * 100) : 0, h = +c.hours || 0;
+  const vs = c.id === top.id ? '<span class="cmp top">👑 El que más te paga</span>'
+    : !m ? '<span class="cmp warn">No te aporta ingresos</span>'
+    : `<span class="cmp" title="Necesitarías ${(media(top) / m).toFixed(1).replace('.', ',')} clientes como este para ganar lo mismo que con ${esc(top.name)}">×${(media(top) / m).toFixed(1).replace('.', ',').replace(',0', '')} para igualar a ${esc(top.name)}</span>`;
+  return `<div class="cmps">${vs}${m ? `<span class="cmp">${pct}% de tus ingresos</span>` : ''}${h && m ? `<span class="cmp">${Math.round(m / h)} €/h</span>` : ''}</div>`;
+}
 const esGratis = c => { const f = parseMoney(c.fixTxt), v = parseMoney(c.varTxt); return !!((f && f.free) || (v && v.free)) && !fmax(c); };
 const feeTxt = c => {
   if (esGratis(c)) return 'Gratis';
@@ -233,6 +247,7 @@ function fichaCard(c){
     ${c.group !== 'mine' && agPago(c) ? `<div class="ffee">${rng(agPago(c).a, agPago(c).b)}<small>/mes a la agencia</small></div>
       ${estadoDe(c) === 'actual' ? `<div class="peso" title="Peso en lo que pagan tus clientes de agencia"><i><span style="width:${agPeso(c)}%"></span></i><b>${agPeso(c)}%</b></div>` : ''}` : ''}
     ${c.group === 'mine' && feeTxt(c) ? `<div class="ffee">${esGratis(c) ? '🎁 Gratis' : `${feeTxt(c)}<small>/mes sin IVA</small>`}</div>` : ''}
+    ${c.group === 'mine' ? compara(c) : ''}
     ${sv.length ? `<ul>${sv.map(s => `<li>${esc(s.name)}</li>`).join('')}</ul>` : '<p class="vacio">Sin servicios todavía</p>'}
   </article>`;
 }
@@ -279,7 +294,7 @@ function draw(){
   form.innerHTML = `
     <h2><span class="dot" style="background:${O.clientColor(c)}"></span> ${esc(c.name)} <span class="badge">${ag ? 'Agencia' : '🔒 Mío'}</span></h2>
     ${ag ? `<label>Cuánto paga a la agencia (€/mes sin IVA) · una cifra o un rango<input type="text" inputmode="decimal" data-ag value="${esc(c.agFeeTxt || '')}" placeholder="Ej.: 2500 o 2000-3000"></label>` : ''}
-    ${ag ? `<label>Horas al mes con este cliente<input type="number" min="0" step="0.5" data-f="hours" value="${c.hours || ''}" placeholder="normalmente entre 8 y 20"></label>` : ''}
+    <label>${ag ? 'Horas al mes con este cliente' : 'Horas al mes que le dedicas (aprox.) · para ver cuánto ganas por hora'}<input type="number" min="0" step="0.5" data-f="hours" value="${c.hours || ''}" placeholder="${ag ? 'normalmente entre 8 y 20' : 'Ej.: 10'}"></label>
     ${ag ? `<div class="row"><label>Estado<select data-f="estado">${ESTADOS.map(([k, t]) => `<option value="${k}" ${estadoDe(c) === k ? 'selected' : ''}>${t}</option>`).join('')}</select></label>
       <label>Tier<select data-f="tier"><option value="">—</option>${Object.entries(TIERS).map(([k, t]) => `<option value="${k}" ${c.tier === k ? 'selected' : ''}>${t}</option>`).join('')}</select></label></div>` : ''}
     ${!ag ? `<div class="row"><label>Estado<select data-f="estado">${ESTADOS.map(([k, t]) => `<option value="${k}" ${estadoDe(c) === k ? 'selected' : ''}>${t}</option>`).join('')}</select></label>
