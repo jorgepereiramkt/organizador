@@ -28,7 +28,7 @@ O.views.clientes = function(){
     html += `<h3 class="rama">${titulo} <span>${cs.length} · ${sub} · arrastra una ficha abajo para apartarla</span></h3>`;
     if (g === 'mine'){
       // tus clientes en dos secciones: ingresos fijos y variables (arrastra para cambiar)
-      for (const [k, t, s] of [['fijo', '💶 Ingresos fijos', 'cuota estable cada mes'], ['variable', '📈 Ingresos variables', 'cambia según el mes o el proyecto']]){
+      for (const [k, t, s] of [['fijo', '💶 Ingresos fijos', 'cuota estable cada mes'], ['mixto', '💶➕📈 Fijo + variable', 'una cuota más una parte variable'], ['variable', '📈 Ingresos variables', 'cambia según el mes, el proyecto o un %']]){
         const xs = cs.filter(c => ingresoDe(c) === k);
         html += `<div class="ingh">${t}<span>${xs.length} · ${sumTxt(xs)}/mes · ${s}</span></div><div class="fichas" data-cestado="actual" data-ingreso="${k}">`;
         html += xs.map(fichaCard).join('') || '<div class="empty">Arrastra aquí una ficha</div>';
@@ -68,7 +68,34 @@ const tierBadge = c => c.tier && TIERS[c.tier] ? `<span class="tier t-${c.tier}"
 // facturación: puede ser una cifra o un rango «650-1300» (según el mes)
 const fmin = c => +(c.feeMin ?? c.fee) || 0, fmax = c => +(c.feeMax ?? c.fee) || 0;
 const eurN = n => (Math.round(n) || 0).toLocaleString('es-ES');
-const feeTxt = c => !fmax(c) ? '' : fmin(c) === fmax(c) ? `${eurN(fmax(c))} €` : `${eurN(fmin(c))}–${eurN(fmax(c))} €`;
+const rng = (a, b) => a === b ? `${eurN(b)} €` : `${eurN(a)}–${eurN(b)} €`;
+// lee «900», «650-1300» o «10%» → {pct} o {a, b}
+function parseMoney(txt){
+  const t = String(txt || '').trim(); if (!t) return null;
+  if (/%/.test(t)){ const n = parseFloat(t.replace(',', '.').match(/\d+(\.\d+)?/)?.[0]); return isNaN(n) ? null : {pct: n}; }
+  const v = (t.replace(/\./g, '').replace(',', '.').match(/\d+(\.\d+)?/g) || []).map(Number).slice(0, 2).sort((x, y) => x - y);
+  return v.length ? {a: v[0], b: v[v.length - 1]} : null;
+}
+const varPart = c => { const v = parseMoney(c.varTxt); if (!v) return null;
+  if (v.pct === undefined) return {a: v.a, b: v.b, txt: rng(v.a, v.b)};
+  const base = parseMoney(c.varBase), on = (c.varOn || '').trim();
+  const lbl = `${String(v.pct).replace('.', ',')}%${on ? ' de ' + on : ''}`;
+  return base && base.a !== undefined ? {a: base.a * v.pct / 100, b: base.b * v.pct / 100, txt: lbl, pct: true} : {a: 0, b: 0, txt: lbl, pct: true}; };
+// recalcula la facturación total estimada (para sumar y ordenar) a partir de lo que pones en la ficha
+function recalcFee(c){
+  const tipo = ingresoDe(c), f = parseMoney(c.fixTxt), fx = f && f.a !== undefined ? f : {a: 0, b: 0}, v = varPart(c) || {a: 0, b: 0};
+  const a = (tipo !== 'variable' ? fx.a : 0) + (tipo !== 'fijo' ? v.a : 0), b = (tipo !== 'variable' ? fx.b : 0) + (tipo !== 'fijo' ? v.b : 0);
+  if (!a && !b){ delete c.feeMin; delete c.feeMax; c.fee = 0; } else { c.feeMin = a; c.feeMax = b; c.fee = (a + b) / 2; }
+}
+const feeTxt = c => {
+  const tipo = ingresoDe(c), v = varPart(c), f = parseMoney(c.fixTxt);
+  if (!c.fixTxt && !c.varTxt) return !fmax(c) ? '' : rng(fmin(c), fmax(c));   // datos antiguos
+  const fijo = f && f.a !== undefined ? rng(f.a, f.b) : '';
+  const vtx = v ? (v.pct ? v.txt + (v.b ? ` (≈${rng(v.a, v.b)})` : '') : v.txt) : '';
+  if (tipo === 'fijo') return fijo;
+  if (tipo === 'variable') return vtx;
+  return [fijo, vtx].filter(Boolean).join(' + ');
+};
 const sumTxt = cs => { const a = cs.reduce((s, c) => s + fmin(c), 0), b = cs.reduce((s, c) => s + fmax(c), 0); return !b ? '0 €' : a === b ? `${eurN(b)} €` : `${eurN(a)}–${eurN(b)} €`; };
 function setFee(c, txt){
   const ns = String(txt).replace(/\./g, '').replace(',', '.').match(/\d+(\.\d+)?/g) || [];
@@ -77,7 +104,7 @@ function setFee(c, txt){
   c.feeMin = v[0]; c.feeMax = v[v.length - 1]; c.fee = (c.feeMin + c.feeMax) / 2;   // «fee» = la media, para ordenar
 }
 // tipo de ingreso: fijo (cuota) o variable (cambia cada mes); si no lo eliges, un rango cuenta como variable
-const ingresoDe = c => c.ingreso === 'fijo' || c.ingreso === 'variable' ? c.ingreso : (fmin(c) !== fmax(c) ? 'variable' : 'fijo');
+const ingresoDe = c => ['fijo', 'variable', 'mixto'].includes(c.ingreso) ? c.ingreso : (fmin(c) !== fmax(c) ? 'variable' : 'fijo');
 const eur = n => (Math.round(n) || 0).toLocaleString('es-ES') + ' €';
 function cartera(){
   O.setToolbar('Clientes', 'tu cartera: arrastra cada cliente a su estado', '', 'Toca un cliente para editar ingresos y servicios');
@@ -91,8 +118,8 @@ function cartera(){
       ${sv.length ? `<div class="csv">${sv.map(s => `<span>${MODES[s.mode || 'manual'].icon} ${esc(s.name)}</span>`).join('')}</div>` : '<p class="vacio">Sin servicios</p>'}
       <footer><span>${p.length ? `${p.length} pendiente${p.length > 1 ? 's' : ''}${urg ? ` · <em>${urg} urgente${urg > 1 ? 's' : ''}</em>` : ''}` : 'Sin pendientes ✓'}</span>${c.since ? `<span>desde ${esc(c.since)}</span>` : ''}</footer>
       ${c.notes ? `<p class="cnote">${esc(c.notes.split('\n')[0])}</p>` : ''}</article>`; };
-  const fij = act.filter(c => ingresoDe(c) === 'fijo'), vari = act.filter(c => ingresoDe(c) === 'variable');
-  return `<div class="cart-sum"><div><b>${sumTxt(fij)}</b><small>💶 fijos al mes (${fij.length})</small></div><div><b>${sumTxt(vari)}</b><small>📈 variables al mes (${vari.length})</small></div><div><b>${sumTxt(act)}</b><small>al mes sin IVA con ${act.length} cliente${act.length === 1 ? '' : 's'} actual${act.length === 1 ? '' : 'es'}</small></div>
+  const fij = act.filter(c => ingresoDe(c) === 'fijo'), mix = act.filter(c => ingresoDe(c) === 'mixto'), vari = act.filter(c => ingresoDe(c) === 'variable');
+  return `<div class="cart-sum"><div><b>${sumTxt(fij)}</b><small>💶 fijos al mes (${fij.length})</small></div><div><b>${sumTxt(mix)}</b><small>💶➕📈 fijo + variable (${mix.length})</small></div><div><b>${sumTxt(vari)}</b><small>📈 variables al mes (${vari.length})</small></div><div><b>${sumTxt(act)}</b><small>al mes sin IVA con ${act.length} cliente${act.length === 1 ? '' : 's'} actual${act.length === 1 ? '' : 'es'}</small></div>
       <div><b>${anyo(act)}</b><small>al año a este ritmo</small></div>
       ${ESTADOS.slice(1).map(([k, t]) => `<div><b>${mios.filter(c => estadoDe(c) === k).length}</b><small>${t.slice(3).toLowerCase()}</small></div>`).join('')}</div>
     <div class="cart-board">${ESTADOS.map(([k, t, sub]) => { const cs = mios.filter(c => estadoDe(c) === k).sort((a, b) => (+b.fee || 0) - (+a.fee || 0) || a.name.localeCompare(b.name));
@@ -118,7 +145,7 @@ document.addEventListener('drop', e => { if (!cartDrag) return; const col = e.ta
   }
   const antes = c.estado, antesIng = ingresoDe(c); c.estado = col.dataset.cestado;
   if (col.dataset.ingreso && c.group === 'mine') c.ingreso = col.dataset.ingreso;
-  if (col.dataset.ingreso && antesIng !== col.dataset.ingreso && (antes || 'actual') === 'actual'){ O.save(); O.render(); return O.toast(`${c.name} → ${col.dataset.ingreso === 'fijo' ? 'ingresos fijos' : 'ingresos variables'}`); }
+  if (col.dataset.ingreso && antesIng !== col.dataset.ingreso && (antes || 'actual') === 'actual'){ recalcFee(c); O.save(); O.render(); return O.toast(`${c.name} → ${({fijo: 'ingresos fijos', variable: 'ingresos variables', mixto: 'fijo + variable'})[col.dataset.ingreso]}`); }
   if (other && (antes || 'actual') === c.estado){ O.save(); O.render(); return; } O.save(); O.render();
   O.toast(`${c.name} → ${(ESTADOS.find(([k]) => k === c.estado) || [, ''])[1]}`); });
 document.addEventListener('click', e => { const c = e.target.closest('[data-cart]'); if (c) openFicha(c.dataset.cart); });
@@ -220,6 +247,18 @@ function openFicha(id){
   cur.services = cur.services || [];
   draw(); dlg.showModal();
 }
+// campos de facturación según el tipo (todo sin IVA, €/mes)
+function moneyFields(c){
+  const tipo = ingresoDe(c), old = fmax(c) ? (fmin(c) === fmax(c) ? String(fmax(c)) : fmin(c) + '-' + fmax(c)) : '';
+  const fix = c.fixTxt ?? (tipo === 'fijo' ? old : ''), vr = c.varTxt ?? (tipo === 'variable' ? old : '');
+  const esPct = /%/.test(vr);
+  return `<div class="money">
+    ${tipo !== 'variable' ? `<label>${tipo === 'mixto' ? 'Parte fija' : 'Cuota fija'} (€/mes sin IVA)<input type="text" inputmode="decimal" data-m="fixTxt" value="${esc(fix)}" placeholder="Ej.: 900 o 650-1300"></label>` : ''}
+    ${tipo !== 'fijo' ? `<label>${tipo === 'mixto' ? 'Parte variable' : 'Variable'} · en € o en %<input type="text" data-m="varTxt" value="${esc(vr)}" placeholder="Ej.: 200-600 o 10%"></label>
+      ${esPct ? `<label>% sobre qué<input data-m="varOn" value="${esc(c.varOn || '')}" placeholder="ventas, inversión en anuncios…"></label>
+      <label>Base estimada (€/mes)<input type="text" inputmode="decimal" data-m="varBase" value="${esc(c.varBase || '')}" placeholder="Ej.: 5000 o 3000-8000"></label>` : ''}` : ''}
+    <p class="iahint">Total estimado: <b data-feetot>${feeTxt(c) || '—'}</b>${fmax(c) ? ` · cuenta como ${rng(fmin(c), fmax(c))}/mes` : ''}</p></div>`;
+}
 function draw(){
   const c = cur, ag = c.group !== 'mine';
   const limpio = n => n.trim().replace(/^servicio\s+/i, '').replace(/\s+/g, ' ');
@@ -235,9 +274,9 @@ function draw(){
       <label>Tier<select data-f="tier"><option value="">—</option>${Object.entries(TIERS).map(([k, t]) => `<option value="${k}" ${c.tier === k ? 'selected' : ''}>${t}</option>`).join('')}</select></label></div>` : ''}
     ${!ag ? `<div class="row"><label>Estado<select data-f="estado">${ESTADOS.map(([k, t]) => `<option value="${k}" ${estadoDe(c) === k ? 'selected' : ''}>${t}</option>`).join('')}</select></label>
       <label>Tier<select data-f="tier"><option value="">—</option>${Object.entries(TIERS).map(([k, t]) => `<option value="${k}" ${c.tier === k ? 'selected' : ''}>${t}</option>`).join('')}</select></label></div>
-      <div class="row"><label>Facturación sin IVA (€/mes) · una cifra o un rango<input type="text" inputmode="numeric" data-fee value="${fmax(c) ? (fmin(c) === fmax(c) ? fmax(c) : fmin(c) + '-' + fmax(c)) : ''}" placeholder="Ej.: 900 o 650-1300"></label>
-      <label>Tipo de ingreso<select data-f="ingreso">${[['fijo', '💶 Fijo'], ['variable', '📈 Variable']].map(([k, t]) => `<option value="${k}" ${ingresoDe(c) === k ? 'selected' : ''}>${t}</option>`).join('')}</select></label>
-      <label>Cliente desde<input type="month" data-f="since" value="${esc(c.since || '')}"></label></div>` : ''}
+      <div class="row"><label>Tipo de ingreso<select data-f="ingreso">${[['fijo', '💶 Fijo'], ['mixto', '💶➕📈 Fijo + variable'], ['variable', '📈 Variable']].map(([k, t]) => `<option value="${k}" ${ingresoDe(c) === k ? 'selected' : ''}>${t}</option>`).join('')}</select></label>
+      <label>Cliente desde<input type="month" data-f="since" value="${esc(c.since || '')}"></label></div>
+      ${moneyFields(c)}` : ''}
     <label>Notas (contacto, objetivos, cosas a recordar)<textarea rows="2" data-f="notes">${esc(c.notes || '')}</textarea></label>
     <h3 class="h3">Servicios</h3>
     <div class="svs">${c.services.map((s, i) => `<div class="sv" data-i="${i}">
@@ -250,9 +289,14 @@ function draw(){
       <button type="button" class="chip" data-sadd="">+ Otro</button></div>
     <div class="actions"><span class="sp"></span><button class="btn primary" value="ok">Listo</button></div>`;
 }
+// al pasar de los datos antiguos (una sola cifra) a los campos nuevos, se conserva la cifra
+const fix0 = c => { if (c.fixTxt === undefined && c.varTxt === undefined && fmax(c)){ const old = fmin(c) === fmax(c) ? String(fmax(c)) : fmin(c) + '-' + fmax(c); if (ingresoDe(c) === 'variable') c.varTxt = old; else c.fixTxt = old; } return false; };
+form.addEventListener('change', e => { if (e.target.dataset.f === 'ingreso'){ fix0(cur); recalcFee(cur); O.save(); draw(); } });
 form.addEventListener('input', e => {
   const t = e.target;
-  if (t.dataset.fee !== undefined) setFee(cur, t.value);
+  if (t.dataset.m){ if (fix0(cur)) {} cur[t.dataset.m] = t.value; recalcFee(cur);
+    const tot = form.querySelector('[data-feetot]'); if (tot) tot.textContent = feeTxt(cur) || '—';
+    const pctAhora = /%/.test(cur.varTxt || ''); if (t.dataset.m === 'varTxt' && pctAhora !== !!form.querySelector('[data-m=varOn]')) { O.save(); const pos = t.selectionStart; draw(); const n = form.querySelector('[data-m=varTxt]'); n.focus(); n.setSelectionRange(pos, pos); return; } }
   if (t.dataset.f){ cur[t.dataset.f] = (t.dataset.f === 'hours' || t.dataset.f === 'fee') ? (parseFloat(t.value) || 0) : t.value; }
   if (t.dataset.s){ cur.services[+t.closest('.sv').dataset.i][t.dataset.s] = t.value; }
   O.save();
