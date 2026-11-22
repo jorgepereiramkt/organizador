@@ -78,10 +78,18 @@ function fillPlan(month){
   for (const c of agencyClients()){
     const tk = taskFor(c); if (!tk || !target(month, c)) continue;
     const reg = registered(month, c.id) || 0, falta = Math.round(expectedTo(month, c, hoy) - reg);
-    const vacios = dias.filter(d => !regDay(month, c.id, d)); if (falta < 15 || !vacios.length) continue;
-    let resto = falta; const por = Math.min(MAX_DIA, Math.max(15, r5(falta / vacios.length)));
-    for (const d of vacios){ if (resto < 5) break; const m = Math.min(por, r5(resto)); if (!m) break; (plan[d] = plan[d] || {})[c.id] = m; resto -= m; }
-    resumen.push({c, falta, dias: vacios.filter(d => plan[d] && plan[d][c.id]).length, total: falta - Math.max(0, resto)});
+    // días «flojos»: sin nada o con algo testimonial (menos de 15 min, p. ej. 1 min): ahí se completa
+    const flojos = dias.filter(d => regDay(month, c.id, d) < 15); if (falta < 15 || !flojos.length) continue;
+    let resto = falta; const media = falta / flojos.length;
+    flojos.forEach((d, k) => {
+      if (resto < 5) return;
+      const ultimo = k === flojos.length - 1;
+      let m = ultimo ? resto : r5(media * (0.8 + Math.random() * 0.4));   // con variación, para que no sea siempre igual
+      m = Math.min(Math.max(m, 15), resto, ultimo ? 150 : 120);
+      m = r5(m); if (!m) return;
+      (plan[d] = plan[d] || {})[c.id] = m; resto -= m;
+    });
+    resumen.push({c, falta, dias: flojos.filter(d => plan[d] && plan[d][c.id]).length, total: falta - Math.max(0, resto)});
   }
   return {plan, resumen};
 }
@@ -91,7 +99,7 @@ async function fillToToday(month){
   const {plan, resumen} = fillPlan(month);
   if (!resumen.length) return O.toast('Nada que rellenar: vas al día ✓');
   const txt = resumen.map(r => `• ${r.c.name}: ${fmt(r.total)} en ${r.dias} día${r.dias > 1 ? 's' : ''}`).join('\n');
-  if (!confirm(`Voy a registrar en ClickUp (en la «⭐ Tarea Principal ⭐» de cada cliente) lo que falta hasta hoy, en los días que no tienen nada (máx. 1 h 30 por cliente y día):\n\n${txt}\n\n¿Lo registro?`)) return;
+  if (!confirm(`Voy a registrar en ClickUp (en la «⭐ Tarea Principal ⭐» de cada cliente) lo que falta hasta hoy, en los días sin registrar o con solo unos minutos (de 15 min a 2 h por cliente y día, con variación):\n\n${txt}\n\n¿Lo registro?`)) return;
   let n = 0;
   for (const d of Object.keys(plan).sort()){ await pushDay(d, plan[d], true); n++; }
   O.toast(`⏱ Rellenado: ${n} día${n > 1 ? 's' : ''} registrados en ClickUp`);
