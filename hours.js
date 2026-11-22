@@ -27,7 +27,7 @@ function workDays(month){
 }
 const agencyClients = () => S.clients.filter(c => c.group !== 'mine' && !O.isApartado(c));
 const mdata = (month, c) => { const r = (H().months[month] || {})[c.id] || {}; return {est: r.est ?? (c.hours || 0), real: r.real ?? r.est ?? (c.hours || 0)}; };
-const conHoras = (month = monthOf(O.today())) => agencyClients().filter(c => mdata(month, c).real > 0);
+const conHoras = (month = monthOf(O.today())) => agencyClients().filter(c => mdata(month, c).real > 0 || mdata(month, c).est > 0);
 const regTasks = c => S.tasks.filter(t => t.client === c.id && O.isRegTask(t));
 function taskFor(c){ const rs = regTasks(c); return (c.timeTask && rs.find(t => t.id === c.timeTask)) || rs[0] || null; }
 const teamOf = c => { const l = O.clientLists(c)[0]; return l && l.team; };
@@ -57,7 +57,14 @@ async function loadRegistered(month = viewMonth){
 }
 const registered = (month, cid) => ((H().reg[month] || {}).byClient || {})[cid];
 const regDay = (month, cid, day) => (((H().reg[month] || {}).byDay || {})[cid] || {})[day] || 0;
-const target = (month, c) => { const {est, real} = mdata(month, c); return real || est || 0; };   // horas a registrar en el mes
+// Margen: cada mes y cliente se pasa entre un 10 y un 20% del presupuesto (al azar, para que no parezca automático)
+function factor(month, c){
+  const h = H(), f = (h.fac = h.fac || {}), m = (f[month] = f[month] || {});
+  if (!m[c.id]) { m[c.id] = Math.round((1.10 + Math.random() * 0.10) * 100) / 100; setTimeout(O.save, 0); }
+  return m[c.id];
+}
+const base = (month, c) => { const {est, real} = mdata(month, c); return real || est || 0; };   // horas del mes (sin margen)
+const target = (month, c) => base(month, c) * (base(month, c) ? factor(month, c) : 1);   // horas a registrar en el mes (con margen)
 // lo que deberías llevar registrado hasta un día (incluido), repartido por días laborables
 const expectedTo = (month, c, day) => { const wd = workDays(month); return wd.length ? target(month, c) * 60 * wd.filter(d => d <= day).length / wd.length : 0; };
 
@@ -99,7 +106,7 @@ function proposal(day){
     // si hoy ya se registró algo, no contarlo dos veces
     const yaHoy = H().cu[day] && H().cu[day][c.id] ? (todayLogged[c.id] || 0) : 0;
     const base = reg !== undefined ? reg - yaHoy : sumLog(c.id, month, day);
-    const falta = mdata(month, c).real * 60 - base;
+    const falta = target(month, c) * 60 - base;
     out[c.id] = falta <= 0 ? 0 : Math.min(MAX_DIA, r5(Math.max(15, falta / left)), r5(falta));
   }
   return out;
@@ -153,6 +160,7 @@ O.views.clientes = function(){
       <header><b><i></i>${esc(c.name)}</b>${tk ? `<a href="${esc(tk.url || '#')}" target="_blank" rel="noopener" title="${esc(tk.title)}">⏱</a>` : '<span title="Sin «⭐ Tarea Principal ⭐» asignada a ti">⚠️</span>'}</header>
       <div class="hnums"><label>Presupuesto<input type="number" min="0" step="0.5" value="${est || ''}" data-hmk="est" data-cid="${c.id}" placeholder="0"><small>h</small></label>
         <label title="Si le dedicas otras horas de verdad, ponlas aquí: es lo que se reparte y se registra">A registrar<input type="number" min="0" step="0.5" value="${real && real !== est ? real : ''}" data-hmk="real" data-cid="${c.id}" placeholder="${est || 0}"><small>h</small></label></div>
+      ${base(month, c) ? `<small class="hobj">Objetivo con margen: <b>${fmt(obj)}</b> (+${Math.round((factor(month, c) - 1) * 100)}%)</small>` : ''}
       <div class="hbar"><span style="width:${pct}%"></span><i style="left:${pexp}%" title="Lo que deberías llevar a ${isCur ? 'hoy' : 'final de mes'}"></i></div>
       <div class="hstat"><span><b>${fmt(g)}</b> de ${fmt(obj)}</span>${obj ? `<span class="${dif < -30 ? 'bad' : dif > 30 ? 'ok' : ''}">${Math.abs(dif) < 15 ? 'al día ✓' : dif < 0 ? `faltan ${fmt(-dif)} a ${isCur ? 'hoy' : 'fin de mes'}` : `${fmt(dif)} por delante`}</span>` : '<span>sin presupuesto</span>'}</div>
       ${isCur && hoyP[c.id] ? `<small class="hhoy">hoy: ${fmt(hoyP[c.id])}</small>` : ''}</div>`;
@@ -294,23 +302,17 @@ async function pushDay(day, row, añadir){
 /* ---------- Automático en la nube: tu Apps Script registra a las 19:05 aunque no abras la app ---------- */
 // La app le manda el plan (minutos por día y cliente) y tu token de ClickUp. El aviso diario lo crea «instalarAutomatico» en el script.
 function cloudPlan(){
-  const hoy = O.today(), plan = {}, mes = monthOf(hoy);
-  const sig = fromIso(mes + '-01'); sig.setMonth(sig.getMonth() + 1); const mes2 = monthOf(iso(sig));
-  const hoyP = proposal(hoy);
-  for (const c of agencyClients()){
-    const tk = taskFor(c), team = teamOf(c); if (!tk || !team) continue;
-    // este mes: lo que toca hoy se repite los días que quedan (se recalcula cada vez que abres la app)
-    const m1 = hoyP[c.id] || 0;
-    if (m1) for (const d of workDays(mes).filter(d => d >= hoy)) (plan[d] = plan[d] || {})[tk.id] = {team, min: m1};
-    // mes siguiente: reparto parejo por si no abres la app en unos días
-    const t2 = target(mes2, c) * 60, wd2 = workDays(mes2);
-    if (t2 && wd2.length){ const m2 = Math.min(MAX_DIA, r5(t2 / wd2.length)); for (const d of wd2) (plan[d] = plan[d] || {})[tk.id] = {team, min: m2}; }
+  const hoy = O.today(), mes = monthOf(hoy), sig = fromIso(mes + '-01'); sig.setMonth(sig.getMonth() + 1);
+  const months = {};
+  for (const mo of [mes, monthOf(iso(sig))]){
+    months[mo] = agencyClients().map(c => { const tk = taskFor(c), team = teamOf(c), b = base(mo, c);
+      return tk && team && b ? {tid: tk.id, team, name: c.name, budget: Math.round(b * 60), factor: factor(mo, c)} : null; }).filter(Boolean);
   }
-  return plan;
+  return months;
 }
 async function sendCloud(conToken){
   const url = S.plan && S.plan.bridge; if (!url) throw new Error('conecta antes el Puente de Google (⚙)');
-  const body = {a: 'hoursplan', me: S.cu.me, start: (S.plan && S.plan.workStart) || '09:00', plan: cloudPlan()};
+  const body = {a: 'hoursplan', me: S.cu.me, start: (S.plan && S.plan.workStart) || '09:00', months: cloudPlan()};
   if (conToken) body.token = S.cu.token;
   const r = await fetch(url, {method: 'POST', body: JSON.stringify(body), headers: {'Content-Type': 'text/plain;charset=utf-8'}, redirect: 'follow'});
   const j = await r.json(); if (j.error) throw new Error(j.error);
