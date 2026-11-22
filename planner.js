@@ -424,6 +424,29 @@ function lanes(items){
   if (group.length) flush();
   return out;
 }
+function wkTasks(d, blk, its){
+  const works = its.filter(x => x.kind === 'work');
+  const T = O.visibleTasks();
+  return T.filter(t => { const sl = S.slots[t.id]; if (!sl || sl.day !== d) return false;
+    const m = toMin(sl.at); const b = works.find(w => m >= w.start && m < w.end) || works.find(w => w.start >= m) || works[works.length - 1];
+    return b && b.start === blk.start; }).sort(O.byOrder);
+}
+// Panel derecho de la semana: atrasadas, para hoy y sin fecha (arrástralas a un bloque)
+function wkSide(){
+  const hoy = O.today(), T = O.visibleTasks().filter(t => t.status !== 'done' && !t.ia && !(P().proc || {})[t.id]);
+  const futuro = t => { const sl = S.slots[t.id]; return sl && sl.day >= hoy; };
+  const libres = T.filter(t => !futuro(t));
+  const atr = libres.filter(t => { const sl = S.slots[t.id]; return (sl && sl.day < hoy) || (t.today && t.today < hoy) || (t.day && t.day < hoy); });
+  const hoyTs = libres.filter(t => !atr.includes(t) && (t.today === hoy || t.day === hoy));
+  const sin = libres.filter(t => !atr.includes(t) && !hoyTs.includes(t) && !t.day && !t.today);
+  const rank = (a, b) => O.urgRank(a) - O.urgRank(b) || O.byOrder(a, b);
+  const sec = (k, title, ts, empty) => `<div class="urg wk-l" data-field="unslot" data-wk="${k}"><h4>${title}<span>${ts.length}</span></h4>
+    <div class="list">${ts.sort(rank).map(t => O.card(t)).join('') || `<div class="empty">${empty}</div>`}</div></div>`;
+  return `<aside class="col side wk-side"><header><h3>Tareas para colocar</h3></header>
+    ${sec('atr', '⏪ Atrasadas', atr, 'Nada atrasado 👌')}
+    ${sec('hoy', '📌 Para hoy', hoyTs, 'Marca tareas con «Hoy» en Clientes')}
+    ${sec('sin', '🗂️ Sin fecha', sin, 'No hay tareas sin fecha')}</aside>`;
+}
 function weekView(){
   const days = weekDays(), m = O.fromIso(days[0]), dEnd = O.fromIso(days[6]);
   const rango = m.getMonth() === dEnd.getMonth() ? `${m.getDate()} – ${dEnd.getDate()} ${O.MESES[m.getMonth()]}` : `${m.getDate()} ${O.MESES[m.getMonth()]} – ${dEnd.getDate()} ${O.MESES[dEnd.getMonth()]}`;
@@ -450,13 +473,17 @@ function weekView(){
       const top = (i.start - H0) * PXM, h = Math.max(16, (i.end - i.start) * PXM - 2);
       const w = 100 / i.ncol, left = i.col * w;
       let cls = 'ev', color = i.color || '#8E8E93', label = esc(i.title || ''), extra = '';
-      if (i.kind === 'work'){ cls = 'work'; color = 'var(--accent)'; label = 'Trabajo'; const n = nTareas(d, i.at); extra = n ? ` · ${n} tarea${n > 1 ? 's' : ''}` : ''; }
+      let inner = '';
+      if (i.kind === 'work'){ cls = 'work'; color = 'var(--accent)'; label = 'Trabajo';
+        const ts = wkTasks(d, i, its); extra = ts.length ? ` · ${ts.filter(t => t.status === 'done').length}/${ts.length}` : '';
+        inner = `<div class="wk-ts">${ts.map(t => { const c = O.client(t.client);
+          return `<article class="card wk-t${t.status === 'done' ? ' done' : ''}" data-id="${t.id}" style="--c:${O.clientColor(c)}"><button class="chk" aria-label="Completar"></button><span class="tt">${esc(t.title)}</span></article>`; }).join('')}</div>`; }
       else if (i.kind === 'routine'){ cls = 'rout'; color = ROUTC[i.id] || '#A3A3AD'; }
       else if (i.isCall){ cls = 'call'; color = '#A78BFA'; label = '📞 ' + label; }
       else if (i.kind === 'free'){ cls = 'free'; }
       const past = d < hoy || (d === hoy && i.end <= nowMin);
-      return `<div class="wk-ev ${cls}${past ? ' past' : ''}" ${i.kind === 'work' ? `data-wbuild="${d}"` : ''} style="top:${top}px;height:${h}px;left:calc(${left}% + 1px);width:calc(${w}% - 3px);--c:${color}" title="${label.replace(/"/g, '')} · ${toHM(i.start)}–${toHM(i.end)}">
-        <b>${label}</b>${h > 26 ? `<small>${toHM(i.start)} – ${toHM(i.end)}${extra}</small>` : ''}</div>`;
+      return `<div class="wk-ev ${cls}${past ? ' past' : ''}" ${i.kind === 'work' ? `data-wbuild="${d}" data-field="slot" data-value="${i.at}" data-day="${d}"` : ''} style="top:${top}px;height:${h}px;left:calc(${left}% + 1px);width:calc(${w}% - 3px);--c:${color}" title="${label.replace(/"/g, '')} · ${toHM(i.start)}–${toHM(i.end)}">
+        <b>${label}</b>${h > 26 ? `<small>${toHM(i.start)} – ${toHM(i.end)}${extra}</small>` : ''}${inner}</div>`;
     }).join('');
     const line = d === hoy && nowMin >= H0 && nowMin <= H1 ? `<i class="wk-now" style="top:${(nowMin - H0) * PXM}px"></i>` : '';
     return `<div class="wk-col${d === hoy ? ' today' : ''}" data-wday="${d}">${blocks}${line}</div>`;
@@ -465,9 +492,9 @@ function weekView(){
     return `<button type="button" class="wk-head${d === hoy ? ' today' : ''}" data-wopen="${d}"><small>${O.DIAS_L[x.getDay()].slice(0, 3).toUpperCase()}</small><b>${x.getDate()}</b>
       ${allDay.slice(0, 2).map(e => `<span class="wk-all" style="--c:${e.color || '#8E8E93'}">${esc(e.title)}</span>`).join('')}</button>`; }).join('');
   const msg = calError ? `<div class="note warnbox">${esc(calError)}</div>` : weekLoading ? '<div class="note">Cargando la semana…</div>' : '';
-  return `${msg}<div class="wk"><div class="wk-grid"><div class="wk-corner"></div>${heads}
+  return `${msg}<div class="wk-wrap"><div class="wk"><div class="wk-grid"><div class="wk-corner"></div>${heads}
     <div class="wk-hours" style="height:${(H1 - H0) * PXM}px">${hours}</div>
-    <div class="wk-cols" style="height:${(H1 - H0) * PXM}px">${cols}</div></div></div>`;
+    <div class="wk-cols" style="height:${(H1 - H0) * PXM}px" data-h0="${H0}" data-pxm="${PXM}">${cols}</div></div></div>${wkSide()}</div>`;
 }
 O.views.dia = function(){ return S.diaMode === 'semana' ? weekView() : diaView(); };
 O.views.dia.after = diaAfter;
@@ -478,8 +505,37 @@ document.addEventListener('click', e => {
   if (w){ const n = +w.dataset.pweek; planDay = n === 0 ? O.today() : O.iso(O.addDays(O.fromIso(planDay), 7 * n)); lastEvents = []; O.render(); return; }
   const o = e.target.closest('[data-wopen]');
   if (o){ planDay = o.dataset.wopen; S.diaMode = 'dia'; lastEvents = weekEv[planDay] || []; O.render(); refresh(); return; }
-  const b = e.target.closest('[data-wbuild]');
+  const b = !e.target.closest('.card') && !wkJustMade && e.target.closest('[data-wbuild]');
   if (b){ planDay = b.dataset.wbuild; lastEvents = weekEv[planDay] || []; openBuild(planDay); }
+});
+let wkJustMade = false;
+function wkAddBlock(day, s, e){
+  const blocks = P().dayBlocks = P().dayBlocks || {};
+  if (!blocks[day]) blocks[day] = day >= MANUAL_FROM ? [] : buildDay(day, weekEv[day] || [], true).filter(i => i.kind === 'work').map(i => ({id: Math.random().toString(36).slice(2, 8), start: i.start, end: i.end}));
+  blocks[day].push({id: Math.random().toString(36).slice(2, 8), start: s, end: e});
+  blocks[day].sort((a, b) => a.start - b.start);
+  O.save(); O.render(); O.toast(`Bloque de trabajo ${toHM(s)} – ${toHM(e)}`);
+}
+document.addEventListener('pointerdown', e => {
+  const col = e.target.closest('.wk-col'); if (!col || e.target.closest('.wk-ev') || e.button !== 0) return;
+  const cols = col.closest('.wk-cols'), H0 = +cols.dataset.h0, PXM = +cols.dataset.pxm, day = col.dataset.wday;
+  const atY = y => { const r = col.getBoundingClientRect(); return Math.max(H0, Math.min(24 * 60, H0 + Math.round((y - r.top) / PXM / 15) * 15)); };
+  const s0 = atY(e.clientY);
+  if (e.pointerType === 'touch'){ // en el móvil: tocar un hueco crea un bloque de 1 h (arrastrar sigue siendo hacer scroll)
+    const sx = e.clientX, sy = e.clientY;
+    const up = ev => { removeEventListener('pointerup', up); if (Math.hypot(ev.clientX - sx, ev.clientY - sy) < 8 && confirm(`¿Crear bloque de trabajo de 1 h a las ${toHM(s0)}?`)) wkAddBlock(day, s0, Math.min(24 * 60, s0 + 60)); };
+    addEventListener('pointerup', up); return;
+  }
+  e.preventDefault();
+  const g = document.createElement('div'); g.className = 'wk-ev work wk-new'; col.appendChild(g);
+  let s = s0, en = s0 + 15;
+  const draw = () => { g.style.top = (s - H0) * PXM + 'px'; g.style.height = (en - s) * PXM + 'px'; g.style.left = '1px'; g.style.width = 'calc(100% - 3px)'; g.innerHTML = `<b>Trabajo</b><small>${toHM(s)} – ${toHM(en)}</small>`; };
+  draw();
+  const mv = ev => { const m = atY(ev.clientY); if (m >= s0){ s = s0; en = Math.max(s0 + 15, m); } else { s = m; en = s0 + 15; } draw(); };
+  const up = () => { removeEventListener('pointermove', mv); removeEventListener('pointerup', up); g.remove();
+    wkJustMade = true; setTimeout(() => wkJustMade = false, 100);
+    if (en - s >= 15) wkAddBlock(day, s, en); };
+  addEventListener('pointermove', mv); addEventListener('pointerup', up);
 });
 try { S.diaMode = localStorage.getItem('jp-diamode') || 'dia'; } catch(e){ S.diaMode = 'dia'; }
 // al guardar bloques o refrescar el calendario, la semana se recarga
