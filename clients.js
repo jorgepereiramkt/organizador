@@ -101,7 +101,7 @@ function compara(c){
   const act = misActuales(), top = act.slice().sort((a, b) => media(b) - media(a))[0], tot = act.reduce((s, x) => s + media(x), 0);
   if (!top || !media(top) || estadoDe(c) !== 'actual') return '';
   const m = media(c), pct = tot ? Math.round(m / tot * 100) : 0, h = +c.hours || 0;
-  const vs = c.id === top.id ? '<span class="cmp top">👑 El que más te paga</span>'
+  const vs = c.id === top.id ? '<span class="cmp cmp-top">👑 El que más te paga</span>'
     : !m ? '<span class="cmp warn">No te aporta ingresos</span>'
     : `<span class="cmp" title="Necesitarías ${(media(top) / m).toFixed(1).replace('.', ',')} clientes como este para ganar lo mismo que con ${esc(top.name)}">×${(media(top) / m).toFixed(1).replace('.', ',').replace(',0', '')} para igualar a ${esc(top.name)}</span>`;
   return `<div class="cmps">${vs}${m ? `<span class="cmp">${pct}% de tus ingresos</span>` : ''}${h && m ? `<span class="cmp">${Math.round(m / h)} €/h</span>` : ''}</div>`;
