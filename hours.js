@@ -63,8 +63,11 @@ function factor(month, c){
   if (!m[c.id]) { m[c.id] = Math.round((1.10 + Math.random() * 0.10) * 100) / 100; setTimeout(O.save, 0); }
   return m[c.id];
 }
-const base = (month, c) => { const {est, real} = mdata(month, c); return real || est || 0; };   // horas del mes (sin margen)
-const target = (month, c) => base(month, c) * (base(month, c) ? factor(month, c) : 1);   // horas a registrar en el mes (con margen)
+const base = (month, c) => { const {est, real} = mdata(month, c); return est || real || 0; };   // presupuesto del mes
+// variación del mes en horas (+/-): la que pongas tú; si no pones nada, el margen al azar del 10-20 %
+const varH = (month, c) => { const v = ((H().months[month] || {})[c.id] || {}).var; return v !== undefined && v !== null && v !== '' ? +v : Math.round(base(month, c) * (factor(month, c) - 1) * 4) / 4; };
+const varManual = (month, c) => { const v = ((H().months[month] || {})[c.id] || {}).var; return v !== undefined && v !== null && v !== ''; };
+const target = (month, c) => base(month, c) ? Math.max(0, base(month, c) + varH(month, c)) : 0;   // horas a registrar en el mes
 // lo que deberías llevar registrado hasta un día (incluido), repartido por días laborables
 const expectedTo = (month, c, day) => { const wd = workDays(month); return wd.length ? target(month, c) * 60 * wd.filter(d => d <= day).length / wd.length : 0; };
 
@@ -159,8 +162,8 @@ O.views.clientes = function(){
     return `<div class="hcard" style="--c:${O.clientColor(c)}">
       <header><b><i></i>${esc(c.name)}</b>${tk ? `<a href="${esc(tk.url || '#')}" target="_blank" rel="noopener" title="${esc(tk.title)}">⏱</a>` : '<span title="Sin «⭐ Tarea Principal ⭐» asignada a ti">⚠️</span>'}</header>
       <div class="hnums"><label>Presupuesto<input type="number" min="0" step="0.5" value="${est || ''}" data-hmk="est" data-cid="${c.id}" placeholder="0"><small>h</small></label>
-        <label title="Si le dedicas otras horas de verdad, ponlas aquí: es lo que se reparte y se registra">A registrar<input type="number" min="0" step="0.5" value="${real && real !== est ? real : ''}" data-hmk="real" data-cid="${c.id}" placeholder="${est || 0}"><small>h</small></label></div>
-      ${base(month, c) ? `<small class="hobj">Objetivo con margen: <b>${fmt(obj)}</b> (+${Math.round((factor(month, c) - 1) * 100)}%)</small>` : ''}
+        <label title="Horas de más (+) o de menos (−) este mes. Si lo dejas vacío, se usa un margen al azar del 10-20 %">Variación<input type="number" step="0.5" value="${varManual(month, c) ? varH(month, c) : ''}" data-hmk="var" data-cid="${c.id}" placeholder="${base(month, c) ? (varH(month, c) >= 0 ? '+' : '') + varH(month, c) : '±0'}"><small>h</small></label></div>
+      ${base(month, c) ? `<small class="hobj">Objetivo del mes: <b>${fmt(obj)}</b> (${est || real} h ${varH(month, c) >= 0 ? '+' : '−'} ${Math.abs(varH(month, c))} h${varManual(month, c) ? '' : ', al azar'})</small>` : ''}
       <div class="hbar"><span style="width:${pct}%"></span><i style="left:${pexp}%" title="Lo que deberías llevar a ${isCur ? 'hoy' : 'final de mes'}"></i></div>
       <div class="hstat"><span><b>${fmt(g)}</b> de ${fmt(obj)}</span>${obj ? `<span class="${dif < -30 ? 'bad' : dif > 30 ? 'ok' : ''}">${Math.abs(dif) < 15 ? 'al día ✓' : dif < 0 ? `faltan ${fmt(-dif)} a ${isCur ? 'hoy' : 'fin de mes'}` : `${fmt(dif)} por delante`}</span>` : '<span>sin presupuesto</span>'}</div>
       ${isCur && hoyP[c.id] ? `<small class="hhoy">hoy: ${fmt(hoyP[c.id])}</small>` : ''}</div>`;
@@ -209,7 +212,10 @@ document.addEventListener('change', e => {
   if (t.id === 'hAuto'){ H().auto = t.checked; O.save(); O.render(); }
   if (t.dataset.hmk){
     const mo = (H().months[viewMonth] = H().months[viewMonth] || {}), row = (mo[t.dataset.cid] = mo[t.dataset.cid] || {});
-    row[t.dataset.hmk] = Math.max(0, parseFloat(t.value) || 0);
+    if (t.dataset.hmk === 'var'){ if (t.value === '') delete row.var; else row.var = parseFloat(t.value) || 0; }
+    else row[t.dataset.hmk] = Math.max(0, parseFloat(t.value) || 0);
+    if (t.dataset.hmk === 'est') delete row.real;   // ya no se usa «A registrar»: manda el presupuesto
+    const hc = H().cloud; if (hc && hc.on) { hc.at = 0; setTimeout(() => cloudSync(), 500); }   // el script recibe el cambio al momento
     O.save(); O.render();
   }
 });
@@ -306,7 +312,7 @@ function cloudPlan(){
   const months = {};
   for (const mo of [mes, monthOf(iso(sig))]){
     months[mo] = agencyClients().map(c => { const tk = taskFor(c), team = teamOf(c), b = base(mo, c);
-      return tk && team && b ? {tid: tk.id, team, name: c.name, budget: Math.round(b * 60), factor: factor(mo, c)} : null; }).filter(Boolean);
+      return tk && team && b ? {tid: tk.id, team, name: c.name, budget: Math.round(target(mo, c) * 60), factor: 1} : null; }).filter(Boolean);
   }
   return months;
 }
