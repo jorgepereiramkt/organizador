@@ -70,30 +70,50 @@ const base = (month, c) => { const {est, real} = mdata(month, c); return est || 
 // variación del mes en horas (+/-): la que pongas tú; si no pones nada, el margen al azar del 10-20 %
 const varH = (month, c) => { const v = ((H().months[month] || {})[c.id] || {}).var; return v !== undefined && v !== null && v !== '' ? +v : Math.round(base(month, c) * (factor(month, c) - 1) * 4) / 4; };
 const varManual = (month, c) => { const v = ((H().months[month] || {})[c.id] || {}).var; return v !== undefined && v !== null && v !== ''; };
-const target = (month, c) => base(month, c) ? Math.max(0, base(month, c) + varH(month, c)) : 0;   // horas a registrar en el mes
+// Total del mes: las horas que vas a trabajar ese mes. Lo que no va a clientes va a «Jorge Personal» (relleno).
+const DIA_MIN = 450, DIA_MAX = 570;   // cada día entre 7 h 30 y 9 h 30 en total
+const isFiller = c => /jorge\s*personal/i.test(c.name || '');
+const monthTotal = month => +((H().months[month] || {})._total) || 0;   // horas
+const clientTarget = (month, c) => base(month, c) ? Math.max(0, base(month, c) + varH(month, c)) : 0;
+const target = (month, c) => {
+  if (isFiller(c) && monthTotal(month)) return Math.max(0, monthTotal(month) - agencyClients().filter(x => !isFiller(x)).reduce((s, x) => s + clientTarget(month, x), 0));
+  return clientTarget(month, c);
+};   // horas a registrar en el mes
 // lo que deberías llevar registrado hasta un día (incluido), repartido por días laborables
 const expectedTo = (month, c, day) => { const wd = workDays(month); return wd.length ? target(month, c) * 60 * wd.filter(d => d <= day).length / wd.length : 0; };
 
 /* ---------- Rellenar hasta hoy: reparte lo que falta en los días sin registrar (máx. 1 h 30 por día) ---------- */
 function fillPlan(month){
-  const hoy = O.today(), plan = {}, resumen = [];
-  const dias = workDays(month).filter(d => d <= hoy);
-  for (const c of agencyClients()){
-    const tk = taskFor(c); if (!tk || !target(month, c)) continue;
-    const reg = registered(month, c.id) || 0, falta = Math.round(expectedTo(month, c, hoy) - reg);
-    // días «flojos»: sin nada o con algo testimonial (menos de 15 min, p. ej. 1 min): ahí se completa
-    const flojos = dias.filter(d => regDay(month, c.id, d) < 15); if (falta < 15 || !flojos.length) continue;
-    let resto = falta; const media = falta / flojos.length;
-    flojos.forEach((d, k) => {
-      if (resto < 5) return;
-      const ultimo = k === flojos.length - 1;
-      let m = ultimo ? resto : r5(media * (0.8 + Math.random() * 0.4));   // con variación, para que no sea siempre igual
-      m = Math.min(Math.max(m, 15), resto, ultimo ? 150 : 120);
-      m = r5(m); if (!m) return;
-      (plan[d] = plan[d] || {})[c.id] = m; resto -= m;
-    });
-    resumen.push({c, falta, dias: flojos.filter(d => plan[d] && plan[d][c.id]).length, total: falta - Math.max(0, resto)});
+  const hoy = O.today(), plan = {}, tot = {};
+  const wd = workDays(month), dias = wd.filter(d => d <= hoy), cs = agencyClients().filter(c => taskFor(c));
+  const diaReg = d => cs.reduce((s, c) => s + regDay(month, c.id, d), 0);
+  // días «flojos»: sin registrar o con algo testimonial (menos de 1 h en total)
+  const flojos = dias.filter(d => diaReg(d) < 60); if (!flojos.length) return {plan, resumen: []};
+  const rnd = (a, b) => a + Math.random() * (b - a);
+  // lo que falta a cada cliente (sin contar el relleno) repartido entre los días flojos, con variación
+  const reparto = {};
+  for (const c of cs.filter(c => !isFiller(c) || !monthTotal(month))){
+    if (!target(month, c)) continue;
+    let resto = Math.round(expectedTo(month, c, hoy) - (registered(month, c.id) || 0)); if (resto < 15) continue;
+    const media = resto / flojos.length;
+    flojos.forEach((d, k) => { if (resto < 5) return; let m = k === flojos.length - 1 ? resto : r5(media * rnd(0.8, 1.2)); m = r5(Math.min(Math.max(m, 15), resto, 150)); if (!m) return; (reparto[d] = reparto[d] || {})[c.id] = m; resto -= m; });
   }
+  // total del día entre 7 h 30 y 9 h 30 (para cuadrar el mes); la diferencia, a Jorge Personal
+  const f = cs.find(isFiller), T = monthTotal(month) * 60;
+  let faltaTot = T ? Math.round(T * dias.length / wd.length - cs.reduce((s, c) => s + (registered(month, c.id) || 0), 0)) : 0;
+  flojos.forEach((d, k) => {
+    const row = reparto[d] || {}, ya = diaReg(d);
+    if (f && T){
+      let D = k === flojos.length - 1 ? faltaTot : faltaTot / (flojos.length - k) * rnd(0.92, 1.08);
+      D = Math.min(DIA_MAX, Math.max(DIA_MIN, D)) - ya;
+      let sc = Object.values(row).reduce((a, b) => a + b, 0);
+      if (sc > D){ for (const id in row) row[id] = r5(row[id] * D / sc); sc = Object.values(row).reduce((a, b) => a + b, 0); }
+      const rel = r5(Math.max(0, D - sc)); if (rel) row[f.id] = rel;
+      faltaTot -= ya + Object.values(row).reduce((a, b) => a + b, 0);
+    }
+    for (const id in row){ if (!row[id]) continue; (plan[d] = plan[d] || {})[id] = row[id]; tot[id] = tot[id] || {m: 0, n: 0}; tot[id].m += row[id]; tot[id].n++; }
+  });
+  const resumen = Object.entries(tot).map(([id, t]) => ({c: O.client(id), total: t.m, dias: t.n}));
   return {plan, resumen};
 }
 async function fillToToday(month){
@@ -101,7 +121,8 @@ async function fillToToday(month){
   await loadRegistered(month);
   const {plan, resumen} = fillPlan(month);
   if (!resumen.length) return O.toast('Nada que rellenar: vas al día ✓');
-  const txt = resumen.map(r => `• ${r.c.name}: ${fmt(r.total)} en ${r.dias} día${r.dias > 1 ? 's' : ''}`).join('\n');
+  resumen.sort((a, b) => b.total - a.total);
+  const txt = resumen.map(r => `• ${r.c.name}: ${fmt(r.total)} en ${r.dias} día${r.dias > 1 ? 's' : ''}`).join('\n') + (monthTotal(month) ? '\n\nCada día quedará entre 7 h 30 y 9 h 30 en total: lo que no es de clientes va a Jorge Personal.' : '');
   if (!confirm(`Voy a registrar en ClickUp (en la «⭐ Tarea Principal ⭐» de cada cliente) lo que falta hasta hoy, en los días sin registrar o con solo unos minutos (de 15 min a 2 h por cliente y día, con variación):\n\n${txt}\n\n¿Lo registro?`)) return;
   let n = 0;
   for (const d of Object.keys(plan).sort()){ await pushDay(d, plan[d], true); n++; }
@@ -121,8 +142,19 @@ function proposal(day){
     // si hoy ya se registró algo, no contarlo dos veces
     const yaHoy = H().cu[day] && H().cu[day][c.id] ? (todayLogged[c.id] || 0) : 0;
     const base = reg !== undefined ? reg - yaHoy : sumLog(c.id, month, day);
+    if (isFiller(c) && monthTotal(month)) continue;   // el relleno se calcula al final
     const falta = target(month, c) * 60 - base;
     out[c.id] = falta <= 0 ? 0 : Math.min(MAX_DIA, r5(Math.max(15, falta / left)), r5(falta));
+  }
+  const f = agencyClients().find(isFiller);
+  if (f && monthTotal(month)){
+    const prev = agencyClients().reduce((s, c) => s + (registered(month, c.id) || 0) - regDay(month, c.id, day), 0);
+    let D = Math.min(DIA_MAX, Math.max(DIA_MIN, (monthTotal(month) * 60 - prev) / left));
+    const yaHoy = agencyClients().reduce((s, c) => s + regDay(month, c.id, day), 0);
+    let sc = Object.values(out).reduce((a, b) => a + b, 0);
+    if (sc > D){ for (const k in out) out[k] = r5(out[k] * D / sc); sc = Object.values(out).reduce((a, b) => a + b, 0); }
+    out[f.id] = r5(Math.max(0, D - sc));
+    void yaHoy;
   }
   return out;
 }
@@ -173,9 +205,9 @@ O.views.clientes = function(){
     const pct = obj ? Math.min(100, Math.round(g / obj * 100)) : 0, pexp = obj ? Math.min(100, Math.round(exp / obj * 100)) : 0, dif = g - exp;
     return `<div class="hcard" style="--c:${O.clientColor(c)}">
       <header><b><i></i>${esc(c.name)}</b>${tk ? `<a href="${esc(tk.url || '#')}" target="_blank" rel="noopener" title="${esc(tk.title)}">⏱</a>` : '<span title="Sin «⭐ Tarea Principal ⭐» asignada a ti">⚠️</span>'}</header>
-      <div class="hnums"><label>Presupuesto<input type="number" min="0" step="0.5" value="${est || ''}" data-hmk="est" data-cid="${c.id}" placeholder="0"><small>h</small></label>
-        <label title="Horas de más (+) o de menos (−) este mes. Si lo dejas vacío, se usa un margen al azar del 10-20 %">Variación<input type="number" step="0.5" value="${varManual(month, c) ? varH(month, c) : ''}" data-hmk="var" data-cid="${c.id}" placeholder="${base(month, c) ? (varH(month, c) >= 0 ? '+' : '') + varH(month, c) : '±0'}"><small>h</small></label></div>
-      ${base(month, c) ? `<small class="hobj">Objetivo del mes: <b>${fmt(obj)}</b> (${est || real} h ${varH(month, c) >= 0 ? '+' : '−'} ${String(Math.abs(varH(month, c))).replace('.', ',')} h${varManual(month, c) ? '' : ', al azar'})</small>` : ''}
+      ${isFiller(c) && monthTotal(month) ? `<div class="hfill">🧩 Se calcula solo: <b>${fmt(obj)}</b> = ${monthTotal(month)} h del mes − horas de clientes</div>` : `<div class="hnums"><label>Presupuesto<input type="number" min="0" step="0.5" value="${est || ''}" data-hmk="est" data-cid="${c.id}" placeholder="0"><small>h</small></label>
+        <label title="Horas de más (+) o de menos (−) este mes. Si lo dejas vacío, se usa un margen al azar del 10-20 %">Variación<input type="number" step="0.5" value="${varManual(month, c) ? varH(month, c) : ''}" data-hmk="var" data-cid="${c.id}" placeholder="${base(month, c) ? (varH(month, c) >= 0 ? '+' : '') + varH(month, c) : '±0'}"><small>h</small></label></div>`}
+      ${base(month, c) && !(isFiller(c) && monthTotal(month)) ? `<small class="hobj">Objetivo del mes: <b>${fmt(obj)}</b> (${est || real} h ${varH(month, c) >= 0 ? '+' : '−'} ${String(Math.abs(varH(month, c))).replace('.', ',')} h${varManual(month, c) ? '' : ', al azar'})</small>` : ''}
       <div class="hbar"><span style="width:${pct}%"></span><i style="left:${pexp}%" title="Lo que deberías llevar a ${isCur ? 'hoy' : 'final de mes'}"></i></div>
       <div class="hstat"><span><b>${fmt(g)}</b> de ${fmt(obj)}</span>${obj ? `<span class="${dif < -30 ? 'bad' : dif > 30 ? 'ok' : ''}">${Math.abs(dif) < 15 ? 'al día ✓' : dif < 0 ? `faltan ${fmt(-dif)} a ${isCur ? 'hoy' : 'fin de mes'}` : `${fmt(dif)} por delante`}</span>` : '<span>sin presupuesto</span>'}</div>
       ${isCur && hoyP[c.id] ? `<small class="hhoy">hoy: ${fmt(hoyP[c.id])}</small>` : ''}</div>`;
@@ -194,6 +226,7 @@ O.views.clientes = function(){
   const atrasado = isCur && cs.some(c => target(month, c) && expectedTo(month, c, hoyD) - (registered(month, c.id) || 0) >= 15);
   return `<div class="hbox hbox2">
     <div class="hhead">
+      <label class="hmes">Horas que vas a trabajar este mes<span><input type="number" min="0" step="0.5" data-htotal value="${monthTotal(month) || ''}" placeholder="${Math.round(wd.length * 8.5)}"> h</span><small>${monthTotal(month) ? `≈ ${fmt(monthTotal(month) * 60 / Math.max(1, wd.length))}/día · cada día entre 7 h 30 y 9 h 30` : 'pon el total y lo que no sea de clientes irá a Jorge Personal'}</small></label>
       <div class="htot"><span><b>${fmt(tG)}</b><small>registrado</small></span><span><b>${fmt(tX)}</b><small>deberías llevar a ${isCur ? 'hoy' : 'fin de mes'}</small></span><span><b>${fmt(tP)}</b><small>presupuesto del mes</small></span></div>
       <span class="sp"></span>
       ${isCur ? `<button class="btn primary${atrasado ? '' : ' muted'}" data-hfill>⏩ Rellenar hasta hoy</button>` : ''}
@@ -221,6 +254,8 @@ O.views.clientes.after = () => {
 };
 document.addEventListener('change', e => {
   const t = e.target;
+  if (t.dataset.htotal !== undefined){ const mo = (H().months[viewMonth] = H().months[viewMonth] || {}); if (t.value === '') delete mo._total; else mo._total = Math.max(0, parseFloat(t.value) || 0);
+    O.save(); const hc = H().cloud; if (hc && hc.on){ hc.at = 0; setTimeout(() => cloudSync(), 300); } O.render(); return; }
   if (t.id === 'hAuto'){ H().auto = t.checked; O.save(); O.render(); }
   if (t.dataset.hmk){
     const mo = (H().months[viewMonth] = H().months[viewMonth] || {}), row = (mo[t.dataset.cid] = mo[t.dataset.cid] || {});
@@ -325,8 +360,8 @@ function cloudPlan(){
   const hoy = O.today(), mes = monthOf(hoy), sig = fromIso(mes + '-01'); sig.setMonth(sig.getMonth() + 1);
   const months = {};
   for (const mo of [mes, monthOf(iso(sig))]){
-    months[mo] = agencyClients().map(c => { const tk = taskFor(c), team = teamOf(c), b = base(mo, c);
-      return tk && team && b ? {tid: tk.id, team, name: c.name, budget: Math.round(target(mo, c) * 60), factor: 1} : null; }).filter(Boolean);
+    months[mo] = {total: Math.round(monthTotal(mo) * 60), clients: agencyClients().map(c => { const tk = taskFor(c), team = teamOf(c), t = target(mo, c);
+      return tk && team && (t || isFiller(c)) ? {tid: tk.id, team, name: c.name, budget: Math.round(t * 60), factor: 1, filler: isFiller(c)} : null; }).filter(Boolean)};
   }
   return months;
 }
