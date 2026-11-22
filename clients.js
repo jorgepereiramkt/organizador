@@ -14,7 +14,7 @@ const NO_SERVICIO = /onboarding|review|strategy|tarea principal|general|interno|
 /* ---------- Vista: Clientes → Tareas | Fichas ---------- */
 const tareas = O.views.clientes;
 O.views.clientes = function(){
-  if (S.clientMode === 'cartera') return cartera();
+  if (S.clientMode === 'cartera') S.clientMode = 'fichas';   // la Cartera ya está dentro de Fichas
   if (S.clientMode !== 'fichas') return tareas();
   O.setToolbar('Clientes', 'servicios y cómo los resuelves', '', 'Toca una ficha para editarla');
   const grupos = [['mine', 'Mis clientes', '🔒 Solo en la app'], ['agency', 'Agencia', 'ClickUp']];
@@ -54,8 +54,7 @@ O.views.clientes.after = () => {
   sw.className = 'modes';
   sw.innerHTML = `<button class="chip" data-cmode="tareas" aria-pressed="${S.clientMode !== 'fichas'}">Tareas</button>
     <button class="chip" data-cmode="hoy" aria-pressed="${S.clientMode === 'hoy'}">Tareas hoy</button>
-    <button class="chip" data-cmode="fichas" aria-pressed="${S.clientMode === 'fichas'}">Fichas</button>
-    <button class="chip" data-cmode="cartera" aria-pressed="${S.clientMode === 'cartera'}">Cartera</button>`;
+    <button class="chip" data-cmode="fichas" aria-pressed="${S.clientMode === 'fichas'}">Fichas</button>`;
   tb.insertBefore(sw, tb.querySelector('.sp'));
 };
 $('#toolbar').addEventListener('click', e => {

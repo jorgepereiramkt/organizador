@@ -40,19 +40,53 @@ async function loadRegistered(month = viewMonth){
   try {
     const [y, m] = month.split('-').map(Number);
     const start = new Date(y, m - 1, 1).getTime(), end = new Date(y, m, 1).getTime() - 1;
-    const out = {};
+    const out = {}, byDay = {};
     for (const c of agencyClients()){
       const tk = taskFor(c), team = teamOf(c);
       if (!tk || !team) continue;
       const r = await O.cu(`/team/${team}/time_entries?start_date=${start}&end_date=${end}&task_id=${tk.id}&assignee=${S.cu.me}`);
-      out[c.id] = Math.round((r.data || []).reduce((a, e) => a + (+e.duration > 0 ? +e.duration : 0), 0) / 60000);
+      const dd = byDay[c.id] = {};
+      for (const e of r.data || []){ const m = +e.duration > 0 ? +e.duration / 60000 : 0; if (!m) continue; const d = iso(new Date(+e.start)); dd[d] = (dd[d] || 0) + m; }
+      for (const d in dd) dd[d] = Math.round(dd[d]);
+      out[c.id] = Object.values(dd).reduce((a, b) => a + b, 0);
     }
-    H().reg[month] = {at: Date.now(), byClient: out}; O.save();
+    H().reg[month] = {at: Date.now(), byClient: out, byDay}; O.save();
   } catch(e){ O.toast('No pude leer las horas de ClickUp: ' + e.message); }
   loadingReg = false;
   if (S.view === 'clientes' && S.clientMode === 'horas') O.render();
 }
 const registered = (month, cid) => ((H().reg[month] || {}).byClient || {})[cid];
+const regDay = (month, cid, day) => (((H().reg[month] || {}).byDay || {})[cid] || {})[day] || 0;
+const target = (month, c) => { const {est, real} = mdata(month, c); return real || est || 0; };   // horas a registrar en el mes
+// lo que deberías llevar registrado hasta un día (incluido), repartido por días laborables
+const expectedTo = (month, c, day) => { const wd = workDays(month); return wd.length ? target(month, c) * 60 * wd.filter(d => d <= day).length / wd.length : 0; };
+
+/* ---------- Rellenar hasta hoy: reparte lo que falta en los días sin registrar (máx. 1 h 30 por día) ---------- */
+function fillPlan(month){
+  const hoy = O.today(), plan = {}, resumen = [];
+  const dias = workDays(month).filter(d => d <= hoy);
+  for (const c of agencyClients()){
+    const tk = taskFor(c); if (!tk || !target(month, c)) continue;
+    const reg = registered(month, c.id) || 0, falta = Math.round(expectedTo(month, c, hoy) - reg);
+    const vacios = dias.filter(d => !regDay(month, c.id, d)); if (falta < 15 || !vacios.length) continue;
+    let resto = falta; const por = Math.min(MAX_DIA, Math.max(15, r5(falta / vacios.length)));
+    for (const d of vacios){ if (resto < 5) break; const m = Math.min(por, r5(resto)); if (!m) break; (plan[d] = plan[d] || {})[c.id] = m; resto -= m; }
+    resumen.push({c, falta, dias: vacios.filter(d => plan[d] && plan[d][c.id]).length, total: falta - Math.max(0, resto)});
+  }
+  return {plan, resumen};
+}
+async function fillToToday(month){
+  if (!O.online()) return O.toast('Conecta ClickUp primero');
+  await loadRegistered(month);
+  const {plan, resumen} = fillPlan(month);
+  if (!resumen.length) return O.toast('Nada que rellenar: vas al día ✓');
+  const txt = resumen.map(r => `• ${r.c.name}: ${fmt(r.total)} en ${r.dias} día${r.dias > 1 ? 's' : ''}`).join('\n');
+  if (!confirm(`Voy a registrar en ClickUp (en la «⭐ Tarea Principal ⭐» de cada cliente) lo que falta hasta hoy, en los días que no tienen nada (máx. 1 h 30 por cliente y día):\n\n${txt}\n\n¿Lo registro?`)) return;
+  let n = 0;
+  for (const d of Object.keys(plan).sort()){ await pushDay(d, plan[d], true); n++; }
+  O.toast(`⏱ Rellenado: ${n} día${n > 1 ? 's' : ''} registrados en ClickUp`);
+  H().reg[month] = null; await loadRegistered(month);
+}
 
 /* ---------- Reparto del día ---------- */
 // Lo que toca hoy a cada cliente para llegar a lo real: lo que falta / días laborables que quedan (máx. 1 h 30)
@@ -108,31 +142,45 @@ O.views.clientes = function(){
      <button class="icon" data-hm="1" aria-label="Mes siguiente"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m9 18 6-6-6-6"/></svg></button>`, '');
   const reg = H().reg[month];
   if (O.online() && (!reg || Date.now() - reg.at > 10 * 60e3)) setTimeout(() => loadRegistered(month), 50);
-  const hoy = isCur ? (H().log[O.today()] || proposal(O.today())) : {};
-  let tE = 0, tR = 0, tG = 0;
-  const rows = agencyClients().map(c => {
-    const {est, real} = mdata(month, c), g = registered(month, c.id), tk = taskFor(c);
-    tE += est; tR += real; tG += g || 0;
-    const pct = real ? Math.min(100, Math.round((g || 0) / (real * 60) * 100)) : 0;
-    const falta = real ? Math.max(0, real * 60 - (g || 0)) : 0;
-    return `<div class="hrow2" style="--c:${O.clientColor(c)}">
-      <b class="hn"><i></i>${esc(c.name)}</b>
-      <label class="hin">Estimado<input type="number" min="0" step="0.5" value="${est || ''}" data-hmk="est" data-cid="${c.id}" placeholder="0"> h</label>
-      <label class="hin">Real<input type="number" min="0" step="0.5" value="${real || ''}" data-hmk="real" data-cid="${c.id}" placeholder="0"> h</label>
-      <div class="hreg"><div class="bar"><span style="width:${pct}%"></span></div>
-        <small>${g === undefined ? (O.online() ? 'leyendo ClickUp…' : 'sin ClickUp') : `Registrado ${fmt(g)} · faltan ${fmt(falta)}`}</small></div>
-      <span class="num hoy">${hoy[c.id] ? 'hoy ' + fmt(hoy[c.id]) : ''}</span>
-      <span class="reg">${tk ? `⏱ <a href="${esc(tk.url || '#')}" target="_blank" rel="noopener">${esc(tk.title)}</a>` : (O.online() ? '⚠️ sin «⭐ Tarea Principal ⭐» asignada a ti' : '')}</span></div>`;
+  const hoyD = O.today(), hoyP = isCur ? (H().log[hoyD] || proposal(hoyD)) : {};
+  const cs = agencyClients(), refDay = isCur ? hoyD : (month < monthOf(hoyD) ? wd[wd.length - 1] : wd[0]);
+  let tP = 0, tG = 0, tX = 0;
+  const cards = cs.map(c => {
+    const {est, real} = mdata(month, c), g = registered(month, c.id) || 0, obj = target(month, c) * 60, exp = Math.round(expectedTo(month, c, refDay)), tk = taskFor(c);
+    tP += obj; tG += g; tX += exp;
+    const pct = obj ? Math.min(100, Math.round(g / obj * 100)) : 0, pexp = obj ? Math.min(100, Math.round(exp / obj * 100)) : 0, dif = g - exp;
+    return `<div class="hcard" style="--c:${O.clientColor(c)}">
+      <header><b><i></i>${esc(c.name)}</b>${tk ? `<a href="${esc(tk.url || '#')}" target="_blank" rel="noopener" title="${esc(tk.title)}">⏱</a>` : '<span title="Sin «⭐ Tarea Principal ⭐» asignada a ti">⚠️</span>'}</header>
+      <div class="hnums"><label>Presupuesto<input type="number" min="0" step="0.5" value="${est || ''}" data-hmk="est" data-cid="${c.id}" placeholder="0"><small>h</small></label>
+        <label title="Si le dedicas otras horas de verdad, ponlas aquí: es lo que se reparte y se registra">A registrar<input type="number" min="0" step="0.5" value="${real && real !== est ? real : ''}" data-hmk="real" data-cid="${c.id}" placeholder="${est || 0}"><small>h</small></label></div>
+      <div class="hbar"><span style="width:${pct}%"></span><i style="left:${pexp}%" title="Lo que deberías llevar a ${isCur ? 'hoy' : 'final de mes'}"></i></div>
+      <div class="hstat"><span><b>${fmt(g)}</b> de ${fmt(obj)}</span>${obj ? `<span class="${dif < -30 ? 'bad' : dif > 30 ? 'ok' : ''}">${Math.abs(dif) < 15 ? 'al día ✓' : dif < 0 ? `faltan ${fmt(-dif)} a ${isCur ? 'hoy' : 'fin de mes'}` : `${fmt(dif)} por delante`}</span>` : '<span>sin presupuesto</span>'}</div>
+      ${isCur && hoyP[c.id] ? `<small class="hhoy">hoy: ${fmt(hoyP[c.id])}</small>` : ''}</div>`;
   }).join('');
-  const autoDone = isCur && H().log[O.today()] && H().log[O.today()]._auto;
-  return `<div class="hbox">
+  // calendario del mes: un cuadro por día laborable con lo registrado de cada cliente
+  const semanas = []; let sem = [];
+  for (const d of wd){ const dw = fromIso(d).getDay(); if (sem.length && dw === 1){ semanas.push(sem); sem = []; } sem.push(d); }
+  if (sem.length) semanas.push(sem);
+  const DN = ['', 'L', 'M', 'X', 'J', 'V'];
+  const cal = semanas.map(w => `<div class="hweek">${[1, 2, 3, 4, 5].map(k => { const d = w.find(x => fromIso(x).getDay() === k);
+      if (!d) return '<div class="hday empty"></div>';
+      const rows = cs.map(c => ({c, m: regDay(month, c.id, d)})).filter(r => r.m), tot = rows.reduce((a, r) => a + r.m, 0);
+      const fut = d > hoyD, isHoy = d === hoyD;
+      return `<div class="hday${fut ? ' fut' : ''}${isHoy ? ' hoy' : ''}${!fut && !tot ? ' vacio' : ''}"><header><b>${DN[k]} ${+d.slice(8)}</b>${tot ? `<span>${fmt(tot)}</span>` : ''}</header>
+        ${rows.map(r => `<div class="hent" style="--c:${O.clientColor(r.c)}"><i></i><span>${esc(r.c.name)}</span><b>${fmt(r.m)}</b></div>`).join('') || (fut ? '' : '<small>sin registrar</small>')}</div>`; }).join('')}</div>`).join('');
+  const atrasado = isCur && cs.some(c => target(month, c) && expectedTo(month, c, hoyD) - (registered(month, c.id) || 0) >= 15);
+  return `<div class="hbox hbox2">
     <div class="hhead">
-      <label class="check"><input type="checkbox" id="hAuto" ${H().auto ? 'checked' : ''}> Registrar solo en ClickUp cada día laborable a partir de las 19:00 (máx. 1 h 30 por cliente)</label>
-      <span>Mes: estimado <b>${tE} h</b> · real <b>${tR} h</b> · registrado <b>${fmt(tG)}</b></span>
+      <div class="htot"><span><b>${fmt(tG)}</b><small>registrado</small></span><span><b>${fmt(tX)}</b><small>deberías llevar a ${isCur ? 'hoy' : 'fin de mes'}</small></span><span><b>${fmt(tP)}</b><small>presupuesto del mes</small></span></div>
+      <span class="sp"></span>
+      ${isCur ? `<button class="btn primary${atrasado ? '' : ' muted'}" data-hfill>⏩ Rellenar hasta hoy</button>` : ''}
       <button class="btn" data-hreload>↻ Leer ClickUp</button></div>
-    ${autoDone ? `<div class="note">⏱ Hoy se registró automáticamente. <button class="btn" data-hundo>Deshacer lo de hoy</button></div>` : ''}
-    ${rows || '<div class="empty">Conecta ClickUp para ver los clientes de la agencia.</div>'}
-    <p class="iahint">«Estimado» son las horas del contrato. «Real» es lo que le dedicas de verdad: es lo que se reparte día a día y se registra en la «⭐ Tarea Principal ⭐» de cada cliente.</p>
+    <label class="check hauto"><input type="checkbox" id="hAuto" ${H().auto ? 'checked' : ''}> Registrar solo cada día laborable a partir de las 19:00 lo que toca ese día (máx. 1 h 30 por cliente)</label>
+    ${isCur && H().log[hoyD] && H().log[hoyD]._auto ? `<div class="note">⏱ Hoy se registró automáticamente. <button class="btn" data-hundo>Deshacer lo de hoy</button></div>` : ''}
+    <div class="hcards">${cards || '<div class="empty">Conecta ClickUp para ver los clientes de la agencia.</div>'}</div>
+    <h3 class="h3">📅 ${O.MESES[d0.getMonth()]} día a día</h3>
+    <div class="hcal">${cal}</div>
+    <p class="iahint">«Presupuesto» son las horas del contrato. Si le dedicas otras de verdad, ponlas en «A registrar». La línea fina de cada barra marca lo que deberías llevar a hoy. «Rellenar hasta hoy» reparte lo que falta en los días que están vacíos (máx. 1 h 30 por cliente y día) y lo registra en la «⭐ Tarea Principal ⭐» de cada cliente.</p>
   </div>`;
 };
 O.views.clientes.after = () => {
@@ -151,13 +199,13 @@ document.addEventListener('change', e => {
   if (t.dataset.hmk){
     const mo = (H().months[viewMonth] = H().months[viewMonth] || {}), row = (mo[t.dataset.cid] = mo[t.dataset.cid] || {});
     row[t.dataset.hmk] = Math.max(0, parseFloat(t.value) || 0);
-    if (t.dataset.hmk === 'est' && row.real === undefined) row.real = row.est;
     O.save(); O.render();
   }
 });
 document.addEventListener('click', e => {
   const m = e.target.closest('[data-hm]');
   if (m){ const n = +m.dataset.hm; if (n === 0) viewMonth = monthOf(O.today()); else { const d = fromIso(viewMonth + '-01'); d.setMonth(d.getMonth() + n); viewMonth = monthOf(iso(d)); } O.render(); return; }
+  if (e.target.closest('[data-hfill]')){ fillToToday(viewMonth); return; }
   if (e.target.closest('[data-hreload]')){ H().reg[viewMonth] = null; loadRegistered(viewMonth); return; }
   if (e.target.closest('[data-hundo]')){ undoDay(O.today()); return; }
   const b = e.target.closest('[data-close-day]'); if (b) openClose(b.dataset.closeDay);
@@ -219,8 +267,8 @@ async function undoDay(day){
   O.render(); O.toast('Horas de hoy deshechas');
 }
 // Una entrada de tiempo por cliente, seguidas desde la hora de inicio del día
-async function pushDay(day, row){
-  const h = H(); const prev = h.cu[day] || {}, ids = {};
+async function pushDay(day, row, añadir){
+  const h = H(); const prev = añadir ? {} : (h.cu[day] || {}), ids = añadir ? {...(h.cu[day] || {})} : {};
   const start0 = fromIso(day); const [hh, mm] = ((S.plan && S.plan.workStart) || '09:00').split(':').map(Number);
   start0.setHours(hh, mm, 0, 0);
   let t = start0.getTime(), ok = 0, fail = 0;
@@ -235,7 +283,8 @@ async function pushDay(day, row){
       }
     } catch(e){ fail++; }
   }
-  h.cu[day] = ids; O.save();
+  h.cu[day] = ids; if (añadir) h.log[day] = {...(h.log[day] || {}), ...row}; O.save();
+  if (añadir) return;
   O.toast(fail ? `ClickUp: ${ok} registradas, ${fail} con error` : `⏱ Registradas en ClickUp las horas de hoy (${ok} clientes)`);
 }
 
