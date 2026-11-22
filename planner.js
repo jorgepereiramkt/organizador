@@ -255,6 +255,7 @@ O.views.dia = function(){
     `<button class="icon" data-pday="-1" aria-label="Día anterior"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m15 18-6-6 6-6"/></svg></button>
      <button class="chip" data-pday="0">Hoy</button>
      <button class="icon" data-pday="1" aria-label="Día siguiente"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m9 18 6-6-6-6"/></svg></button>
+     <div class="modes"><button class="chip" data-dmode="dia" aria-pressed="true">Día</button><button class="chip" data-dmode="semana" aria-pressed="false">Semana</button></div>
      <button class="chip build-btn" data-buildday>🧱 Montar bloques</button>
      <span class="cal-st">${calStatus()}</span>`, 'Arrastra tareas a los bloques de trabajo');
 
@@ -396,9 +397,93 @@ O.views.dia = function(){
   return `${msg}${head}<div class="planner"><div class="timeline">${tl}</div>${side}</div>`;
 };
 O.views.dia.after = () => {
+  if (S.diaMode === 'semana') return loadWeek();
   const need = P().accounts.some(a => tokenOk(a.email) && !evCache[a.email + '|' + planDay]);
   if (need && !loading) refresh();
 };
+
+/* ---------- Vista Semana: calendario de 7 días con tus eventos, bloques de trabajo y rutinas ---------- */
+const diaView = O.views.dia, diaAfter = O.views.dia.after;
+const weekEv = {};            // día -> eventos (de Google, por el puente o la última versión guardada)
+let weekLoading = false;
+const monday = day => { const d = O.fromIso(day); return O.addDays(d, -((d.getDay() + 6) % 7)); };
+const weekDays = () => { const m = monday(planDay); return [...Array(7)].map((_, i) => O.iso(O.addDays(m, i))); };
+async function loadWeek(force){
+  const days = weekDays().filter(d => force || !weekEv[d]);
+  if (!days.length || weekLoading) return;
+  weekLoading = true;
+  try { await Promise.all(days.map(async d => { weekEv[d] = await fetchEvents(d); })); } catch(e){ calError = 'Calendario: ' + e.message; }
+  weekLoading = false;
+  if (S.view === 'dia' && S.diaMode === 'semana') O.render();
+}
+// reparte en columnas los elementos que se solapan
+function lanes(items){
+  const out = []; let group = [], end = -1;
+  const flush = () => { const cols = []; for (const it of group){ let c = cols.findIndex(e => e <= it.start); if (c < 0){ c = cols.length; cols.push(0); } cols[c] = it.end; it.col = c; } group.forEach(it => it.ncol = cols.length); out.push(...group); group = []; };
+  for (const it of items.sort((a, b) => a.start - b.start || b.end - a.end)){ if (group.length && it.start >= end) flush(); group.push(it); end = Math.max(end, it.end); }
+  if (group.length) flush();
+  return out;
+}
+function weekView(){
+  const days = weekDays(), m = O.fromIso(days[0]), dEnd = O.fromIso(days[6]);
+  const rango = m.getMonth() === dEnd.getMonth() ? `${m.getDate()} – ${dEnd.getDate()} ${O.MESES[m.getMonth()]}` : `${m.getDate()} ${O.MESES[m.getMonth()]} – ${dEnd.getDate()} ${O.MESES[dEnd.getMonth()]}`;
+  O.setToolbar('Semana', rango,
+    `<button class="icon" data-pweek="-1" aria-label="Semana anterior"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m15 18-6-6 6-6"/></svg></button>
+     <button class="chip" data-pweek="0">Hoy</button>
+     <button class="icon" data-pweek="1" aria-label="Semana siguiente"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m9 18 6-6-6-6"/></svg></button>
+     <div class="modes"><button class="chip" data-dmode="dia" aria-pressed="false">Día</button><button class="chip" data-dmode="semana" aria-pressed="true">Semana</button></div>
+     <span class="cal-st">${calStatus()}</span>`, 'Toca un día para abrirlo · toca un bloque para montarlo');
+  const ROUTC = {comida:'#FFC93D', cena:'#C77DFF', deporte:'#3DDC97'};
+  const per = days.map(d => {
+    const evs = weekEv[d] || [];
+    const its = buildDay(d, evs).filter(i => i.end > i.start);
+    return {d, allDay: evs.filter(e => e.allDay), its};
+  });
+  const all = per.flatMap(p => p.its);
+  const G0 = Math.min(8 * 60, ...all.map(i => i.start)) , G1 = Math.max(22 * 60, ...all.map(i => i.end));
+  const H0 = Math.floor(G0 / 60) * 60, H1 = Math.min(24 * 60, Math.ceil(G1 / 60) * 60), PXM = 0.9;
+  const now = new Date(), nowMin = now.getHours() * 60 + now.getMinutes(), hoy = O.today();
+  let hours = ''; for (let h = H0; h < H1; h += 60) hours += `<div class="wk-h" style="top:${(h - H0) * PXM}px"><span>${toHM(h)}</span></div>`;
+  const nTareas = (d, at) => Object.values(S.slots).filter(sl => sl.day === d && sl.at === at).length;
+  const cols = per.map(({d, its}) => {
+    const blocks = lanes(its.map(i => ({...i}))).map(i => {
+      const top = (i.start - H0) * PXM, h = Math.max(16, (i.end - i.start) * PXM - 2);
+      const w = 100 / i.ncol, left = i.col * w;
+      let cls = 'ev', color = i.color || '#8E8E93', label = esc(i.title || ''), extra = '';
+      if (i.kind === 'work'){ cls = 'work'; color = 'var(--accent)'; label = 'Trabajo'; const n = nTareas(d, i.at); extra = n ? ` · ${n} tarea${n > 1 ? 's' : ''}` : ''; }
+      else if (i.kind === 'routine'){ cls = 'rout'; color = ROUTC[i.id] || '#A3A3AD'; }
+      else if (i.isCall){ cls = 'call'; color = '#A78BFA'; label = '📞 ' + label; }
+      else if (i.kind === 'free'){ cls = 'free'; }
+      const past = d < hoy || (d === hoy && i.end <= nowMin);
+      return `<div class="wk-ev ${cls}${past ? ' past' : ''}" ${i.kind === 'work' ? `data-wbuild="${d}"` : ''} style="top:${top}px;height:${h}px;left:calc(${left}% + 1px);width:calc(${w}% - 3px);--c:${color}" title="${label.replace(/"/g, '')} · ${toHM(i.start)}–${toHM(i.end)}">
+        <b>${label}</b>${h > 26 ? `<small>${toHM(i.start)} – ${toHM(i.end)}${extra}</small>` : ''}</div>`;
+    }).join('');
+    const line = d === hoy && nowMin >= H0 && nowMin <= H1 ? `<i class="wk-now" style="top:${(nowMin - H0) * PXM}px"></i>` : '';
+    return `<div class="wk-col${d === hoy ? ' today' : ''}" data-wday="${d}">${blocks}${line}</div>`;
+  }).join('');
+  const heads = per.map(({d, allDay}) => { const x = O.fromIso(d);
+    return `<button type="button" class="wk-head${d === hoy ? ' today' : ''}" data-wopen="${d}"><small>${O.DIAS_L[x.getDay()].slice(0, 3).toUpperCase()}</small><b>${x.getDate()}</b>
+      ${allDay.slice(0, 2).map(e => `<span class="wk-all" style="--c:${e.color || '#8E8E93'}">${esc(e.title)}</span>`).join('')}</button>`; }).join('');
+  const msg = calError ? `<div class="note warnbox">${esc(calError)}</div>` : weekLoading ? '<div class="note">Cargando la semana…</div>' : '';
+  return `${msg}<div class="wk"><div class="wk-grid"><div class="wk-corner"></div>${heads}
+    <div class="wk-hours" style="height:${(H1 - H0) * PXM}px">${hours}</div>
+    <div class="wk-cols" style="height:${(H1 - H0) * PXM}px">${cols}</div></div></div>`;
+}
+O.views.dia = function(){ return S.diaMode === 'semana' ? weekView() : diaView(); };
+O.views.dia.after = diaAfter;
+document.addEventListener('click', e => {
+  const m = e.target.closest('[data-dmode]');
+  if (m){ S.diaMode = m.dataset.dmode; try { localStorage.setItem('jp-diamode', S.diaMode); } catch(err){} O.render(); return; }
+  const w = e.target.closest('[data-pweek]');
+  if (w){ const n = +w.dataset.pweek; planDay = n === 0 ? O.today() : O.iso(O.addDays(O.fromIso(planDay), 7 * n)); lastEvents = []; O.render(); return; }
+  const o = e.target.closest('[data-wopen]');
+  if (o){ planDay = o.dataset.wopen; S.diaMode = 'dia'; lastEvents = weekEv[planDay] || []; O.render(); refresh(); return; }
+  const b = e.target.closest('[data-wbuild]');
+  if (b){ planDay = b.dataset.wbuild; lastEvents = weekEv[planDay] || []; openBuild(planDay); }
+});
+try { S.diaMode = localStorage.getItem('jp-diamode') || 'dia'; } catch(e){ S.diaMode = 'dia'; }
+// al guardar bloques o refrescar el calendario, la semana se recarga
+setInterval(() => { if (S.view === 'dia' && S.diaMode === 'semana' && !document.querySelector('dialog[open]')){ for (const k in weekEv) delete weekEv[k]; clearCache(); loadWeek(); } }, 5 * 60e3);
 /* ---------- Buzón: tareas que Claude deja en un calendario ---------- */
 // Cada evento del calendario buzón = una tarea. Título = la tarea. Descripción: «cliente: …», «urgencia: …».
 // Entran en «Por revisar (IA)» para que las revises antes de colocarlas (y antes de subir nada a ClickUp).

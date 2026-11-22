@@ -6,7 +6,7 @@
 <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' https://www.gstatic.com https://apis.google.com https://accounts.google.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://accounts.google.com; font-src https://fonts.gstatic.com; connect-src https://api.clickup.com https://script.google.com https://script.googleusercontent.com https://accounts.google.com https://firestore.googleapis.com https://identitytoolkit.googleapis.com https://securetoken.googleapis.com https://www.googleapis.com https://apis.google.com; frame-src https://organizador-jp.firebaseapp.com https://accounts.google.com; img-src 'self' data: https://lh3.googleusercontent.com https://www.google.com; manifest-src 'self'; base-uri 'none'; form-action 'self'; object-src 'none'">
 <meta name="referrer" content="no-referrer">
 <meta name="robots" content="noindex, nofollow">
-<link rel="manifest" href="manifest.json?v=20261119165651">
+<link rel="manifest" href="manifest.json?v=20261122143114">
 <link rel="icon" href="icon-192.png">
 <link rel="apple-touch-icon" href="icon-180.png">
 <meta name="theme-color" content="#0a0a0b">
@@ -376,6 +376,32 @@ a.btn{display:inline-flex;align-items:center;text-decoration:none;color:var(--te
 @keyframes pulse2{50%{box-shadow:0 0 0 8px rgba(255,107,61,.08)}}
 .trow.past .tbody{opacity:.55}
 .trow.past .tcol{opacity:.5}
+/* Vista Semana */
+.wk{background:var(--surface);border:1px solid var(--line);border-radius:18px;overflow-x:auto;overscroll-behavior-x:contain}
+.wk-grid{display:grid;grid-template-columns:52px repeat(7,minmax(118px,1fr));min-width:880px}
+.wk-corner{position:sticky;top:0;z-index:3;background:var(--surface);border-bottom:1px solid var(--line)}
+.wk-head{position:sticky;top:0;z-index:3;display:flex;flex-direction:column;align-items:center;gap:2px;padding:10px 4px 8px;background:var(--surface);border:0;border-bottom:1px solid var(--line);border-left:1px solid var(--line);cursor:pointer;color:var(--text);font:inherit}
+.wk-head small{font-size:11px;letter-spacing:.06em;color:var(--muted)}
+.wk-head b{font:600 22px/1.1 var(--head);width:38px;height:38px;display:grid;place-items:center;border-radius:50%}
+.wk-head.today b{background:var(--accent);color:#fff}
+.wk-head:hover b{box-shadow:0 0 0 2px color-mix(in srgb,var(--accent) 40%,transparent)}
+.wk-all{display:block;width:100%;font-size:10.5px;padding:1px 6px;border-radius:5px;background:color-mix(in srgb,var(--c) 30%,transparent);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;text-align:left}
+.wk-hours{position:relative}
+.wk-h{position:absolute;left:0;right:0;height:0}
+.wk-h span{position:absolute;top:-7px;right:8px;font-size:11px;color:var(--faint);font-variant-numeric:tabular-nums}
+.wk-cols{grid-column:2/-1;display:grid;grid-template-columns:repeat(7,minmax(118px,1fr));position:relative;background-image:repeating-linear-gradient(to bottom,var(--line) 0 1px,transparent 1px 54px)}
+.wk-col{position:relative;border-left:1px solid var(--line)}
+.wk-col.today{background:color-mix(in srgb,var(--accent) 4%,transparent)}
+.wk-ev{position:absolute;border-radius:7px;padding:3px 6px;overflow:hidden;background:color-mix(in srgb,var(--c) 26%,var(--surface));border-left:3px solid var(--c);font-size:11.5px;line-height:1.25;cursor:default}
+.wk-ev b{display:block;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.wk-ev small{display:block;color:var(--muted);font-size:10.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.wk-ev.work{background:color-mix(in srgb,var(--accent) 16%,var(--surface));cursor:pointer}
+.wk-ev.work:hover{box-shadow:inset 0 0 0 1.5px var(--accent)}
+.wk-ev.call{background:color-mix(in srgb,#A78BFA 30%,var(--surface))}
+.wk-ev.free{background:transparent;border:1px dashed var(--c);border-left-width:3px}
+.wk-ev.past{opacity:.5}
+.wk-now{position:absolute;left:-4px;right:0;height:2px;background:#E5484D;z-index:2}
+.wk-now::before{content:'';position:absolute;left:-2px;top:-4px;width:10px;height:10px;border-radius:50%;background:#E5484D}
 .wzone{border-radius:12px;padding:6px 6px 2px;margin-top:6px}
 .wzone h5{display:flex;align-items:center;gap:6px;margin:0 2px 6px;font:700 12px var(--body);letter-spacing:.02em}
 .wzone h5 span{margin-left:auto;color:var(--faint);font-weight:500}
@@ -912,12 +938,12 @@ html[data-theme=light] .jplogo .lg-l{display:block}
 
 <div class="toast" id="toast"></div>
 
-<script src="app.js?v=20261119165651"></script>
-<script src="planner.js?v=20261119165651"></script>
-<script src="clients.js?v=20261119165651"></script>
-<script src="quick.js?v=20261119165651"></script>
-<script src="ia.js?v=20261119165651"></script>
-<script src="hours.js?v=20261119165651"></script>
-<script type="module" src="cloud.js?v=20261119165651"></script>
+<script src="app.js?v=20261122143114"></script>
+<script src="planner.js?v=20261122143114"></script>
+<script src="clients.js?v=20261122143114"></script>
+<script src="quick.js?v=20261122143114"></script>
+<script src="ia.js?v=20261122143114"></script>
+<script src="hours.js?v=20261122143114"></script>
+<script type="module" src="cloud.js?v=20261122143114"></script>
 </body>
 </html>
