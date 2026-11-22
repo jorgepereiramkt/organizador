@@ -25,7 +25,8 @@ O.views.clientes = function(){
     if (!cs.length && S.group !== 'all' && S.group !== g) continue;
     resto.push(...cs.filter(c => estadoDe(c) !== 'actual'));
     cs = cs.filter(c => estadoDe(c) === 'actual');
-    html += `<h3 class="rama">${titulo} <span>${cs.length} · ${sub} · arrastra una ficha abajo para apartarla</span></h3>`;
+    const agTot = g !== 'mine' ? cs.reduce((s, c) => { const m = agPago(c); return m ? [s[0] + m.a, s[1] + m.b] : s; }, [0, 0]) : null;
+    html += `<h3 class="rama">${titulo} <span>${cs.length} · ${sub}${agTot && agTot[1] ? ` · <b>${rng(agTot[0], agTot[1])}/mes</b> a la agencia entre todos` : ''} · arrastra una ficha abajo para apartarla</span></h3>`;
     if (g === 'mine'){
       // tus clientes en dos secciones: ingresos fijos y variables (arrastra para cambiar)
       for (const [k, t, s] of [['fijo', '💶 Ingresos fijos', 'cuota estable cada mes'], ['mixto', '💶➕📈 Fijo + variable', 'una cuota más una parte variable'], ['variable', '📈 Ingresos variables', 'cambia según el mes, el proyecto o un %']]){
@@ -88,6 +89,9 @@ function recalcFee(c){
   const a = (tipo !== 'variable' ? fx.a : 0) + (tipo !== 'fijo' ? v.a : 0), b = (tipo !== 'variable' ? fx.b : 0) + (tipo !== 'fijo' ? v.b : 0);
   if (!a && !b){ delete c.feeMin; delete c.feeMax; c.fee = 0; } else { c.feeMin = a; c.feeMax = b; c.fee = (a + b) / 2; }
 }
+const agPago = c => { const m = parseMoney(c.agFeeTxt); return m && m.a !== undefined ? m : null; };
+const agMedia = c => { const m = agPago(c); return m ? (m.a + m.b) / 2 : 0; };
+const agPeso = c => { const tot = S.clients.filter(x => x.group !== 'mine' && estadoDe(x) === 'actual').reduce((s, x) => s + agMedia(x), 0); return tot ? Math.round(agMedia(c) / tot * 100) : 0; };
 const esGratis = c => { const f = parseMoney(c.fixTxt), v = parseMoney(c.varTxt); return !!((f && f.free) || (v && v.free)) && !fmax(c); };
 const feeTxt = c => {
   if (esGratis(c)) return 'Gratis';
@@ -226,6 +230,8 @@ function fichaCard(c){
   const sv = c.services || [];
   return `<article class="ficha" data-ficha="${c.id}" draggable="true" data-fdrag="${c.id}" style="--c:${O.clientColor(c)}" tabindex="0">
     <header><i></i><b>${esc(c.name)}</b>${tierBadge(c)}${c.hours ? `<span class="hrs">${c.hours} h/mes</span>` : ''}</header>
+    ${c.group !== 'mine' && agPago(c) ? `<div class="ffee">${rng(agPago(c).a, agPago(c).b)}<small>/mes a la agencia</small></div>
+      ${estadoDe(c) === 'actual' ? `<div class="peso" title="Peso en lo que facturan tus clientes de agencia"><span style="width:${agPeso(c)}%"></span><b>${agPeso(c)}%</b></div>` : ''}` : ''}
     ${c.group === 'mine' && feeTxt(c) ? `<div class="ffee">${esGratis(c) ? '🎁 Gratis' : `${feeTxt(c)}<small>/mes sin IVA</small>`}</div>` : ''}
     ${sv.length ? `<ul>${sv.map(s => `<li>${esc(s.name)}</li>`).join('')}</ul>` : '<p class="vacio">Sin servicios todavía</p>'}
   </article>`;
@@ -272,6 +278,7 @@ function draw(){
   sugeridos.splice(14);
   form.innerHTML = `
     <h2><span class="dot" style="background:${O.clientColor(c)}"></span> ${esc(c.name)} <span class="badge">${ag ? 'Agencia' : '🔒 Mío'}</span></h2>
+    ${ag ? `<label>Cuánto paga a la agencia (€/mes sin IVA) · una cifra o un rango<input type="text" inputmode="decimal" data-ag value="${esc(c.agFeeTxt || '')}" placeholder="Ej.: 2500 o 2000-3000"></label>` : ''}
     ${ag ? `<label>Horas al mes con este cliente<input type="number" min="0" step="0.5" data-f="hours" value="${c.hours || ''}" placeholder="normalmente entre 8 y 20"></label>` : ''}
     ${ag ? `<div class="row"><label>Estado<select data-f="estado">${ESTADOS.map(([k, t]) => `<option value="${k}" ${estadoDe(c) === k ? 'selected' : ''}>${t}</option>`).join('')}</select></label>
       <label>Tier<select data-f="tier"><option value="">—</option>${Object.entries(TIERS).map(([k, t]) => `<option value="${k}" ${c.tier === k ? 'selected' : ''}>${t}</option>`).join('')}</select></label></div>` : ''}
@@ -297,6 +304,7 @@ const fix0 = c => { if (c.fixTxt === undefined && c.varTxt === undefined && fmax
 form.addEventListener('change', e => { if (e.target.dataset.f === 'ingreso'){ fix0(cur); recalcFee(cur); O.save(); draw(); } });
 form.addEventListener('input', e => {
   const t = e.target;
+  if (t.dataset.ag !== undefined) cur.agFeeTxt = t.value;
   if (t.dataset.m){ if (fix0(cur)) {} cur[t.dataset.m] = t.value; recalcFee(cur);
     const tot = form.querySelector('[data-feetot]'); if (tot) tot.textContent = feeTxt(cur) || '—';
     const pctAhora = /%/.test(cur.varTxt || ''); if (t.dataset.m === 'varTxt' && pctAhora !== !!form.querySelector('[data-m=varOn]')) { O.save(); const pos = t.selectionStart; draw(); const n = form.querySelector('[data-m=varTxt]'); n.focus(); n.setSelectionRange(pos, pos); return; } }
