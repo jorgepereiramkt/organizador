@@ -20,11 +20,14 @@ const monthOf = day => day.slice(0, 7);
 const isWork = d => d.getDay() !== 0 && d.getDay() !== 6;
 let viewMonth = monthOf(O.today());
 
+// días libres tuyos (festivos, vacaciones…): no cuentan como laborables
+const libres = () => (H().off = H().off || {});
 function workDays(month){
   const [y, m] = month.split('-').map(Number), out = [];
-  for (let d = new Date(y, m - 1, 1); d.getMonth() === m - 1; d.setDate(d.getDate() + 1)) if (isWork(d)) out.push(iso(d));
+  for (let d = new Date(y, m - 1, 1); d.getMonth() === m - 1; d.setDate(d.getDate() + 1)) if (isWork(d) && !libres()[iso(d)]) out.push(iso(d));
   return out;
 }
+const weekDaysOf = month => { const [y, m] = month.split('-').map(Number), out = []; for (let d = new Date(y, m - 1, 1); d.getMonth() === m - 1; d.setDate(d.getDate() + 1)) if (isWork(d)) out.push(iso(d)); return out; };
 const agencyClients = () => S.clients.filter(c => c.group !== 'mine' && !O.isApartado(c));
 const mdata = (month, c) => { const r = (H().months[month] || {})[c.id] || {}; return {est: r.est ?? (c.hours || 0), real: r.real ?? r.est ?? (c.hours || 0)}; };
 const conHoras = (month = monthOf(O.today())) => agencyClients().filter(c => mdata(month, c).real > 0 || mdata(month, c).est > 0);
@@ -110,6 +113,7 @@ async function fillToToday(month){
 // Lo que toca hoy a cada cliente para llegar a lo real: lo que falta / días laborables que quedan (máx. 1 h 30)
 function proposal(day){
   const month = monthOf(day), out = {};
+  if (libres()[day]) return out;   // día libre: no toca nada
   const left = Math.max(1, workDays(month).filter(d => d >= day).length);
   const todayLogged = H().log[day] || {};
   for (const c of conHoras(month)){
@@ -178,14 +182,14 @@ O.views.clientes = function(){
   }).join('');
   // calendario del mes: un cuadro por día laborable con lo registrado de cada cliente
   const semanas = []; let sem = [];
-  for (const d of wd){ const dw = fromIso(d).getDay(); if (sem.length && dw === 1){ semanas.push(sem); sem = []; } sem.push(d); }
+  for (const d of weekDaysOf(month)){ const dw = fromIso(d).getDay(); if (sem.length && dw === 1){ semanas.push(sem); sem = []; } sem.push(d); }
   if (sem.length) semanas.push(sem);
   const DN = ['', 'L', 'M', 'X', 'J', 'V'];
   const cal = semanas.map(w => `<div class="hweek">${[1, 2, 3, 4, 5].map(k => { const d = w.find(x => fromIso(x).getDay() === k);
       if (!d) return '<div class="hday empty"></div>';
       const rows = cs.map(c => ({c, m: regDay(month, c.id, d)})).filter(r => r.m), tot = rows.reduce((a, r) => a + r.m, 0);
-      const fut = d > hoyD, isHoy = d === hoyD;
-      return `<div class="hday${fut ? ' fut' : ''}${isHoy ? ' hoy' : ''}${!fut && !tot ? ' vacio' : ''}"><header><b>${DN[k]} ${+d.slice(8)}</b>${tot ? `<span>${fmt(tot)}</span>` : ''}</header>
+      const fut = d > hoyD, isHoy = d === hoyD, off = !!libres()[d];
+      return `<div class="hday${fut ? ' fut' : ''}${isHoy ? ' hoy' : ''}${off ? ' off' : !fut && !tot ? ' vacio' : ''}"><header><b>${DN[k]} ${+d.slice(8)}</b>${tot ? `<span>${fmt(tot)}</span>` : ''}<button type="button" class="hoff" data-hoff="${d}" title="${off ? 'Volver a hacerlo laborable' : 'Marcar como día libre (festivo, vacaciones…)'}">${off ? '🏖️' : '＋🏖️'}</button></header>${off ? '<small class="offtxt">🏖️ Día libre: no se reparte nada</small>' : ''}
         ${rows.map(r => `<div class="hent" style="--c:${O.clientColor(r.c)}"><i></i><span>${esc(r.c.name)}</span><b>${fmt(r.m)}</b></div>`).join('') || (fut ? '' : '<small>sin registrar</small>')}</div>`; }).join('')}</div>`).join('');
   const atrasado = isCur && cs.some(c => target(month, c) && expectedTo(month, c, hoyD) - (registered(month, c.id) || 0) >= 15);
   return `<div class="hbox hbox2">
@@ -202,7 +206,7 @@ O.views.clientes = function(){
     <div class="hcards">${cards || '<div class="empty">Conecta ClickUp para ver los clientes de la agencia.</div>'}</div>
     <h3 class="h3">📅 ${O.MESES[d0.getMonth()]} día a día</h3>
     <div class="hcal">${cal}</div>
-    <p class="iahint">«Presupuesto» son las horas del contrato. Si le dedicas otras de verdad, ponlas en «A registrar». La línea fina de cada barra marca lo que deberías llevar a hoy. «Rellenar hasta hoy» reparte lo que falta en los días que están vacíos (máx. 1 h 30 por cliente y día) y lo registra en la «⭐ Tarea Principal ⭐» de cada cliente.</p>
+    <p class="iahint">«Presupuesto» son las horas del contrato y «Variación» las de más o de menos ese mes (vacío = margen al azar del 10-20 %). La línea fina de cada barra marca lo que deberías llevar a hoy. Marca con 🏖️ tus días libres: no se reparte nada en ellos. «Rellenar hasta hoy» completa los días sin registrar o con solo unos minutos y lo registra en la «⭐ Tarea Principal ⭐» de cada cliente.</p>
   </div>`;
 };
 O.views.clientes.after = () => {
@@ -230,6 +234,8 @@ document.addEventListener('change', e => {
 document.addEventListener('click', e => {
   const m = e.target.closest('[data-hm]');
   if (m){ const n = +m.dataset.hm; if (n === 0) viewMonth = monthOf(O.today()); else { const d = fromIso(viewMonth + '-01'); d.setMonth(d.getMonth() + n); viewMonth = monthOf(iso(d)); } O.render(); return; }
+  const off = e.target.closest('[data-hoff]');
+  if (off){ const d = off.dataset.hoff, L = libres(); if (L[d]) delete L[d]; else L[d] = 1; O.save(); const hc = H().cloud; if (hc && hc.on){ hc.at = 0; setTimeout(() => cloudSync(), 300); } O.render(); O.toast(L[d] ? '🏖️ Día libre: no se reparten horas' : 'Vuelve a ser laborable'); return; }
   if (e.target.closest('[data-hfill]')){ fillToToday(viewMonth); return; }
   if (e.target.closest('[data-hreload]')){ H().reg[viewMonth] = null; loadRegistered(viewMonth); return; }
   if (e.target.closest('[data-hundo]')){ undoDay(O.today()); return; }
@@ -326,7 +332,7 @@ function cloudPlan(){
 }
 async function sendCloud(conToken){
   const url = S.plan && S.plan.bridge; if (!url) throw new Error('conecta antes el Puente de Google (⚙)');
-  const body = {a: 'hoursplan', me: S.cu.me, start: (S.plan && S.plan.workStart) || '09:00', months: cloudPlan()};
+  const body = {a: 'hoursplan', me: S.cu.me, start: (S.plan && S.plan.workStart) || '09:00', months: cloudPlan(), off: Object.keys(libres()).filter(d => d >= O.today())};
   if (conToken) body.token = S.cu.token;
   const r = await fetch(url, {method: 'POST', body: JSON.stringify(body), headers: {'Content-Type': 'text/plain;charset=utf-8'}, redirect: 'follow'});
   const j = await r.json(); if (j.error) throw new Error(j.error);
