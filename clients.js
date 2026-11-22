@@ -56,24 +56,36 @@ const ESTADOS = [['actual', '🟢 Actuales', 'Te pagan ahora'], ['pausa', '⏸�
 const estadoDe = c => ESTADOS.some(([k]) => k === c.estado) ? c.estado : 'actual';
 const TIERS = {S: 'Tier S · top', A: 'Tier A', B: 'Tier B', C: 'Tier C'};
 const tierBadge = c => c.tier && TIERS[c.tier] ? `<span class="tier t-${c.tier}" title="${TIERS[c.tier]}">${c.tier}</span>` : '';
+// facturación: puede ser una cifra o un rango «650-1300» (según el mes)
+const fmin = c => +(c.feeMin ?? c.fee) || 0, fmax = c => +(c.feeMax ?? c.fee) || 0;
+const eurN = n => (Math.round(n) || 0).toLocaleString('es-ES');
+const feeTxt = c => !fmax(c) ? '' : fmin(c) === fmax(c) ? `${eurN(fmax(c))} €` : `${eurN(fmin(c))}–${eurN(fmax(c))} €`;
+const sumTxt = cs => { const a = cs.reduce((s, c) => s + fmin(c), 0), b = cs.reduce((s, c) => s + fmax(c), 0); return !b ? '0 €' : a === b ? `${eurN(b)} €` : `${eurN(a)}–${eurN(b)} €`; };
+function setFee(c, txt){
+  const ns = String(txt).replace(/\./g, '').replace(',', '.').match(/\d+(\.\d+)?/g) || [];
+  const v = ns.map(Number).filter(n => !isNaN(n)).slice(0, 2).sort((a, b) => a - b);
+  if (!v.length){ delete c.feeMin; delete c.feeMax; c.fee = 0; return; }
+  c.feeMin = v[0]; c.feeMax = v[v.length - 1]; c.fee = (c.feeMin + c.feeMax) / 2;   // «fee» = la media, para ordenar
+}
 const eur = n => (Math.round(n) || 0).toLocaleString('es-ES') + ' €';
 function cartera(){
   O.setToolbar('Clientes', 'tu cartera: arrastra cada cliente a su estado', '', 'Toca un cliente para editar ingresos y servicios');
   const mios = S.clients.filter(c => c.group === 'mine');
-  const act = mios.filter(c => estadoDe(c) === 'actual'), mes = act.reduce((s, c) => s + (+c.fee || 0), 0);
+  const act = mios.filter(c => estadoDe(c) === 'actual');
+  const anyo = cs => { const a = cs.reduce((s, c) => s + fmin(c), 0) * 12, b = cs.reduce((s, c) => s + fmax(c), 0) * 12; return a === b ? `${eurN(b)} €` : `${eurN(a)}–${eurN(b)} €`; };
   const pend = c => S.tasks.filter(t => t.client === c.id && t.status !== 'done' && !t.ia);
   const card = c => { const p = pend(c), urg = p.filter(t => t.priority === 'super' || t.priority === 'alta').length, sv = c.services || [];
     return `<article class="cart" draggable="true" data-cart="${c.id}" style="--c:${O.clientColor(c)}" tabindex="0">
-      <header><span class="clp">${esc(c.name)}</span>${tierBadge(c)}${c.fee ? `<b class="fee">${eur(c.fee)}<small>/mes s/IVA</small></b>` : '<b class="fee none">— €/mes</b>'}</header>
+      <header><span class="clp">${esc(c.name)}</span>${tierBadge(c)}${fmax(c) ? `<b class="fee">${feeTxt(c)}<small>/mes s/IVA</small></b>` : '<b class="fee none">— €/mes</b>'}</header>
       ${sv.length ? `<div class="csv">${sv.map(s => `<span>${MODES[s.mode || 'manual'].icon} ${esc(s.name)}</span>`).join('')}</div>` : '<p class="vacio">Sin servicios</p>'}
       <footer><span>${p.length ? `${p.length} pendiente${p.length > 1 ? 's' : ''}${urg ? ` · <em>${urg} urgente${urg > 1 ? 's' : ''}</em>` : ''}` : 'Sin pendientes ✓'}</span>${c.since ? `<span>desde ${esc(c.since)}</span>` : ''}</footer>
       ${c.notes ? `<p class="cnote">${esc(c.notes.split('\n')[0])}</p>` : ''}</article>`; };
-  return `<div class="cart-sum"><div><b>${eur(mes)}</b><small>al mes sin IVA con ${act.length} cliente${act.length === 1 ? '' : 's'} actual${act.length === 1 ? '' : 'es'}</small></div>
-      <div><b>${eur(mes * 12)}</b><small>al año a este ritmo</small></div>
+  return `<div class="cart-sum"><div><b>${sumTxt(act)}</b><small>al mes sin IVA con ${act.length} cliente${act.length === 1 ? '' : 's'} actual${act.length === 1 ? '' : 'es'}</small></div>
+      <div><b>${anyo(act)}</b><small>al año a este ritmo</small></div>
       ${ESTADOS.slice(1).map(([k, t]) => `<div><b>${mios.filter(c => estadoDe(c) === k).length}</b><small>${t.slice(3).toLowerCase()}</small></div>`).join('')}</div>
     <div class="cart-board">${ESTADOS.map(([k, t, sub]) => { const cs = mios.filter(c => estadoDe(c) === k).sort((a, b) => (+b.fee || 0) - (+a.fee || 0) || a.name.localeCompare(b.name));
-      const tot = cs.reduce((s, c) => s + (+c.fee || 0), 0);
-      return `<section class="cart-col" data-cestado="${k}"><h3>${t}<span>${cs.length}${tot ? ` · ${eur(tot)}/mes` : ''}</span></h3><small class="sub">${sub}</small>
+      const tot = cs.reduce((s, c) => s + fmax(c), 0);
+      return `<section class="cart-col" data-cestado="${k}"><h3>${t}<span>${cs.length}${tot ? ` · ${sumTxt(cs)}/mes` : ''}</span></h3><small class="sub">${sub}</small>
         <div class="cart-list">${cs.map(card).join('') || '<div class="empty">Arrastra aquí</div>'}</div></section>`; }).join('')}</div>`;
 }
 // arrastrar tarjetones entre columnas (ratón); en el móvil se cambia el estado en la ficha
@@ -170,7 +182,7 @@ function fichaCard(c){
   const sv = c.services || [];
   return `<article class="ficha" data-ficha="${c.id}" draggable="true" data-fdrag="${c.id}" style="--c:${O.clientColor(c)}" tabindex="0">
     <header><i></i><b>${esc(c.name)}</b>${tierBadge(c)}${c.hours ? `<span class="hrs">${c.hours} h/mes</span>` : ''}</header>
-    ${c.group === 'mine' && c.fee ? `<div class="ffee">${eur(c.fee)}<small>/mes sin IVA</small></div>` : ''}
+    ${c.group === 'mine' && fmax(c) ? `<div class="ffee">${feeTxt(c)}<small>/mes sin IVA</small></div>` : ''}
     ${sv.length ? `<ul>${sv.map(s => `<li>${esc(s.name)}</li>`).join('')}</ul>` : '<p class="vacio">Sin servicios todavía</p>'}
   </article>`;
 }
@@ -209,7 +221,7 @@ function draw(){
       <label>Tier<select data-f="tier"><option value="">—</option>${Object.entries(TIERS).map(([k, t]) => `<option value="${k}" ${c.tier === k ? 'selected' : ''}>${t}</option>`).join('')}</select></label></div>` : ''}
     ${!ag ? `<div class="row"><label>Estado<select data-f="estado">${ESTADOS.map(([k, t]) => `<option value="${k}" ${estadoDe(c) === k ? 'selected' : ''}>${t}</option>`).join('')}</select></label>
       <label>Tier<select data-f="tier"><option value="">—</option>${Object.entries(TIERS).map(([k, t]) => `<option value="${k}" ${c.tier === k ? 'selected' : ''}>${t}</option>`).join('')}</select></label></div>
-      <div class="row"><label>Facturación media sin IVA (€/mes)<input type="number" min="0" step="10" data-f="fee" value="${c.fee || ''}" placeholder="0"></label>
+      <div class="row"><label>Facturación sin IVA (€/mes) · una cifra o un rango<input type="text" inputmode="numeric" data-fee value="${fmax(c) ? (fmin(c) === fmax(c) ? fmax(c) : fmin(c) + '-' + fmax(c)) : ''}" placeholder="Ej.: 900 o 650-1300"></label>
       <label>Cliente desde<input type="month" data-f="since" value="${esc(c.since || '')}"></label></div>` : ''}
     <label>Notas (contacto, objetivos, cosas a recordar)<textarea rows="2" data-f="notes">${esc(c.notes || '')}</textarea></label>
     <h3 class="h3">Servicios</h3>
@@ -225,6 +237,7 @@ function draw(){
 }
 form.addEventListener('input', e => {
   const t = e.target;
+  if (t.dataset.fee !== undefined) setFee(cur, t.value);
   if (t.dataset.f){ cur[t.dataset.f] = (t.dataset.f === 'hours' || t.dataset.f === 'fee') ? (parseFloat(t.value) || 0) : t.value; }
   if (t.dataset.s){ cur.services[+t.closest('.sv').dataset.i][t.dataset.s] = t.value; }
   O.save();

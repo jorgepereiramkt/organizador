@@ -58,7 +58,7 @@ const DEMO_IDS = new Set(['mio-1','mio-2','ag-a','ag-b','ag-int']);
 let lastSent = '', cloudTimer = null;
 function cloudData(){
   return JSON.parse(JSON.stringify({
-    clients: S.clients.map(({id,name,group,color,keywords,listId,auto,services,hours,notes,estado,fee,since,ord,tier}) => ({id,name,group,color,keywords,listId,auto,services,hours,notes,estado,fee,since,ord,tier})),
+    clients: S.clients.map(({id,name,group,color,keywords,listId,auto,services,hours,notes,estado,fee,feeMin,feeMax,since,ord,tier}) => ({id,name,group,color,keywords,listId,auto,services,hours,notes,estado,fee,feeMin,feeMax,since,ord,tier})),
     tasks: S.tasks.filter(t => !t.cu && !t.demo),
     token: S.cu.token || '', hidden: S.cu.hidden || [], plan: S.plan || null, slots: S.slots || {}, hours: S.hours || null, ai: S.ai || null,
     picks: Object.fromEntries(S.tasks.filter(t => t.cu && t.today && t.today >= today()).map(t => [t.id, t.today])) }));
