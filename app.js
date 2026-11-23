@@ -738,7 +738,8 @@ main.addEventListener('contextmenu', e => { if (e.target.closest('.card')) e.pre
 main.addEventListener('click', e => {
   const g = e.target.closest('[data-cgo]'); if (!g) return;
   const col = main.querySelector(`.col[data-field="client"][data-value="${CSS.escape(g.dataset.cgo)}"]`); if (!col) return;
-  col.scrollIntoView({behavior: matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth', block: 'start'});
+  const tope = (document.querySelector('.cliguia')?.getBoundingClientRect().height || 0) * (innerWidth <= 900 ? 1 : 0) + 16;
+  window.scrollTo({top: Math.max(0, col.getBoundingClientRect().top + scrollY - tope), behavior: 'instant'});
   col.classList.remove('flash'); void col.offsetWidth; col.classList.add('flash');
   setTimeout(() => col.classList.remove('flash'), 1600);
 });
