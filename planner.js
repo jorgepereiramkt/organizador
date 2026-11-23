@@ -61,6 +61,23 @@ async function connectBridge(url){
   } catch(e){ P().bridge = null; throw e; }
 }
 O.bridge = bridge;
+// Al abrir la app se vuelve a mirar qué calendarios ve tu Apps Script: si compartes uno nuevo con tu cuenta
+// (p. ej. el de la agencia), aparece solo y se lee siempre por ahí, sin iniciar sesión en cada dispositivo
+async function refrescaCalsPuente(){
+  const plan = S.plan; if (!plan || !plan.bridge) return;
+  try {
+    const r = await bridge({a: 'calendars'});
+    const prev = plan.accounts.find(a => a.email === 'puente'); if (!prev) return;
+    const prevOn = new Map(prev.cals.map(c => [c.id, c.on]));
+    const nuevos = (r.calendars || []).filter(c => !prevOn.has(c.id));
+    if (!nuevos.length) return;
+    // si ya lo tenías activado en otra cuenta conectada, se activa también aquí
+    const onFuera = new Set(plan.accounts.filter(a => !a.bridge).flatMap(a => a.cals.filter(c => c.on).map(c => c.id)));
+    prev.cals = (r.calendars || []).map(c => ({id: c.id, name: c.name, color: c.color || '#8E8E93', on: prevOn.has(c.id) ? prevOn.get(c.id) : (onFuera.has(c.id) || /jorgepereiramktdigital|leadfluence/i.test(c.id))}));
+    O.save(); clearCache(); for (const k in weekEv) delete weekEv[k]; lastEvents = []; refresh();
+  } catch(e){}
+}
+setTimeout(refrescaCalsPuente, 5000);
 const evCache = {};     // `${email}|${day}` -> eventos
 let gisReady = null;
 function loadGis(){
@@ -188,9 +205,9 @@ async function fetchEvents(day){
   await Promise.all(P().accounts.map(async acc => {
     const key = acc.email + '|' + day;
     if (evCache[key]) return out.push(...evCache[key]);
-    if (!tokenOk(acc.email)) return out.push(...snapGet(acc.email, day));
     // si hay puente, las demás cuentas solo se usan para calendarios que el puente no ve
     if (!acc.bridge && P().bridge){ const seenIds = new Set(((P().accounts.find(a => a.bridge) || {}).cals || []).map(c => c.id)); if (acc.cals.filter(c => c.on).every(c => seenIds.has(c.id))) return; }
+    if (!tokenOk(acc.email)) return out.push(...snapGet(acc.email, day));
     if (acc.bridge){
       const ids = acc.cals.filter(c => c.on).map(c => c.id); if (!ids.length) return;
       const r = await bridge({a: 'events', day, cals: ids.join(',')});
