@@ -1,7 +1,7 @@
 // Inicio de sesión con Google y sincronización entre dispositivos (Firebase, plan gratis).
 // Solo la cuenta ALLOWED puede entrar; las reglas de Firestore lo vuelven a comprobar en el servidor.
 import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.14.1/firebase-app.js';
-import { getAuth, onAuthStateChanged, GoogleAuthProvider, signInWithPopup, signInWithRedirect, getRedirectResult, signOut }
+import { getAuth, onAuthStateChanged, GoogleAuthProvider, signInWithPopup, signInWithRedirect, getRedirectResult, signInWithCredential, signOut }
   from 'https://www.gstatic.com/firebasejs/10.14.1/firebase-auth.js';
 import { initializeFirestore, persistentLocalCache, doc, onSnapshot, runTransaction, serverTimestamp }
   from 'https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore.js';
@@ -26,8 +26,32 @@ const gateMsg = document.getElementById('gateMsg');
 const gateBtn = document.getElementById('gateBtn');
 const showGate = msg => { try { localStorage.removeItem('jp-session'); } catch(e){} gate.classList.remove('loading'); gate.hidden = false; gateMsg.textContent = msg || ''; gateBtn.disabled = false; };
 
+// Safari (iPad/iPhone/Mac) bloquea el inicio de sesión normal de Firebase (se queda «cargando» en firebaseapp.com).
+// Ahí se entra con la ventana de Google directamente y luego se pasa el permiso a Firebase.
+const ua = navigator.userAgent;
+const esSafari = /iP(ad|hone|od)/.test(ua) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1) || (/Safari/.test(ua) && !/Chrome|CriOS|FxiOS|Edg|Android/.test(ua));
+const GOOGLE_CLIENT = '59642019941-05m7v8u7o9n22ch98kl6rb491oggn6l9.apps.googleusercontent.com';
+let gisTc = null;
+if (esSafari) {
+  const s = document.createElement('script'); s.src = 'https://accounts.google.com/gsi/client'; s.async = true;
+  s.onload = () => {
+    gisTc = google.accounts.oauth2.initTokenClient({
+      client_id: GOOGLE_CLIENT, scope: 'openid email profile', hint: ALLOWED,
+      callback: async r => {
+        if (r.error) return showGate('No se pudo entrar: ' + r.error);
+        gateMsg.textContent = 'Entrando…';
+        try { await signInWithCredential(auth, GoogleAuthProvider.credential(null, r.access_token)); }
+        catch (e) { showGate('No se pudo entrar: ' + (e.code || e.message)); }
+      },
+      error_callback: e => showGate(e && e.type === 'popup_closed' ? '' : 'No se pudo entrar: ' + ((e && e.type) || 'cancelado')),
+    });
+  };
+  document.head.appendChild(s);
+}
+
 gateBtn.addEventListener('click', async () => {
   gateBtn.disabled = true; gateMsg.textContent = 'Abriendo Google…';
+  if (esSafari && gisTc) { gisTc.requestAccessToken(); return; }
   const provider = new GoogleAuthProvider();
   provider.setCustomParameters({ login_hint: ALLOWED, prompt: 'select_account' });
   try { await signInWithPopup(auth, provider); }

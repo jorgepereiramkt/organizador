@@ -310,7 +310,7 @@ O.views.dia = function(){
     `<button class="icon" data-pday="-1" aria-label="Día anterior"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m15 18-6-6 6-6"/></svg></button>
      <button class="chip" data-pday="0">Hoy</button>
      <button class="icon" data-pday="1" aria-label="Día siguiente"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m9 18 6-6-6-6"/></svg></button>
-     <div class="modes"><button class="chip" data-dmode="dia" aria-pressed="true">Día</button><button class="chip" data-dmode="semana" aria-pressed="false">Semana</button><button class="chip" data-dmode="diario" aria-pressed="false">📒 Clientes</button></div>
+     <div class="modes"><button class="chip" data-dmode="foco" aria-pressed="false">🎯 Foco</button><button class="chip" data-dmode="dia" aria-pressed="true">Día</button><button class="chip" data-dmode="semana" aria-pressed="false">Semana</button><button class="chip" data-dmode="diario" aria-pressed="false">📒 Clientes</button></div>
      <button class="chip build-btn" data-buildday>🧱 Montar bloques</button>
      <span class="cal-st">${calStatus()}</span>`, 'Arrastra tareas a los bloques de trabajo');
 
@@ -517,7 +517,7 @@ function weekView(){
     `<button class="icon" data-pweek="-1" aria-label="Semana anterior"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m15 18-6-6 6-6"/></svg></button>
      <button class="chip" data-pweek="0">Hoy</button>
      <button class="icon" data-pweek="1" aria-label="Semana siguiente"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m9 18 6-6-6-6"/></svg></button>
-     <div class="modes"><button class="chip" data-dmode="dia" aria-pressed="false">Día</button><button class="chip" data-dmode="semana" aria-pressed="true">Semana</button><button class="chip" data-dmode="diario" aria-pressed="false">📒 Clientes</button></div>
+     <div class="modes"><button class="chip" data-dmode="foco" aria-pressed="false">🎯 Foco</button><button class="chip" data-dmode="dia" aria-pressed="false">Día</button><button class="chip" data-dmode="semana" aria-pressed="true">Semana</button><button class="chip" data-dmode="diario" aria-pressed="false">📒 Clientes</button></div>
      <span class="cal-st">${calStatus()}</span>`, 'Toca un día para abrirlo · toca un bloque para montarlo');
   const ROUTC = {comida:'#FFC93D', cena:'#C77DFF', deporte:'#3DDC97'};
   const per = days.map(d => {
@@ -588,8 +588,9 @@ function weekView(){
   }).join('');
   const heads = per.map(({d, allDay}) => { const x = O.fromIso(d);
     return `<button type="button" class="wk-head${d === hoy ? ' today' : d < hoy ? ' old' : ''}" data-wopen="${d}"><small>${O.DIAS_L[x.getDay()].slice(0, 3).toUpperCase()}</small><b>${x.getDate()}</b>
+      ${d >= hoy ? lugarChip(d) : ''}
       ${allDay.slice(0, 2).map(e => `<span class="wk-all" style="--c:${e.color || '#8E8E93'}">${esc(e.title)}</span>`).join('')}</button>`; }).join('');
-  const msg = calError ? `<div class="note warnbox">${esc(calError)}</div>` : weekLoading ? '<div class="note">Cargando la semana…</div>' : '';
+  const msg = (calError ? `<div class="note warnbox">${esc(calError)}</div>` : weekLoading ? '<div class="note">Cargando la semana…</div>' : '') + salCasa();
   return `${msg}${O.statsBar ? O.statsBar() : ''}<div class="wk-wrap"><div class="wk"><div class="wk-grid" style="grid-template-columns:52px ${tpl}"><div class="wk-corner"></div>${heads}
     <div class="wk-hours" style="height:${Y(H1)}px">${hours}</div>
     <div class="wk-cols" style="height:${Y(H1)}px;grid-template-columns:${tpl}">${lines}${cols}</div></div></div>${wkSide()}</div>`;
@@ -609,8 +610,111 @@ O.statsBar = function(){
   return `<div class="stats"><div class="st-done"><span><b>${hoyN}</b><small>hechas hoy</small></span><span><b>${sem}</b><small>esta semana</small></span><span><b>${mesN}</b><small>este mes</small></span></div>
     <div class="st-pend"><small>Pendientes</small>${Object.entries(O.URG).map(([k, u]) => `<span class="u-${k}" title="${u.label}">${u.icon} <b>${byU(k)}</b></span>`).join('')}<span class="st-tot">${pend.length} en total</span></div></div>`;
 };
-O.views.dia = function(){ return S.diaMode === 'diario' && O.diarioView ? O.diarioView() : S.diaMode === 'semana' ? weekView() : diaView(); };
-O.views.dia.after = () => { if (S.diaMode === 'diario' && O.diarioView) return O.diarioAfter && O.diarioAfter(); diaAfter(); centra(); };
+O.views.dia = function(){ return S.diaMode === 'foco' ? focoView() : S.diaMode === 'diario' && O.diarioView ? O.diarioView() : S.diaMode === 'semana' ? weekView() : diaView(); };
+O.views.dia.after = () => { if (S.diaMode === 'foco') return focoAfter(); if (S.diaMode === 'diario' && O.diarioView) return O.diarioAfter && O.diarioAfter(); diaAfter(); centra(); };
+
+/* ---------- 📍 Dónde trabajo cada día (y el empujón para salir de casa) ---------- */
+const LUGARES = {casa: '🏠 Casa', cafe: '☕ Cafetería', work: '💼 Work Café'};
+const lugarDe = d => ((P().lugar || {})[d]) || '';
+function lugarChip(d){ const l = lugarDe(d);
+  return `<span class="wk-lugar${l ? ' l-' + l : ''}" role="button" tabindex="0" data-lugar="${d}" title="¿Dónde vas a trabajar? Toca para cambiar">${l ? LUGARES[l] : '📍 ¿Dónde?'}</span>`; }
+function salCasa(){
+  const hoy = O.today(), l = lugarDe(hoy), man = O.iso(O.addDays(new Date(), 1)), lm = lugarDe(man);
+  if (l === 'cafe' || l === 'work') return `<div class="salcasa ok">✅ Hoy trabajas en <b>${LUGARES[l]}</b>. Buen plan: cambiar de sitio activa la cabeza.${!lm ? ' · ¿Y mañana? Elige el sitio en su día.' : ''}</div>`;
+  return `<div class="salcasa">🚶 <b>Sal de casa.</b> Aunque te parezca poco tiempo, lo vas a notar: más foco, más energía y el día se te hace tuyo. ${l === 'casa' ? 'Hoy está puesto «Casa»: ¿un bloque en la cafetería o el Work Café?' : 'Elige dónde trabajas hoy tocando «📍 ¿Dónde?» encima del día.'}</div>`;
+}
+document.addEventListener('click', e => {
+  const b = e.target.closest('[data-lugar]'); if (!b) return;
+  e.preventDefault(); e.stopPropagation();
+  const d = b.dataset.lugar, orden = ['', 'casa', 'cafe', 'work'], m = P().lugar = P().lugar || {};
+  const sig = orden[(orden.indexOf(m[d] || '') + 1) % orden.length];
+  if (sig) m[d] = sig; else delete m[d];
+  for (const k of Object.keys(m)) if (k < O.iso(O.addDays(new Date(), -30))) delete m[k];
+  O.save(); O.render();
+}, true);
+
+/* ---------- 🎯 Foco: solo el bloque de trabajo de ahora, sus tareas y una cuenta atrás ---------- */
+const FRASES_FOCO = [
+  'Una sola cosa. La primera de la lista. Ahora.',
+  'No hace falta que sea perfecto: hace falta que esté hecho.',
+  'Kaizen: un 1 % mejor que ayer. Este bloque es ese 1 %.',
+  'El móvil boca abajo. Este rato es solo tuyo y de estas tareas.',
+  'Si te distraes, no pasa nada: vuelve a la tarea. Volver es el entrenamiento.',
+  'Termina lo que empiezas antes de abrir otra cosa.',
+  'Pequeños pasos, cada día. Así se construyen las cosas grandes.',
+  'Lo difícil primero. Después todo va cuesta abajo.',
+  'Cuando suene el final, que no quede nada a medias.',
+  'Respira. Mira la primera tarea. Empieza por el paso más pequeño.',
+  'Estás construyendo algo: cada tarea tachada cuenta.',
+  'Concentración es decir que no a todo lo demás durante un rato.',
+  'Hecho es mejor que perfecto. Siguiente.',
+  'El foco es un músculo: cada bloque lo haces más fuerte.',
+  'Nada de pestañas nuevas. Solo esto.',
+];
+let focoTimer = null, focoFrase = Math.floor(Math.random() * FRASES_FOCO.length), focoPidiendo = false;
+function focoDatos(){
+  const hoy = O.today(), nowD = new Date(), now = nowD.getHours() * 60 + nowD.getMinutes() + nowD.getSeconds() / 60;
+  const evs = weekEv[hoy] || (planDay === hoy ? lastEvents : null);
+  if (!evs && !focoPidiendo){ focoPidiendo = true; fetchEvents(hoy).then(e => { weekEv[hoy] = e; }).catch(() => {}).finally(() => { focoPidiendo = false; if (S.view === 'dia' && S.diaMode === 'foco') O.render(); }); }
+  const its = buildDay(hoy, evs || []).filter(i => i.end > i.start);
+  const works = its.filter(i => i.kind === 'work').sort((a, b) => a.start - b.start);
+  const actual = works.find(w => now >= w.start && now < w.end) || null;
+  const sig = works.find(w => w.start > now) || null;
+  const ev = its.find(i => i.kind !== 'work' && i.kind !== 'morning' && !i.allDay && now >= i.start && now < i.end) || null;
+  return {hoy, now, its, actual, sig, ev, cargando: !evs};
+}
+function focoView(){
+  const d = new Date();
+  O.setToolbar('🎯 Foco', `${O.DIAS_L[d.getDay()]} ${d.getDate()} de ${O.MESES[d.getMonth()]}`,
+    `<div class="modes"><button class="chip" data-dmode="foco" aria-pressed="true">🎯 Foco</button><button class="chip" data-dmode="dia" aria-pressed="false">Día</button><button class="chip" data-dmode="semana" aria-pressed="false">Semana</button><button class="chip" data-dmode="diario" aria-pressed="false">📒 Clientes</button></div>
+     <button class="chip" data-fsc title="Pantalla completa">⛶ Pantalla completa</button>`, 'Un bloque, sus tareas y nada más');
+  const {hoy, now, its, actual, sig, ev, cargando} = focoDatos();
+  const frase = `<p class="fo-frase" id="foFrase">${esc(FRASES_FOCO[focoFrase % FRASES_FOCO.length])}</p>`;
+  if (!actual){
+    const queda = sig ? Math.round(sig.start - now) : 0;
+    return `<div class="foco vacio"><div class="fo-in">
+      <div class="fo-k">${cargando ? 'Mirando tu calendario…' : ev ? 'Ahora mismo' : 'Ahora no tienes un bloque de trabajo'}</div>
+      ${ev ? `<h2 class="fo-t">${esc(ev.title || '')}</h2><div class="fo-sub">${toHM(ev.start)} – ${toHM(ev.end)}</div>` : ''}
+      ${sig ? `<div class="fo-next">Siguiente bloque: <b>${esc(sig.bname || 'Trabajo')}</b> a las ${toHM(sig.start)} · en ${queda >= 60 ? Math.floor(queda / 60) + ' h ' : ''}${queda % 60} min</div>` : '<div class="fo-next">No te quedan bloques de trabajo hoy. Descansa: también es parte del proceso 🌙</div>'}
+      ${frase}</div></div>`;
+  }
+  const ts = wkTasks(hoy, actual, its), hechas = ts.filter(t => t.status === 'done').length;
+  const cards = ts.map((t, k) => O.card(t, {group: true, status: true}).replace('class="card ', `class="card fo-t${k} `)).join('');
+  return `<div class="foco"><div class="fo-in">
+    <div class="fo-k">Bloque de ahora · ${toHM(actual.start)} – ${toHM(actual.end)}</div>
+    <h2 class="fo-t">${esc(actual.bname || 'Trabajo')}</h2>
+    <div class="fo-reloj" id="foReloj" data-fin="${actual.end}" data-ini="${actual.start}">--:--</div>
+    <div class="fo-barra"><i id="foBarra"></i></div>
+    <div class="fo-prog">${ts.length ? `${hechas} de ${ts.length} tareas hechas${hechas === ts.length ? ' · ¡bloque completado! 🎉' : ''}` : 'Este bloque no tiene tareas: arrástralas desde «Para hoy» en la Semana'}</div>
+    <div class="fo-lista" data-field="slot" data-value="${actual.at}" data-day="${hoy}">${cards}</div>
+    ${frase}
+    ${['cafe', 'work'].includes(lugarDe(hoy)) ? '' : `<div class="fo-next">🚶 Si estás en casa: el próximo bloque, fuera. Lo vas a notar.</div>`}
+    ${sig ? `<div class="fo-next">Después: <b>${esc(sig.bname || 'Trabajo')}</b> a las ${toHM(sig.start)}</div>` : ''}
+  </div></div>`;
+}
+function focoAfter(){
+  clearInterval(focoTimer);
+  const tick = () => {
+    if (S.view !== 'dia' || S.diaMode !== 'foco'){ clearInterval(focoTimer); return; }
+    const r = document.getElementById('foReloj'), b = document.getElementById('foBarra');
+    const nowD = new Date(), now = nowD.getHours() * 60 + nowD.getMinutes() + nowD.getSeconds() / 60;
+    if (r){
+      const fin = +r.dataset.fin, ini = +r.dataset.ini, seg = Math.max(0, Math.round((fin - now) * 60));
+      if (seg <= 0) return O.render();
+      const h = Math.floor(seg / 3600), m = Math.floor(seg % 3600 / 60), s = seg % 60;
+      r.textContent = (h ? h + ':' + String(m).padStart(2, '0') : m) + ':' + String(s).padStart(2, '0');
+      r.classList.toggle('poco', seg < 600);
+      if (b) b.style.width = Math.min(100, (now - ini) / (fin - ini) * 100) + '%';
+    } else if (Math.floor(Date.now() / 1000) % 30 === 0) O.render();   // sin bloque: mira cada 30 s si empieza uno
+    if (Math.floor(Date.now() / 1000) % 90 === 0){ focoFrase++; const f = document.getElementById('foFrase'); if (f){ f.classList.remove('in'); void f.offsetWidth; f.textContent = FRASES_FOCO[focoFrase % FRASES_FOCO.length]; f.classList.add('in'); } }
+  };
+  tick(); focoTimer = setInterval(tick, 1000);
+}
+document.addEventListener('click', e => {
+  if (!e.target.closest('[data-fsc]')) return;
+  const el = document.documentElement;
+  if (document.fullscreenElement) document.exitFullscreen(); else if (el.requestFullscreen) el.requestFullscreen().catch(() => {}); else O.toast('Tu navegador no deja ponerla a pantalla completa');
+});
 // Al entrar en la Semana, la hora actual queda en el centro de la pantalla (se reajusta mientras carga, salvo que ya te hayas movido)
 let porCentrar = true, centroDesde = 0;
 function centra(){

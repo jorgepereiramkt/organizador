@@ -6,7 +6,7 @@
 <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' https://www.gstatic.com https://apis.google.com https://accounts.google.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://accounts.google.com; font-src https://fonts.gstatic.com; connect-src https://api.clickup.com https://script.google.com https://script.googleusercontent.com https://accounts.google.com https://firestore.googleapis.com https://identitytoolkit.googleapis.com https://securetoken.googleapis.com https://www.googleapis.com https://apis.google.com; frame-src 'self' https://organizador-jp.firebaseapp.com https://accounts.google.com; img-src 'self' data: https://lh3.googleusercontent.com https://www.google.com; manifest-src 'self'; base-uri 'none'; form-action 'self'; object-src 'none'">
 <meta name="referrer" content="no-referrer">
 <meta name="robots" content="noindex, nofollow">
-<link rel="manifest" href="manifest.json?v=20261123222548">
+<link rel="manifest" href="manifest.json?v=20261123223742">
 <link rel="icon" href="icon-192.png">
 <link rel="apple-touch-icon" href="icon-180.png">
 <meta name="theme-color" content="#0a0a0b">
@@ -1281,6 +1281,39 @@ textarea.over{box-shadow:0 0 0 2px var(--accent)}
 .col.flash{animation:cgflash 1.4s ease-out}
 @keyframes cgflash{0%,30%{box-shadow:0 0 0 3px var(--cc,var(--accent))}100%{box-shadow:0 0 0 3px transparent}}
 @media (max-width:900px){ .cliwrap{grid-template-columns:1fr;gap:12px} .cliguia{position:sticky;top:0;z-index:5;flex-direction:row;overflow-x:auto;max-height:none;padding:8px;gap:14px} .cg-grp{flex-direction:row;align-items:center} .cg-grp>b{padding:0 4px;white-space:nowrap} .cg-it{width:auto;white-space:nowrap} .cg-it span{overflow:visible} }
+
+/* 🎯 Foco */
+.foco{min-height:calc(100vh - 220px);display:flex;align-items:flex-start;justify-content:center;padding:28px 16px 48px;border-radius:24px;background:radial-gradient(120% 80% at 50% 0%,color-mix(in srgb,var(--accent) 12%,var(--surface)) 0%,var(--surface) 60%);border:1px solid var(--line)}
+.fo-in{width:min(760px,100%);display:flex;flex-direction:column;align-items:center;text-align:center;gap:10px}
+.fo-k{font:600 12px var(--body);letter-spacing:.12em;text-transform:uppercase;color:var(--muted)}
+.fo-t{font:800 clamp(28px,4vw,44px)/1.1 var(--display,var(--body));margin:0;letter-spacing:-.02em}
+.fo-sub{color:var(--muted)}
+.fo-reloj{font:800 clamp(72px,13vw,150px)/1 var(--body);font-variant-numeric:tabular-nums;letter-spacing:-.04em;color:var(--text);margin:8px 0 2px;transition:color .3s}
+.fo-reloj.poco{color:#ff3b30}
+.fo-barra{width:100%;height:8px;border-radius:99px;background:color-mix(in srgb,var(--text) 8%,transparent);overflow:hidden}
+.fo-barra i{display:block;height:100%;width:0;border-radius:99px;background:linear-gradient(90deg,var(--accent),#ffb347);transition:width 1s linear}
+.fo-prog{font-weight:600;color:var(--muted);margin-top:4px}
+.fo-lista{width:100%;display:flex;flex-direction:column;gap:10px;margin-top:14px;text-align:left;min-height:40px}
+.fo-lista .card{padding:16px 18px;font-size:16px}
+.fo-lista .card .tt{font-size:17px!important;font-weight:600}
+.fo-lista .card .chk{width:24px;height:24px;min-width:24px}
+.fo-lista .card.done{opacity:.45}
+.fo-lista .card.done .tt{text-decoration:line-through}
+.fo-frase{margin:22px 0 0;font-size:18px;font-style:italic;color:var(--muted);max-width:560px}
+.fo-frase.in{animation:rise .6s ease-out}
+.fo-next{margin-top:10px;font-size:14px;color:var(--faint)}
+.foco.vacio .fo-in{margin-top:8vh}
+.foco.vacio .fo-next{font-size:17px;color:var(--muted)}
+@media (prefers-reduced-motion:reduce){.fo-barra i{transition:none}.fo-frase.in{animation:none}}
+
+/* 📍 Dónde trabajo */
+.wk-lugar{display:inline-block;margin-top:4px;padding:2px 8px;border-radius:99px;font:600 11px var(--body);border:1px dashed var(--line);color:var(--faint);cursor:pointer;white-space:nowrap}
+.wk-lugar:hover{border-color:var(--accent);color:var(--text)}
+.wk-lugar.l-casa{border-style:solid;background:color-mix(in srgb,#8E8E93 14%,transparent);color:var(--text)}
+.wk-lugar.l-cafe{border-style:solid;border-color:#C08457;background:color-mix(in srgb,#C08457 18%,transparent);color:var(--text)}
+.wk-lugar.l-work{border-style:solid;border-color:#4F8CFF;background:color-mix(in srgb,#4F8CFF 16%,transparent);color:var(--text)}
+.salcasa{margin:0 0 12px;padding:12px 16px;border-radius:14px;background:linear-gradient(90deg,color-mix(in srgb,#FFB347 22%,var(--surface)),var(--surface));border:1px solid color-mix(in srgb,#FFB347 40%,transparent);font-size:14px}
+.salcasa.ok{background:linear-gradient(90deg,color-mix(in srgb,#3DDC97 18%,var(--surface)),var(--surface));border-color:color-mix(in srgb,#3DDC97 40%,transparent)}
 </style>
 </head>
 <body>
@@ -1363,16 +1396,16 @@ textarea.over{box-shadow:0 0 0 2px var(--accent)}
 
 <div class="toast" id="toast"></div>
 
-<script src="app.js?v=20261123222548"></script>
-<script src="planner.js?v=20261123222548"></script>
-<script src="clients.js?v=20261123222548"></script>
-<script src="quick.js?v=20261123222548"></script>
-<script src="ia.js?v=20261123222548"></script>
-<script src="hours.js?v=20261123222548"></script>
-<script src="cliente.js?v=20261123222548"></script>
-<script src="diario.js?v=20261123222548"></script>
-<script src="imagenes.js?v=20261123222548"></script>
-<script src="archivos.js?v=20261123222548"></script>
-<script type="module" src="cloud.js?v=20261123222548"></script>
+<script src="app.js?v=20261123223742"></script>
+<script src="planner.js?v=20261123223742"></script>
+<script src="clients.js?v=20261123223742"></script>
+<script src="quick.js?v=20261123223742"></script>
+<script src="ia.js?v=20261123223742"></script>
+<script src="hours.js?v=20261123223742"></script>
+<script src="cliente.js?v=20261123223742"></script>
+<script src="diario.js?v=20261123223742"></script>
+<script src="imagenes.js?v=20261123223742"></script>
+<script src="archivos.js?v=20261123223742"></script>
+<script type="module" src="cloud.js?v=20261123223742"></script>
 </body>
 </html>
