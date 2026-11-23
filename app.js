@@ -1041,7 +1041,7 @@ setInterval(() => { if (document.visibilityState === 'visible') guardaNav(); }, 
 let navT = null; addEventListener('scroll', () => { clearTimeout(navT); navT = setTimeout(guardaNav, 200); }, {passive: true});
 addEventListener('pagehide', guardaNav); document.addEventListener('click', () => setTimeout(guardaNav, 50));
 render(); modeIdle();
-if (nav && (nav.y || nav.bx)){   // el contenido (calendario, ClickUp) tarda un poco en llegar: se reintenta unos segundos
+if (nav && (nav.y || nav.bx) && !(S.view === 'dia' && (nav.dmode || 'semana') === 'semana')){   // en la Semana se centra en la hora actual   // el contenido (calendario, ClickUp) tarda un poco en llegar: se reintenta unos segundos
   let tocado = false; const marca = () => { tocado = true; };
   addEventListener('wheel', marca, {once: true, passive: true}); addEventListener('touchstart', marca, {once: true, passive: true}); addEventListener('keydown', marca, {once: true});
   [100, 600, 1500, 3000].forEach(ms => setTimeout(() => { if (tocado) return; scrollTo(0, nav.y || 0); const b = main.querySelector('.board'); if (b && nav.bx) b.scrollLeft = nav.bx; }, ms));

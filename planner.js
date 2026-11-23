@@ -592,7 +592,25 @@ O.statsBar = function(){
     <div class="st-pend"><small>Pendientes</small>${Object.entries(O.URG).map(([k, u]) => `<span class="u-${k}" title="${u.label}">${u.icon} <b>${byU(k)}</b></span>`).join('')}<span class="st-tot">${pend.length} en total</span></div></div>`;
 };
 O.views.dia = function(){ return S.diaMode === 'diario' && O.diarioView ? O.diarioView() : S.diaMode === 'semana' ? weekView() : diaView(); };
-O.views.dia.after = () => { if (S.diaMode === 'diario' && O.diarioView) return O.diarioAfter && O.diarioAfter(); diaAfter(); };
+O.views.dia.after = () => { if (S.diaMode === 'diario' && O.diarioView) return O.diarioAfter && O.diarioAfter(); diaAfter(); centra(); };
+// Al entrar en la Semana, la hora actual queda en el centro de la pantalla (se reajusta mientras carga, salvo que ya te hayas movido)
+let porCentrar = true, centroDesde = 0;
+function centra(){
+  if (!porCentrar || S.view !== 'dia' || S.diaMode !== 'semana') return;
+  setTimeout(() => {
+    const n = document.querySelector('.wk-now'); if (!n || !porCentrar) return;
+    const r = n.getBoundingClientRect(); window.scrollTo({top: Math.max(0, r.top + scrollY - innerHeight / 2), behavior: 'instant'});
+    if (!centroDesde) centroDesde = Date.now();
+    if ((!weekLoading && Object.keys(weekEv).length) || Date.now() - centroDesde > 8000) setTimeout(() => { porCentrar = false; centroDesde = 0; }, 1500);
+  }, 30);
+}
+const quieto = () => { porCentrar = false; };
+addEventListener('wheel', quieto, {passive: true}); addEventListener('touchmove', quieto, {passive: true});
+addEventListener('keydown', e => { if (/Arrow|Page|Home|End|Space/.test(e.code)) quieto(); });
+document.addEventListener('click', e => {
+  const t = e.target.closest('#tabs [data-view="dia"], [data-dmode="semana"]');
+  if (t){ porCentrar = true; setTimeout(centra, 60); }
+}, true);
 document.addEventListener('click', e => {
   const m = e.target.closest('[data-dmode]');
   if (m){ S.diaMode = m.dataset.dmode; try { localStorage.setItem('jp-diamode', S.diaMode); } catch(err){} O.render(); return; }
