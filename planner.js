@@ -600,9 +600,47 @@ function openMorning(day){
   miniForm.innerHTML = `<h2>☀️ Arranque del día · ${O.DIAS_L[d.getDay()]} ${d.getDate()}</h2>
     <div class="mlist">${mi.map((t, k) => `<label class="mitem"><input type="checkbox" data-mk="${k}" ${md.has(k) ? 'checked' : ''}> ${esc(t)}</label>`).join('')}</div>
     <label>Color</label>${swatches((P().kcolors || {}).morning || '', 'data-kcol', Object.fromEntries(APPCOL.map(c => [c, c])))}
-    <div class="actions"><button type="button" class="btn" data-mall>Marcar todo</button><span class="sp"></span><button class="btn primary" value="ok">Listo</button></div>`;
-  miniDlg.showModal();
+    <div class="actions"><button type="button" class="btn" data-mall>Marcar todo</button><button type="button" class="btn" data-medit>✏️ Editar</button><span class="sp"></span><button class="btn primary" value="ok">Listo</button></div>`;
+  if (!miniDlg.open) miniDlg.showModal();
 }
+// ✏️ Editar la lista del Arranque (la misma para todos los días): textos, orden, añadir y quitar
+let mDraft = null;
+function morningEdit(){
+  mDraft = mDraft || (P().morning || []).map((t, i) => ({t, old: i}));
+  miniForm.innerHTML = `<h2>✏️ Editar el Arranque</h2><p class="iahint">Se aplica a todos los días. Ordena arrastrando ⠿ o con las flechas.</p>
+    <div class="mlist medit-list">${mDraft.map((m, k) => `<div class="medit" draggable="true" data-mi="${k}"><span class="mgrip" title="Arrastrar">⠿</span>
+      <input type="text" data-mtxt="${k}" value="${esc(m.t)}" placeholder="Escribe el punto…">
+      <button type="button" class="micon" data-mup="${k}" ${k === 0 ? 'disabled' : ''} aria-label="Subir">↑</button><button type="button" class="micon" data-mdown="${k}" ${k === mDraft.length - 1 ? 'disabled' : ''} aria-label="Bajar">↓</button><button type="button" class="micon del" data-mrm="${k}" aria-label="Quitar">×</button></div>`).join('')}</div>
+    <button type="button" class="btn" data-madd>+ Añadir punto</button>
+    <div class="actions"><button type="button" class="btn" data-mcancel>Cancelar</button><span class="sp"></span><button type="button" class="btn primary" data-msave>Guardar</button></div>`;
+}
+const mSync = () => miniForm.querySelectorAll('[data-mtxt]').forEach(i => { mDraft[+i.dataset.mtxt].t = i.value; });
+function mMove(from, to){ mSync(); if (to < 0 || to >= mDraft.length || from === to) return; const [x] = mDraft.splice(from, 1); mDraft.splice(to, 0, x); morningEdit(); }
+function mSave(){
+  mSync();
+  const keep = mDraft.map(m => ({...m, t: m.t.trim()})).filter(m => m.t);
+  const p = P(), map = new Map(keep.filter(m => m.old != null).map((m, i) => [m.old, keep.indexOf(m)]));
+  p.morning = keep.map(m => m.t);
+  for (const d in (p.morningDone || {})) p.morningDone[d] = (p.morningDone[d] || []).filter(i => map.has(i)).map(i => map.get(i));   // lo ya marcado sigue marcado
+  mDraft = null; O.save(); openMorning(miniDay); O.render();
+}
+miniForm.addEventListener('click', e => {
+  if (e.target.closest('[data-medit]')){ mDraft = null; morningEdit(); return; }
+  if (!mDraft) return;
+  const t = e.target.closest('[data-mup],[data-mdown],[data-mrm],[data-madd],[data-mcancel],[data-msave]'); if (!t) return;
+  if (t.dataset.mup) return mMove(+t.dataset.mup, +t.dataset.mup - 1);
+  if (t.dataset.mdown) return mMove(+t.dataset.mdown, +t.dataset.mdown + 1);
+  if (t.dataset.mrm){ mSync(); mDraft.splice(+t.dataset.mrm, 1); return morningEdit(); }
+  if (t.hasAttribute('data-madd')){ mSync(); mDraft.push({t: '', old: null}); morningEdit(); const ins = miniForm.querySelectorAll('[data-mtxt]'); ins[ins.length - 1].focus(); return; }
+  if (t.hasAttribute('data-mcancel')){ mDraft = null; return openMorning(miniDay); }
+  if (t.hasAttribute('data-msave')) return mSave();
+});
+let mDrag = null;
+miniForm.addEventListener('dragstart', e => { const r = e.target.closest && e.target.closest('.medit'); if (!r || !mDraft) return; if (e.target.tagName === 'INPUT') return e.preventDefault(); mDrag = +r.dataset.mi; e.dataTransfer.effectAllowed = 'move'; r.classList.add('dragging'); });
+miniForm.addEventListener('dragover', e => { const r = e.target.closest && e.target.closest('.medit'); if (mDrag == null || !r) return; e.preventDefault(); miniForm.querySelectorAll('.medit.over').forEach(x => x.classList.remove('over')); r.classList.add('over'); });
+miniForm.addEventListener('drop', e => { const r = e.target.closest && e.target.closest('.medit'); if (mDrag == null || !r) return; e.preventDefault(); const f = mDrag; mDrag = null; mMove(f, +r.dataset.mi); });
+miniForm.addEventListener('dragend', () => { mDrag = null; miniForm.querySelectorAll('.medit').forEach(x => x.classList.remove('over', 'dragging')); });
+miniForm.addEventListener('keydown', e => { if (mDraft && e.key === 'Enter' && e.target.dataset.mtxt != null){ e.preventDefault(); } });
 function openKColor(key, name, day){
   miniKey = key; miniDay = null; miniForm.dataset.day = day || '';
   const mv = day && ((P().moved || {})[day] || {})[key];
@@ -629,7 +667,7 @@ miniForm.addEventListener('click', e => {
   if (c){ const kc = P().kcolors = P().kcolors || {}; kc[miniKey] = c.dataset.kcol; O.save(); miniForm.querySelectorAll('[data-kcol]').forEach(b => b.classList.toggle('on', b === c)); return; }
   if (e.target.closest('[data-mall]') && miniDay){ const p = P(); p.morningDone = p.morningDone || {}; p.morningDone[miniDay] = (p.morning || []).map((_, i) => i); O.save(); miniForm.querySelectorAll('[data-mk]').forEach(x => x.checked = true); }
 });
-miniDlg.addEventListener('close', () => { if (S.view === 'dia') O.render(); });
+miniDlg.addEventListener('close', () => { mDraft = null; if (S.view === 'dia') O.render(); });
 miniDlg.addEventListener('click', e => { if (e.target === miniDlg) miniDlg.close(); });
 /* ---------- Eventos de Google desde la semana: crear, mover, estirar, editar y borrar ---------- */
 const evDlg = document.createElement('dialog'); evDlg.id = 'evDlg';
