@@ -6,7 +6,7 @@
 <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' https://www.gstatic.com https://apis.google.com https://accounts.google.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://accounts.google.com; font-src https://fonts.gstatic.com; connect-src https://api.clickup.com https://script.google.com https://script.googleusercontent.com https://accounts.google.com https://firestore.googleapis.com https://identitytoolkit.googleapis.com https://securetoken.googleapis.com https://www.googleapis.com https://apis.google.com; frame-src 'self' https://organizador-jp.firebaseapp.com https://accounts.google.com; img-src 'self' data: https://lh3.googleusercontent.com https://www.google.com; manifest-src 'self'; base-uri 'none'; form-action 'self'; object-src 'none'">
 <meta name="referrer" content="no-referrer">
 <meta name="robots" content="noindex, nofollow">
-<link rel="manifest" href="manifest.json?v=20261123094234">
+<link rel="manifest" href="manifest.json?v=20261123095255">
 <link rel="icon" href="icon-192.png">
 <link rel="apple-touch-icon" href="icon-180.png">
 <meta name="theme-color" content="#0a0a0b">
@@ -1094,6 +1094,18 @@ html[data-theme=light] .jplogo .lg-l{display:block}
 #pizarraBox{position:fixed;inset:0;z-index:1000;background:var(--bg,#fff)}
 #pizarraBox iframe{position:absolute;inset:0;width:100%;height:100%;border:0}
 .btn-piz{display:inline-flex;align-items:center;gap:6px;margin-left:auto;height:34px;font-size:14px;cursor:pointer;background:var(--card,#fff)}
+
+/* Archivos del ordenador vinculados a una tarea */
+.edfiles{display:flex;flex-direction:column;gap:8px;border-radius:12px;transition:box-shadow .15s}
+.edfiles.over{box-shadow:0 0 0 2px var(--accent)}
+.fchips{display:flex;flex-wrap:wrap;gap:6px}.fchips:empty{display:none}
+.fchip{display:inline-flex;align-items:center;border-radius:999px;background:color-mix(in srgb,var(--accent) 12%,transparent);max-width:100%}
+.fchip a{padding:4px 4px 4px 10px;color:var(--accent);text-decoration:none;font:600 13px var(--body);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:260px}
+.fchip button{border:0;background:none;color:var(--muted);cursor:pointer;padding:2px 9px 2px 4px;font-size:15px}
+.fbtns{display:flex;flex-wrap:wrap;gap:8px;align-items:center}.fbtns .btn{height:34px;font-size:13px}.fbtns small{color:var(--faint);font-size:12px;flex-basis:100%}
+.cdlist{display:flex;flex-direction:column;max-height:55vh;overflow:auto;gap:2px}
+.cdrow{text-align:left;border:0;background:none;padding:9px 10px;border-radius:9px;cursor:pointer;font:500 14px var(--body);color:var(--text)}
+.cdrow:hover{background:var(--hover,rgba(0,0,0,.05))}
 </style>
 </head>
 <body>
@@ -1156,7 +1168,7 @@ html[data-theme=light] .jplogo .lg-l{display:block}
   </div>
   <label>Notas y enlaces<textarea name="notes" rows="4" placeholder="Recursos, enlaces, lo que te han pasado para hacer esta tarea…"></textarea></label>
   <div class="edlinks" id="edLinks"></div>
-  <div class="actions"><button class="btn danger" value="del">Borrar</button><a class="btn" id="edLink" target="_blank" rel="noopener" hidden>ClickUp ↗</a><span class="sp"></span><button class="btn" value="cancel" formnovalidate>Cancelar</button><button class="btn primary" value="ok">Guardar</button></div>
+  <div class="actions"><button type="button" class="btn danger" data-edclose="del">Borrar</button><a class="btn" id="edLink" target="_blank" rel="noopener" hidden>ClickUp ↗</a><span class="sp"></span><button type="button" class="btn" data-edclose="cancel">Cancelar</button><button class="btn primary" value="ok">Guardar</button></div>
 </form></dialog>
 
 <dialog id="st"><form method="dialog" class="sheet">
@@ -1176,12 +1188,13 @@ html[data-theme=light] .jplogo .lg-l{display:block}
 
 <div class="toast" id="toast"></div>
 
-<script src="app.js?v=20261123094234"></script>
-<script src="planner.js?v=20261123094234"></script>
-<script src="clients.js?v=20261123094234"></script>
-<script src="quick.js?v=20261123094234"></script>
-<script src="ia.js?v=20261123094234"></script>
-<script src="hours.js?v=20261123094234"></script>
-<script type="module" src="cloud.js?v=20261123094234"></script>
+<script src="app.js?v=20261123095255"></script>
+<script src="planner.js?v=20261123095255"></script>
+<script src="clients.js?v=20261123095255"></script>
+<script src="quick.js?v=20261123095255"></script>
+<script src="ia.js?v=20261123095255"></script>
+<script src="hours.js?v=20261123095255"></script>
+<script src="archivos.js?v=20261123095255"></script>
+<script type="module" src="cloud.js?v=20261123095255"></script>
 </body>
 </html>

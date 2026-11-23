@@ -473,10 +473,11 @@ const noteOf = id => ((S.plan && S.plan.tnotes) || {})[id] || '';
 function setNote(id, txt){ if (!S.plan) return; const n = S.plan.tnotes = S.plan.tnotes || {}; txt = txt.trim(); if (txt) n[id] = txt; else delete n[id]; }
 const linkHost = u => { try { return new URL(u).hostname.replace(/^www\./, ''); } catch(e){ return 'enlace'; } };
 function notePeek(id){
-  const n = noteOf(id); if (!n) return '';
+  const n = noteOf(id), fs = (window.__org && window.__org.filesOf) ? window.__org.filesOf(id) : [];
+  if (!n && !fs.length) return '';
   const links = [...new Set(n.match(URL_RE) || [])];
   const text = n.replace(URL_RE, '').replace(/\s+/g, ' ').trim();
-  return `<div class="npeek">${text ? `<span class="ntx">📝 ${esc(text)}</span>` : ''}${links.slice(0, 2).map(u => `<a class="nlink" href="${esc(u)}" target="_blank" rel="noopener" title="${esc(u)}">🔗 ${esc(linkHost(u))}</a>`).join('')}${links.length > 2 ? `<span class="nmore">+${links.length - 2}</span>` : ''}</div>`;
+  return `<div class="npeek">${text ? `<span class="ntx">📝 ${esc(text)}</span>` : ''}${links.slice(0, 2).map(u => `<a class="nlink" href="${esc(u)}" target="_blank" rel="noopener" title="${esc(u)}">🔗 ${esc(linkHost(u))}</a>`).join('')}${links.length > 2 ? `<span class="nmore">+${links.length - 2}</span>` : ''}${fs.slice(0, 2).map(f => `<a class="nlink" href="#" data-fopen="${esc(id)}|${f.id}" title="Abrir ${esc(f.name)}">${f.kind === 'dir' ? '📁' : '📎'} ${esc(f.name)}</a>`).join('')}${fs.length > 2 ? `<span class="nmore">+${fs.length - 2}</span>` : ''}</div>`;
 }
 function card(t, hide={}){
   const c = client(t.client), done = t.status === 'done', late = !done && t.day && t.day < today();
@@ -795,7 +796,7 @@ ed.addEventListener('close', () => {
   save(); render();
   if (revisada) pushCreate(t); else afterChange(t, was);
 });
-ed.addEventListener('click', e => { if (e.target === ed) ed.close('cancel'); });
+ed.addEventListener('click', e => { if (e.target === ed) return ed.close('cancel'); const b = e.target.closest('[data-edclose]'); if (b) ed.close(b.dataset.edclose); });
 
 /* ---------- Captura ---------- */
 const q = $('#q'), pv = $('#pv');
@@ -1007,5 +1008,5 @@ if (online()) sync(true);
 // Mantener PC y móvil al día: cada 60 s con la app abierta y al volver a ella
 setInterval(() => { if (document.visibilityState === 'visible') sync(true); }, 60000);
 document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') sync(true); });
-window.__org = {S, isApartado, byClientOrder, GROUP, clientColor, URG, urgRank, parse, pushCreate, uid, maxOrder, clientLists, online, PALETA, cu, listInfo, norm, isRegTask, applyCloud, cloudEmpty, cloudReady, wipeLocal, toast, views, render, save, card, setToolbar, visibleTasks, client, task, esc, iso, fromIso, addDays, today, dayLabel, DIAS_L, MESES, pad, byOrder};
+window.__org = {editingId: () => editing, S, isApartado, byClientOrder, GROUP, clientColor, URG, urgRank, parse, pushCreate, uid, maxOrder, clientLists, online, PALETA, cu, listInfo, norm, isRegTask, applyCloud, cloudEmpty, cloudReady, wipeLocal, toast, views, render, save, card, setToolbar, visibleTasks, client, task, esc, iso, fromIso, addDays, today, dayLabel, DIAS_L, MESES, pad, byOrder};
 })();
