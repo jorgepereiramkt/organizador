@@ -243,7 +243,7 @@ function resumen(c){
 function fichaCard(c){
   const sv = c.services || [];
   return `<article class="ficha" data-ficha="${c.id}" draggable="true" data-fdrag="${c.id}" style="--c:${O.clientColor(c)}" tabindex="0">
-    <header><i></i><b>${esc(c.name)}</b>${tierBadge(c)}${c.hours ? `<span class="hrs">${c.hours} h/mes</span>` : ''}</header>
+    <header><i></i><b>${esc(c.name)}</b>${tierBadge(c)}${c.hours ? `<span class="hrs">${c.hours} h/mes</span>` : ''}<button type="button" class="fpiz" data-pizarra="${c.id}" title="Abrir la pizarra de ${esc(c.name)}" aria-label="Pizarra">🖊️</button></header>
     ${c.group !== 'mine' && agPago(c) ? `<div class="ffee">${rng(agPago(c).a, agPago(c).b)}<small>/mes a la agencia</small></div>
       ${estadoDe(c) === 'actual' ? `<div class="peso" title="Peso en lo que pagan tus clientes de agencia"><i><span style="width:${agPeso(c)}%"></span></i><b>${agPeso(c)}%</b></div>` : ''}` : ''}
     ${c.group === 'mine' && feeTxt(c) ? `<div class="ffee">${esGratis(c) ? '🎁 Gratis' : `${feeTxt(c)}<small>/mes sin IVA</small>`}</div>` : ''}
@@ -252,7 +252,21 @@ function fichaCard(c){
   </article>`;
 }
 document.addEventListener('click', e => {
+  const p = e.target.closest('[data-pizarra]'); if (p){ e.preventDefault(); e.stopPropagation(); if (dlg.open) dlg.close(); return openPizarra(p.dataset.pizarra); }
   const f = e.target.closest('[data-ficha]'); if (f) openFicha(f.dataset.ficha);
+}, true);
+
+/* ---------- Pizarra infinita del cliente (pizarra.html, se guarda en tu Drive) ---------- */
+function openPizarra(id){
+  if (!O.client(id) || document.getElementById('pizarraBox')) return;
+  const v = ((document.querySelector('script[src*="app.js?v="]') || {}).src || '').split('v=')[1] || '';
+  const box = document.createElement('div'); box.id = 'pizarraBox';
+  box.innerHTML = `<iframe src="pizarra.html?c=${encodeURIComponent(id)}&v=${v}" title="Pizarra" allow="clipboard-read; clipboard-write; fullscreen"></iframe>`;
+  document.body.appendChild(box); document.body.style.overflow = 'hidden';
+}
+window.addEventListener('message', e => {
+  if (e.origin !== location.origin || !e.data || e.data.pizarra !== 'close') return;
+  const b = document.getElementById('pizarraBox'); if (b) b.remove(); document.body.style.overflow = '';
 });
 document.addEventListener('keydown', e => {
   const f = e.target.closest && e.target.closest('[data-ficha]'); if (f && e.key === 'Enter') openFicha(f.dataset.ficha);
@@ -292,7 +306,7 @@ function draw(){
   for (const n of [...desdeCU, ...SUGERIDOS]){ const k = n.toLowerCase(); if (!vistos.has(k)){ vistos.add(k); sugeridos.push(n); } }
   sugeridos.splice(14);
   form.innerHTML = `
-    <h2><label class="cpick" title="Elegir color"><input type="color" data-f="ccustom" value="${O.clientColor(c)}"><span class="dot" style="background:${O.clientColor(c)}"></span></label> ${esc(c.name)} <span class="badge">${ag ? 'Agencia' : '🔒 Mío'}</span></h2>
+    <h2><label class="cpick" title="Elegir color"><input type="color" data-f="ccustom" value="${O.clientColor(c)}"><span class="dot" style="background:${O.clientColor(c)}"></span></label> ${esc(c.name)} <span class="badge">${ag ? 'Agencia' : '🔒 Mío'}</span> <button type="button" class="btn ghost btn-piz" data-pizarra="${c.id}">🖊️ Pizarra</button></h2>
     ${ag ? `<label>Cuánto paga a la agencia (€/mes sin IVA) · una cifra o un rango<input type="text" inputmode="decimal" data-ag value="${esc(c.agFeeTxt || '')}" placeholder="Ej.: 2500 o 2000-3000"></label>` : ''}
     <label>${ag ? 'Horas al mes con este cliente' : 'Horas al mes que le dedicas (aprox.) · para ver cuánto ganas por hora'}<input type="number" min="0" step="0.5" data-f="hours" value="${c.hours || ''}" placeholder="${ag ? 'normalmente entre 8 y 20' : 'Ej.: 10'}"></label>
     ${ag ? `<div class="row"><label>Estado<select data-f="estado">${ESTADOS.map(([k, t]) => `<option value="${k}" ${estadoDe(c) === k ? 'selected' : ''}>${t}</option>`).join('')}</select></label>
