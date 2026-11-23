@@ -6,7 +6,7 @@
 <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' https://www.gstatic.com https://apis.google.com https://accounts.google.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://accounts.google.com; font-src https://fonts.gstatic.com; connect-src https://api.clickup.com https://script.google.com https://script.googleusercontent.com https://accounts.google.com https://firestore.googleapis.com https://identitytoolkit.googleapis.com https://securetoken.googleapis.com https://www.googleapis.com https://apis.google.com; frame-src 'self' https://organizador-jp.firebaseapp.com https://accounts.google.com; img-src 'self' data: https://lh3.googleusercontent.com https://www.google.com; manifest-src 'self'; base-uri 'none'; form-action 'self'; object-src 'none'">
 <meta name="referrer" content="no-referrer">
 <meta name="robots" content="noindex, nofollow">
-<link rel="manifest" href="manifest.json?v=20261123115324">
+<link rel="manifest" href="manifest.json?v=20261123131117">
 <link rel="icon" href="icon-192.png">
 <link rel="apple-touch-icon" href="icon-180.png">
 <meta name="theme-color" content="#0a0a0b">
@@ -1234,6 +1234,23 @@ textarea.over{box-shadow:0 0 0 2px var(--accent)}
 .dnote{width:100%;box-sizing:border-box;border:1px solid var(--line)!important;border-radius:12px!important;background:var(--bg)!important;padding:10px 12px!important;font:14px/1.45 var(--body)!important;color:var(--text);resize:vertical;outline:none;min-height:46px;transition:border-color .15s,box-shadow .15s}
 .dnote:focus{border-color:var(--c)!important;box-shadow:0 0 0 3px color-mix(in srgb,var(--c) 22%,transparent);background:var(--surface)!important}
 .dnote::placeholder{color:var(--faint)}
+
+/* Clientes → guía a la izquierda */
+.cliwrap{display:grid;grid-template-columns:210px minmax(0,1fr);gap:22px;align-items:start}
+.cliguia{position:sticky;top:12px;max-height:calc(100vh - 24px);overflow-y:auto;background:var(--surface);border:1px solid var(--line);border-radius:16px;padding:10px 8px;display:flex;flex-direction:column;gap:12px}
+.cg-grp{display:flex;flex-direction:column;gap:2px}
+.cg-grp>b{font:700 11px var(--body);letter-spacing:.08em;text-transform:uppercase;padding:4px 8px 6px}
+.cg-mine>b{color:#3DDC97}.cg-ag>b{color:#4F8CFF}
+.cg-it{display:flex;align-items:center;gap:9px;width:100%;text-align:left;background:none;border:0;border-radius:10px;padding:7px 8px;font:500 13.5px var(--body);color:var(--ink,inherit);cursor:pointer}
+.cg-it:hover{background:var(--line)}
+.cg-it i{width:9px;height:9px;border-radius:50%;background:var(--cc);flex:none}
+.cg-it span{flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.cg-it em{font-style:normal;font-size:11.5px;font-weight:700;min-width:20px;text-align:center;padding:1px 6px;border-radius:99px;background:color-mix(in srgb,var(--cc) 22%,transparent)}
+.cg-it.vacio{opacity:.5}
+.col{scroll-margin-top:16px}
+.col.flash{animation:cgflash 1.4s ease-out}
+@keyframes cgflash{0%,30%{box-shadow:0 0 0 3px var(--cc,var(--accent))}100%{box-shadow:0 0 0 3px transparent}}
+@media (max-width:900px){ .cliwrap{grid-template-columns:1fr;gap:12px} .cliguia{position:sticky;top:0;z-index:5;flex-direction:row;overflow-x:auto;max-height:none;padding:8px;gap:14px} .cg-grp{flex-direction:row;align-items:center} .cg-grp>b{padding:0 4px;white-space:nowrap} .cg-it{width:auto;white-space:nowrap} .cg-it span{overflow:visible} }
 </style>
 </head>
 <body>
@@ -1316,16 +1333,16 @@ textarea.over{box-shadow:0 0 0 2px var(--accent)}
 
 <div class="toast" id="toast"></div>
 
-<script src="app.js?v=20261123115324"></script>
-<script src="planner.js?v=20261123115324"></script>
-<script src="clients.js?v=20261123115324"></script>
-<script src="quick.js?v=20261123115324"></script>
-<script src="ia.js?v=20261123115324"></script>
-<script src="hours.js?v=20261123115324"></script>
-<script src="cliente.js?v=20261123115324"></script>
-<script src="diario.js?v=20261123115324"></script>
-<script src="imagenes.js?v=20261123115324"></script>
-<script src="archivos.js?v=20261123115324"></script>
-<script type="module" src="cloud.js?v=20261123115324"></script>
+<script src="app.js?v=20261123131117"></script>
+<script src="planner.js?v=20261123131117"></script>
+<script src="clients.js?v=20261123131117"></script>
+<script src="quick.js?v=20261123131117"></script>
+<script src="ia.js?v=20261123131117"></script>
+<script src="hours.js?v=20261123131117"></script>
+<script src="cliente.js?v=20261123131117"></script>
+<script src="diario.js?v=20261123131117"></script>
+<script src="imagenes.js?v=20261123131117"></script>
+<script src="archivos.js?v=20261123131117"></script>
+<script type="module" src="cloud.js?v=20261123131117"></script>
 </body>
 </html>

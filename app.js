@@ -581,6 +581,7 @@ const views = {
     }
     // En filas que se adaptan a la pantalla (sin deslizar). Primero los clientes con tareas pendientes, luego el resto.
     html += '<div class="board grid">';
+    let guia = '';
     for (const [g, label] of [['mine','Mis clientes'],['agency','Agencia']]){
       let cs = visibleClients().filter(c => c.group === g);
       const apartados = S.clients.filter(c => c.group === g && isApartado(c)).length;
@@ -593,12 +594,15 @@ const views = {
       }).sort((a, b) => (b.pend.length > 0) - (a.pend.length > 0) || a.i - b.i);
       const conT = cols.filter(x => x.pend.length).length, gc = g === 'mine' ? 'mine' : 'ag';
       html += `<div class="sep sep-${gc}"><b>${g === 'mine' ? '🔒 Mis clientes' : '🏢 Agencia'}</b><span>${conT} con tareas · ${cols.length - conT} sin pendientes${apartados ? ` · ${apartados} pausado${apartados > 1 ? 's' : ''} o antiguo${apartados > 1 ? 's' : ''} (en Fichas)` : ''}</span></div>`;
+      guia += `<div class="cg-grp cg-${gc}"><b>${g === 'mine' ? '🔒 Mis clientes' : '🏢 Agencia'}</b>${cols.map(({c, pend}) =>
+        `<button type="button" class="cg-it${pend.length ? '' : ' vacio'}" data-cgo="${esc(c.id)}" style="--cc:${clientColor(c)}"><i></i><span>${esc(c.name)}</span>${pend.length ? `<em>${pend.length}</em>` : ''}</button>`).join('')}</div>`;
       for (const {c, pend, hechas} of cols)
         html += column({title:c.name, sub: hechas ? `${hechas} hecha${hechas>1?'s':''}` : '', field:'client', value:c.id, tasks:pend, hide:{client:true, urg:true, group:true, pick:true}, dot:clientColor(c), add: hoyMode ? undefined : c.id, cls: `cg-${gc} ${pend.length ? '' : 'quiet'}`, byUrg:true});
     }
     const sin = T.filter(x => (!x.client || !client(x.client)) && x.status !== 'done');
     if (S.group === 'all' && sin.length) html += column({title:'Sin cliente', field:'client', value:'', tasks:sin, hide:{client:true, pick:true}, dot:'var(--faint)', byUrg:true});
-    return html + '</div>';
+    // Guía a la izquierda: pulsa un cliente y te lleva a sus tareas
+    return html.replace('<div class="board grid">', `<div class="cliwrap"><nav class="cliguia" aria-label="Ir a un cliente">${guia}</nav><div class="board grid">`) + '</div></div>';
   },
 };
 
@@ -731,6 +735,13 @@ main.addEventListener('touchstart', e => {
 }, {passive:true});
 main.addEventListener('contextmenu', e => { if (e.target.closest('.card')) e.preventDefault(); });
 
+main.addEventListener('click', e => {
+  const g = e.target.closest('[data-cgo]'); if (!g) return;
+  const col = main.querySelector(`.col[data-field="client"][data-value="${CSS.escape(g.dataset.cgo)}"]`); if (!col) return;
+  col.scrollIntoView({behavior: matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth', block: 'start'});
+  col.classList.remove('flash'); void col.offsetWidth; col.classList.add('flash');
+  setTimeout(() => col.classList.remove('flash'), 1600);
+});
 main.addEventListener('click', window.__cardClick = e => {
   if (justDragged) return;
   const pk = e.target.closest('[data-pick]');
