@@ -614,6 +614,9 @@ O.statsBar = function(){
 O.views.dia = function(){ return S.diaMode === 'foco' ? focoView() : S.diaMode === 'diario' && O.diarioView ? O.diarioView() : S.diaMode === 'semana' ? weekView() : diaView(); };
 O.views.dia.after = () => { if (S.diaMode === 'foco') return focoAfter(); if (S.diaMode === 'diario' && O.diarioView) return O.diarioAfter && O.diarioAfter(); diaAfter(); centra(); };
 
+// al girar el iPad se recoloca la semana
+let giroT = null; addEventListener('resize', () => { clearTimeout(giroT); giroT = setTimeout(() => { if (S.view === 'dia' && S.diaMode === 'semana' && !document.querySelector('dialog[open]')) O.render(); }, 250); });
+
 /* ---------- 📍 Dónde trabajo cada día (y el empujón para salir de casa) ---------- */
 const LUGARES = {casa: '🏠 Casa', cafe: '☕ Cafetería', work: '💼 Work Café'};
 const lugarDe = d => ((P().lugar || {})[d]) || '';
