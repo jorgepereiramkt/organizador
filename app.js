@@ -93,7 +93,7 @@ function cloudSaved(data, mezclado){
 }
 function cloudData(){
   return JSON.parse(JSON.stringify({
-    clients: S.clients.map(({id,name,group,color,keywords,listId,auto,services,hours,notes,estado,fee,feeMin,feeMax,since,ord,tier,ingreso,fixTxt,varTxt,varOn,varBase,agFeeTxt,ccustom}) => ({id,name,group,color,keywords,listId,auto,services,hours,notes,estado,fee,feeMin,feeMax,since,ord,tier,ingreso,fixTxt,varTxt,varOn,varBase,agFeeTxt,ccustom})),
+    clients: S.clients.map(({id,name,group,color,keywords,listId,auto,services,hours,notes,estado,fee,feeMin,feeMax,since,ord,tier,ingreso,fixTxt,varTxt,varOn,varBase,agFeeTxt,ccustom,proyecto}) => ({id,name,group,color,keywords,listId,auto,services,hours,notes,estado,fee,feeMin,feeMax,since,ord,tier,ingreso,fixTxt,varTxt,varOn,varBase,agFeeTxt,ccustom,proyecto})),
     tasks: S.tasks.filter(t => !t.cu && !t.demo),
     token: S.cu.token || '', hidden: S.cu.hidden || [], plan: S.plan || null, slots: S.slots || {}, hours: S.hours || null, ai: S.ai || null,
     picks: Object.fromEntries(S.tasks.filter(t => t.cu && t.today && t.today >= iso(addDays(new Date(), -7))).map(t => [t.id, t.today])) }));
@@ -341,13 +341,13 @@ const PRIO = {super:1, alta:2, normal:3, baja:4};
 const dueMs = day => { const d = fromIso(day); d.setHours(12); return d.getTime(); };
 const snap = t => ({title:t.title, day:t.day, status:t.status, priority:t.priority, client:t.client});
 
-const isAgency = id => { const c = client(id); return !!(c && c.group === 'agency'); };
+const isAgency = id => { const c = client(id); return !!(c && c.group === 'agency' && !c.proyecto); };   // los proyectos son de la agencia pero solo viven en la app
 
 // Regla de oro: solo se sube a ClickUp lo que es de un cliente marcado como «Agencia». Lo tuyo nunca sale de la app.
 const subiendo = new Set();   // tareas que se están creando en ClickUp ahora mismo (evita crearlas dos veces)
 async function pushCreate(t){
   const c = client(t.client);
-  if (!online() || t.cu || t.ia || !c || c.group !== 'agency') return;   // las de la IA esperan a que las revises
+  if (!online() || t.cu || t.ia || !c || c.group !== 'agency' || c.proyecto) return;   // las de la IA esperan a que las revises; los proyectos no van a ClickUp
   if (subiendo.has(t.id)) return;
   const oldId = t.id; subiendo.add(oldId);
   const l = chooseList(c, t.title);
@@ -380,6 +380,7 @@ async function afterChange(t, before){
   const c = client(t.client);
   if (before.client !== t.client){
     if (!c || c.group !== 'agency') return revert('Las tareas de la agencia se quedan en la agencia');
+    if (c.proyecto) return revert('Las tareas de ClickUp no pasan a un proyecto (los proyectos solo viven aquí)');
     const from = listInfo(t.listId), to = chooseList(c, t.title, t.listName);
     if (!to) return revert('Ese cliente no tiene listas en ClickUp');
     if (from && from.team !== to.team) return revert('No se puede mover entre espacios de trabajo distintos');
@@ -634,11 +635,11 @@ const views = {
       }).sort((a, b) => (b.pend.length > 0) - (a.pend.length > 0) || a.i - b.i);
       const conT = cols.filter(x => x.pend.length).length, gc = g === 'mine' ? 'mine' : 'ag', sel = S.cliSel && client(S.cliSel) ? S.cliSel : null;
       if (sel){ for (const {c, pend, hechas} of cols) if (c.id === sel) html += column({title:c.name, sub: hechas ? `${hechas} hecha${hechas>1?'s':''}` : '', field:'client', value:c.id, tasks:pend, hide:{client:true, urg:true, group:true, pick:true}, dot:clientColor(c), add: c.id, cls: `cg-${gc} solo`, byUrg:true}); continue; }
-      html += `<div class="sep sep-${gc}"><b>${g === 'mine' ? '🔒 Mis clientes' : '🏢 Agencia'}</b><span>${conT} con tareas · ${cols.length - conT} sin pendientes${apartados ? ` · ${apartados} pausado${apartados > 1 ? 's' : ''} o antiguo${apartados > 1 ? 's' : ''} (en Fichas)` : ''}</span></div>`;
+      html += `<div class="sep sep-${gc}"><b>${g === 'mine' ? '🔒 Mis clientes' : '🏢 Agencia'}</b>${g === 'agency' ? '<button type="button" class="btn nproy" data-nproy>+ Proyecto</button>' : ''}<span>${conT} con tareas · ${cols.length - conT} sin pendientes${apartados ? ` · ${apartados} pausado${apartados > 1 ? 's' : ''} o antiguo${apartados > 1 ? 's' : ''} (en Fichas)` : ''}</span></div>`;
       guia += `<div class="cg-grp cg-${gc}"><b>${g === 'mine' ? '🔒 Mis clientes' : '🏢 Agencia'}</b>${cols.map(({c, pend}) =>
-        `<button type="button" class="cg-it${pend.length ? '' : ' vacio'}${sel === c.id ? ' on' : ''}" aria-pressed="${sel === c.id}" data-cgo="${esc(c.id)}" style="--cc:${clientColor(c)}"><i></i><span>${esc(c.name)}</span>${pend.length ? `<em>${pend.length}</em>` : ''}</button>`).join('')}</div>`;
+        `<button type="button" class="cg-it${pend.length ? '' : ' vacio'}${sel === c.id ? ' on' : ''}" aria-pressed="${sel === c.id}" data-cgo="${esc(c.id)}" style="--cc:${clientColor(c)}"><i></i><span>${c.proyecto ? '📁 ' : ''}${esc(c.name)}</span>${pend.length ? `<em>${pend.length}</em>` : ''}</button>`).join('')}</div>`;
       for (const {c, pend, hechas} of cols)
-        html += column({title:c.name, sub: hechas ? `${hechas} hecha${hechas>1?'s':''}` : '', field:'client', value:c.id, tasks:pend, hide:{client:true, urg:true, group:true, pick:true}, dot:clientColor(c), add: hoyMode ? undefined : c.id, cls: `cg-${gc} ${pend.length ? '' : 'quiet'}`, byUrg:true});
+        html += column({title:(c.proyecto ? '📁 ' : '') + c.name, sub: hechas ? `${hechas} hecha${hechas>1?'s':''}` : '', field:'client', value:c.id, tasks:pend, hide:{client:true, urg:true, group:true, pick:true}, dot:clientColor(c), add: hoyMode ? undefined : c.id, cls: `cg-${gc} ${pend.length ? '' : 'quiet'}`, byUrg:true});
     }
     const sin = T.filter(x => (!x.client || !client(x.client)) && x.status !== 'done');
     if (S.group === 'all' && sin.length && !(S.cliSel && client(S.cliSel))) html += column({title:'Sin cliente', field:'client', value:'', tasks:sin, hide:{client:true, pick:true}, dot:'var(--faint)', byUrg:true});
@@ -776,6 +777,12 @@ main.addEventListener('touchstart', e => {
 }, {passive:true});
 main.addEventListener('contextmenu', e => { if (e.target.closest('.card')) e.preventDefault(); });
 
+main.addEventListener('click', e => {
+  if (!e.target.closest('[data-nproy]')) return;
+  const nombre = (prompt('Nombre del proyecto (de la agencia, solo en esta app, sin ClickUp):') || '').trim(); if (!nombre) return;
+  const c = {id: uid(), name: nombre, group: 'agency', proyecto: true, color: PALETA[S.clients.length % PALETA.length], keywords: '', estado: 'activo'};
+  S.clients.push(c); S.cliSel = c.id; save(); render(); toast(`Proyecto «${nombre}» creado ✓ · añádele tareas`);
+});
 main.addEventListener('click', e => {
   const g = e.target.closest('[data-cgo]'); if (!g) return;
   S.cliSel = g.dataset.cgo && S.cliSel !== g.dataset.cgo ? g.dataset.cgo : null;   // otro clic en el mismo = quitar filtro
