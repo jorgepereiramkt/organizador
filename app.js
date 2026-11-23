@@ -1005,8 +1005,20 @@ applyTheme();
 matchMedia('(prefers-color-scheme: dark)').addEventListener('change', applyTheme);
 document.getElementById('themeBtn').addEventListener('click', () => { const dark = document.documentElement.dataset.theme === 'dark'; try { localStorage.setItem('jp-theme', dark ? 'light' : 'dark'); } catch(err){} applyTheme(); });
 document.addEventListener('click', e => { const b = e.target.closest('[data-themebtn]'); if (!b) return; try { localStorage.setItem('jp-theme', b.dataset.themebtn); } catch(err){} applyTheme(); });
-S.view = 'dia'; S.clientMode = 'tareas';   // al abrir la app se empieza en el Día
+// Al abrir la app se empieza en el Día; al RECARGAR (misma ventana) se vuelve a donde estabas, con el mismo scroll
+const NAV = 'jp-nav';
+let nav = null; try { nav = JSON.parse(sessionStorage.getItem(NAV) || 'null'); } catch(e){}
+S.view = (nav && nav.view) || 'dia'; S.clientMode = (nav && nav.cmode) || 'tareas';
+if (nav && nav.dmode) S.diaMode = nav.dmode;
+const guardaNav = () => { try { sessionStorage.setItem(NAV, JSON.stringify({view: S.view, cmode: S.clientMode, dmode: S.diaMode, y: scrollY, bx: main.querySelector('.board')?.scrollLeft || 0})); } catch(e){} };
+let navT = null; addEventListener('scroll', () => { clearTimeout(navT); navT = setTimeout(guardaNav, 200); }, {passive: true});
+addEventListener('pagehide', guardaNav); document.addEventListener('click', () => setTimeout(guardaNav, 50));
 render(); modeIdle();
+if (nav && (nav.y || nav.bx)){   // el contenido (calendario, ClickUp) tarda un poco en llegar: se reintenta unos segundos
+  let tocado = false; const marca = () => { tocado = true; };
+  addEventListener('wheel', marca, {once: true, passive: true}); addEventListener('touchstart', marca, {once: true, passive: true}); addEventListener('keydown', marca, {once: true});
+  [100, 600, 1500, 3000].forEach(ms => setTimeout(() => { if (tocado) return; scrollTo(0, nav.y || 0); const b = main.querySelector('.board'); if (b && nav.bx) b.scrollLeft = nav.bx; }, ms));
+}
 $('#mode').classList.add('mode-btn');
 $('#mode').addEventListener('click', () => online() ? sync() : ($('#settingsBtn').click()));
 if (online()) sync(true);
