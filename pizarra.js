@@ -110,7 +110,8 @@
       theme: dark ? 'dark' : 'light',
       initialData: {
         elements: data.elements, files: data.files, scrollToContent: !view.zoom,
-        appState: { viewBackgroundColor: data.bg || (dark ? '#121214' : '#ffffff'), currentItemFontFamily: 1,
+        appState: { viewBackgroundColor: (!data.bg || data.bg === '#121214') ? '#ffffff' : data.bg,   // en modo oscuro Excalidraw invierte los colores: el fondo se guarda blanco
+          currentItemFontFamily: 1,
           ...(view.zoom ? { scrollX: view.scrollX, scrollY: view.scrollY, zoom: { value: view.zoom } } : {}) }
       },
       UIOptions: { canvasActions: { loadScene: false, saveToActiveFile: false, export: { saveFileToDisk: true } } },
