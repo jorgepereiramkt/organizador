@@ -6,7 +6,7 @@
 <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' https://www.gstatic.com https://apis.google.com https://accounts.google.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://accounts.google.com; font-src https://fonts.gstatic.com; connect-src https://api.clickup.com https://script.google.com https://script.googleusercontent.com https://accounts.google.com https://firestore.googleapis.com https://identitytoolkit.googleapis.com https://securetoken.googleapis.com https://www.googleapis.com https://apis.google.com; frame-src 'self' https://organizador-jp.firebaseapp.com https://accounts.google.com; img-src 'self' data: https://lh3.googleusercontent.com https://www.google.com; manifest-src 'self'; base-uri 'none'; form-action 'self'; object-src 'none'">
 <meta name="referrer" content="no-referrer">
 <meta name="robots" content="noindex, nofollow">
-<link rel="manifest" href="manifest.json?v=20261123234325">
+<link rel="manifest" href="manifest.json?v=20261123235535">
 <link rel="icon" href="icon-192.png">
 <link rel="apple-touch-icon" href="icon-180.png">
 <meta name="theme-color" content="#0a0a0b">
@@ -1356,6 +1356,18 @@ textarea.over{box-shadow:0 0 0 2px var(--accent)}
 #refreshAll.girando{animation:girar 1s linear infinite;pointer-events:none}
 @keyframes girar{to{transform:rotate(360deg)}}
 @media (prefers-reduced-motion:reduce){#refreshAll.girando{animation:none;opacity:.5}}
+
+/* Día ampliado: clientes del bloque a la izquierda */
+.wk-split{display:grid;grid-template-columns:minmax(70px,32%) 1fr;gap:6px;margin-top:3px;min-height:0}
+.wk-split .wk-ts{margin-top:0}
+.wk-clis{list-style:none;margin:0;padding:4px 6px;border-radius:6px;background:color-mix(in srgb,var(--surface) 70%,transparent);display:flex;flex-direction:column;gap:3px;counter-reset:cli;align-self:start}
+.wk-clis li{counter-increment:cli;font:700 10.5px/1.2 var(--body);display:flex;gap:5px;align-items:baseline;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.wk-clis li::before{content:counter(cli);flex:none;width:14px;height:14px;border-radius:50%;background:var(--c);color:#fff;font-size:9px;display:inline-grid;place-items:center}
+.wk-head.ancha b{color:var(--accent)}
+.wk-head:not(.old){cursor:zoom-in}
+.wk-head.ancha{cursor:default}
+.wk-abrir{display:inline-block;margin-top:4px;font:600 11px var(--body);color:var(--muted);padding:2px 8px;border-radius:99px;border:1px solid var(--line);cursor:pointer}
+.wk-abrir:hover{color:var(--text);border-color:var(--accent)}
 </style>
 </head>
 <body>
@@ -1439,16 +1451,16 @@ textarea.over{box-shadow:0 0 0 2px var(--accent)}
 
 <div class="toast" id="toast"></div>
 
-<script src="app.js?v=20261123234325"></script>
-<script src="planner.js?v=20261123234325"></script>
-<script src="clients.js?v=20261123234325"></script>
-<script src="quick.js?v=20261123234325"></script>
-<script src="ia.js?v=20261123234325"></script>
-<script src="hours.js?v=20261123234325"></script>
-<script src="cliente.js?v=20261123234325"></script>
-<script src="diario.js?v=20261123234325"></script>
-<script src="imagenes.js?v=20261123234325"></script>
-<script src="archivos.js?v=20261123234325"></script>
-<script type="module" src="cloud.js?v=20261123234325"></script>
+<script src="app.js?v=20261123235535"></script>
+<script src="planner.js?v=20261123235535"></script>
+<script src="clients.js?v=20261123235535"></script>
+<script src="quick.js?v=20261123235535"></script>
+<script src="ia.js?v=20261123235535"></script>
+<script src="hours.js?v=20261123235535"></script>
+<script src="cliente.js?v=20261123235535"></script>
+<script src="diario.js?v=20261123235535"></script>
+<script src="imagenes.js?v=20261123235535"></script>
+<script src="archivos.js?v=20261123235535"></script>
+<script type="module" src="cloud.js?v=20261123235535"></script>
 </body>
 </html>

@@ -557,7 +557,10 @@ function weekView(){
   wkScale = {H0, H1, cum};
   let hours = '', lines = ''; for (let h = H0; h < H1; h += 60){ hours += `<div class="wk-h" style="top:${Y(h)}px"><span>${toHM(h)}</span></div>`; lines += `<i class="wk-line" style="top:${Y(h)}px"></i>`; }
   const peq = innerWidth < 1300;   // iPad: columnas más estrechas para que quepa sin salirse
-  const tpl = days.map(d => d < hoy ? (peq ? 'minmax(44px,.45fr)' : 'minmax(74px,.55fr)') : d === hoy ? (peq ? 'minmax(170px,2.2fr)' : 'minmax(240px,2.6fr)') : (peq ? 'minmax(72px,1fr)' : 'minmax(110px,1fr)')).join(' ');   // hoy, mucho más ancho
+  // el día «ampliado»: hoy, o el que toques; desde las 18:00, mañana (para dejarlo organizado)
+  const manana = O.iso(O.addDays(new Date(), 1));
+  const ancho = S.wkAncho && days.includes(S.wkAncho) && S.wkAncho >= hoy ? S.wkAncho : (nowMin >= 18 * 60 && days.includes(manana) && S.wkAncho !== hoy ? manana : hoy);
+  const tpl = days.map(d => d < hoy ? (peq ? 'minmax(44px,.45fr)' : 'minmax(74px,.55fr)') : d === ancho ? (peq ? 'minmax(170px,2.2fr)' : 'minmax(240px,2.6fr)') : d === hoy ? (peq ? 'minmax(90px,1.2fr)' : 'minmax(130px,1.3fr)') : (peq ? 'minmax(72px,1fr)' : 'minmax(110px,1fr)')).join(' ');
   const cols = per.map(({d, its}) => {
     const blocks = lanes(its.map(i => ({...i}))).map(i => {
       const top = Y(i.start), h = Math.max(16, Y(i.end) - Y(i.start) - 2);
@@ -568,8 +571,8 @@ function weekView(){
       if (i.kind === 'work'){ cls = 'work'; color = kcol.work || 'var(--accent)'; label = esc(i.bname || 'Trabajo');
         const ts = wkTasks(d, i, its); pendN = ts.filter(t => t.status !== 'done').length; extra = ts.length ? ` · ${ts.filter(t => t.status === 'done').length}/${ts.length}` : '';
         if (d < hoy){ cls += ' wk-old'; inner = pendN ? '' : ts.length ? `<span class="wk-sum">✓ ${ts.length}/${ts.length}</span>` : ''; }
-        else inner = `<div class="wk-ts">${ts.map((t, k) => { const c = O.client(t.client);
-          return `<article class="card wk-t${t.status === 'done' ? ' done' : ''}" data-id="${t.id}" style="--c:${O.clientColor(c)}"><span class="wk-n">#${k + 1}</span><button class="chk" aria-label="Completar"></button><span class="wk-tx"><span class="tt">${esc(t.title)}</span><span class="wk-cl">${c ? esc(c.name) : 'Sin cliente'}</span></span></article>`; }).join('')}</div>`; }
+        else inner = (d === ancho && ts.length ? `<div class="wk-split"><ol class="wk-clis" title="Clientes de este bloque, en orden">${[...new Map(ts.map(t => [t.client || '', O.client(t.client)])).values()].map(c => `<li style="--c:${O.clientColor(c)}">${c ? esc(c.name) : 'Sin cliente'}</li>`).join('')}</ol>` : '') + `<div class="wk-ts">${ts.map((t, k) => { const c = O.client(t.client);
+          return `<article class="card wk-t${t.status === 'done' ? ' done' : ''}" data-id="${t.id}" style="--c:${O.clientColor(c)}"><span class="wk-n">#${k + 1}</span><button class="chk" aria-label="Completar"></button><span class="wk-tx"><span class="tt">${esc(t.title)}</span><span class="wk-cl">${c ? esc(c.name) : 'Sin cliente'}</span></span></article>`; }).join('')}</div>` + (d === ancho && ts.length ? '</div>' : ''); }
       else if (i.kind === 'routine'){ cls = 'rout'; color = kcol['r:' + i.id] || ROUTC[i.id] || '#A3A3AD'; }
       else if (i.kind === 'morning'){ cls = 'morn'; color = kcol.morning || '#FFC93D'; }
       else if (i.isCall){ cls = 'call'; color = '#A78BFA'; label = '📞 ' + label; }
@@ -589,10 +592,11 @@ function weekView(){
     }).join('');
     const line = d === hoy && nowMin >= H0 && nowMin <= H1 ? `<i class="wk-now" style="top:${Y(nowMin)}px"></i>` : '';
     const lug = tramosDe(d).map(t => `<span class="wk-tramo l-${t.l}" data-ltramo="${d}|${t.id}" style="top:${Y(t.start)}px;height:${Math.max(14, Y(t.end) - Y(t.start) - 2)}px" title="${LUGARES[t.l]} · ${toHM(t.start)}–${toHM(t.end)}"><i>${ICONL[t.l]} ${LUGARES[t.l].split(' ').slice(1).join(' ')} · ${toHM(t.start)}–${toHM(t.end)}</i></span>`).join('');
-    return `<div class="wk-col${d === hoy ? ' today' : d < hoy ? ' old' : ''}" data-wday="${d}"><div class="wk-lug" data-lday="${d}" title="Dónde trabajas: toca o arrastra para marcar un tramo">${lug}</div>${blocks}${line}</div>`;
+    return `<div class="wk-col${d === hoy ? ' today' : d < hoy ? ' old' : ''}${d === ancho ? ' ancha' : ''}" data-wday="${d}"><div class="wk-lug" data-lday="${d}" title="Dónde trabajas: toca o arrastra para marcar un tramo">${lug}</div>${blocks}${line}</div>`;
   }).join('');
   const heads = per.map(({d, allDay}) => { const x = O.fromIso(d);
-    return `<button type="button" class="wk-head${d === hoy ? ' today' : d < hoy ? ' old' : ''}" data-wopen="${d}"><small>${O.DIAS_L[x.getDay()].slice(0, 3).toUpperCase()}</small><b>${x.getDate()}</b>
+    return `<button type="button" class="wk-head${d === hoy ? ' today' : d < hoy ? ' old' : ''}${d === ancho ? ' ancha' : ''}" ${d < hoy ? `data-wopen="${d}"` : `data-wancho="${d}" title="${d === ancho ? 'Día ampliado' : 'Toca para ampliar este día y organizarlo'}"`}><small>${O.DIAS_L[x.getDay()].slice(0, 3).toUpperCase()}</small><b>${x.getDate()}</b>
+      ${d === ancho ? `<span class="wk-abrir" data-wopen="${d}" role="button" tabindex="0">Abrir día ↗</span>` : ''}
       ${allDay.slice(0, 2).map(e => `<span class="wk-all" style="--c:${e.color || '#8E8E93'}">${esc(e.title)}</span>`).join('')}</button>`; }).join('');
   const msg = (calError ? `<div class="note warnbox">${esc(calError)}</div>` : weekLoading ? '<div class="note">Cargando la semana…</div>' : '') + salCasa();
   return `${msg}${O.statsBar ? O.statsBar() : ''}<div class="wk-wrap"><div class="wk"><div class="wk-grid" style="grid-template-columns:52px ${tpl}"><div class="wk-corner"></div>${heads}
@@ -819,6 +823,8 @@ document.addEventListener('click', e => {
   if (w){ const n = +w.dataset.pweek; planDay = n === 0 ? O.today() : O.iso(O.addDays(O.fromIso(planDay), 7 * n)); lastEvents = []; O.render(); return; }
   const o = e.target.closest('[data-wopen]');
   if (o){ planDay = o.dataset.wopen; S.diaMode = 'dia'; lastEvents = weekEv[planDay] || []; O.render(); refresh(); return; }
+  const an = e.target.closest('[data-wancho]');
+  if (an){ S.wkAncho = an.dataset.wancho; O.render(); return; }
   const x = e.target.closest('[data-wexp]');
   if (x){ const ev = x.closest('.wk-ev'); const on = ev.classList.toggle('open'); x.textContent = on ? 'Recoger' : x.dataset.lbl; return; }
   const mo = e.target.closest('[data-wmorn]'); if (mo){ openMorning(mo.dataset.wmorn); return; }
