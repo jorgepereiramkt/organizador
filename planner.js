@@ -150,6 +150,7 @@ function snapPut(email, day, evs){
   const min = O.iso(O.addDays(new Date(), -40)); for (const d in mine) if (d < min) delete mine[d];
   O.save();
 }
+O.fetchEvents = d => fetchEvents(d);
 O.callsOn = day => {
   const out = [], seen = new Set(), add = e => { if (!e || e.allDay || !e.isCall) return; const k = e.title + '|' + e.start; if (seen.has(k)) return; seen.add(k); out.push({title: e.title, min: Math.max(0, e.end - e.start)}); };
   for (const a of P().accounts || []) for (const e of snapGet(a.email, day)) add(e);

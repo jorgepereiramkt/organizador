@@ -253,7 +253,7 @@ function fichaCard(c){
 }
 document.addEventListener('click', e => {
   const p = e.target.closest('[data-pizarra]'); if (p){ e.preventDefault(); e.stopPropagation(); if (dlg.open) dlg.close(); return openPizarra(p.dataset.pizarra); }
-  const f = e.target.closest('[data-ficha]'); if (f) openFicha(f.dataset.ficha);
+  const f = e.target.closest('[data-ficha]'); if (f) (O.openCliente || openFicha)(f.dataset.ficha);
 }, true);
 
 /* ---------- Pizarra infinita del cliente (pizarra.html, se guarda en tu Drive) ---------- */
@@ -280,6 +280,8 @@ document.body.appendChild(dlg);
 const form = dlg.querySelector('form');
 let cur = null;
 
+O.openFicha = id => openFicha(id);
+O.fichaInfo = c => ({fee: c.group === 'mine' ? (esGratis(c) ? '🎁 Gratis' : feeTxt(c)) : (agPago(c) ? rng(agPago(c).a, agPago(c).b) + ' a la agencia' : ''), tier: c.tier || ''});
 function openFicha(id){
   cur = O.client(id); if (!cur) return;
   cur.services = cur.services || [];
