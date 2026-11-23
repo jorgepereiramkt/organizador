@@ -1212,13 +1212,13 @@ async function importInbox(){
   } catch(e){ /* sin conexión o permiso caducado: se reintenta luego */ }
   importing = false;
 }
-// ¿Ya la tienes? Misma tarea (mismo texto y cliente) aunque ya la aprobaste, la hiciste o la descartaste → no se vuelve a proponer
+// ¿Ya la tienes? Misma tarea (mismo texto) aunque ya la aprobaste, la hiciste o la descartaste → no se vuelve a proponer
 function iaRepetida(t, tid){
-  const k = O.norm(t.title) + '|' + (t.client || '');
+  const k = O.norm(t.title);
   if ((P().iaVistas || {})[k]) return true;
-  return S.tasks.some(x => x.id === tid || (O.norm(x.title) === O.norm(t.title) && (x.client || '') === (t.client || '')));
+  return S.tasks.some(x => x.id === tid || O.norm(x.title) === k);   // mismo texto = misma tarea (aunque la cambiaras de cliente)
 }
-O.iaVista = t => { const m = P().iaVistas = P().iaVistas || {}; m[O.norm(t.title) + '|' + (t.client || '')] = O.today();
+O.iaVista = t => { const m = P().iaVistas = P().iaVistas || {}; m[O.norm(t.title)] = O.today();
   const lim = O.iso(O.addDays(new Date(), -90)); for (const k in m) if (m[k] < lim) delete m[k]; };
 // Buzón de Drive: cada archivo de la carpeta = una tarea. Nombre = la tarea. Contenido: «cliente: …», «urgencia: …», «nota: …».
 function parseInbox(title, desc){
