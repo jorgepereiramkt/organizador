@@ -258,7 +258,7 @@ function buildDay(day, events, auto){
   const mv = (plan.moved || {})[day] || {};
   const place = (key, start, end) => mv[key] ? {start: mv[key].start, end: mv[key].end, moved: true} : {start, end};
   for (const e of events.filter(e => !e.allDay)){ const key = `e:${e.title}|${e.start}`; items.push({kind: e.free ? 'free' : 'event', ...e, mkey: key, ...(e.isCall ? {} : place(key, e.start, e.end))}); }
-  for (const r of plan.routines.filter(r => r.on && r.days.includes(dow))){ const key = 'r:' + r.id;
+  for (const r of plan.routines.filter(r => r.on && (r.date ? r.date === day : r.days.includes(dow)) && !(r.skip || []).includes(day))){ const key = 'r:' + r.id;
     items.push({kind:'routine', title:`${r.icon || ''} ${r.name}`.trim(), id:r.id, mkey: key, ...place(key, toMin(r.start), toMin(r.end))}); }
   // Ocupado = reuniones (no las marcadas como «libre») + bloques fijos
   const busy = items.filter(i => i.kind !== 'free').map(i => [i.start, i.end]).sort((a,b) => a[0]-b[0]);
@@ -704,6 +704,7 @@ const FRASES_FOCO = [
   'El foco es un músculo: cada bloque lo haces más fuerte.',
   'Nada de pestañas nuevas. Solo esto.',
 ];
+let focoSel = null;   // bloque que estás mirando (null = el de ahora)
 let focoTimer = null, focoFrase = Math.floor(Math.random() * FRASES_FOCO.length), focoPidiendo = false;
 function focoDatos(){
   const hoy = O.today(), nowD = new Date(), now = nowD.getHours() * 60 + nowD.getMinutes() + nowD.getSeconds() / 60;
@@ -714,18 +715,35 @@ function focoDatos(){
   const actual = works.find(w => now >= w.start && now < w.end) || null;
   const sig = works.find(w => w.start > now) || null;
   const ev = its.find(i => i.kind !== 'work' && i.kind !== 'morning' && !i.allDay && now >= i.start && now < i.end) || null;
-  return {hoy, now, its, actual, sig, ev, cargando: !evs};
+  return {hoy, now, its, works, actual, sig, ev, cargando: !evs};
 }
 function focoView(){
   const d = new Date();
   O.setToolbar('🎯 Foco', `${O.DIAS_L[d.getDay()]} ${d.getDate()} de ${O.MESES[d.getMonth()]}`,
     `<div class="modes"><button class="chip" data-dmode="foco" aria-pressed="true">🎯 Foco</button><button class="chip" data-dmode="dia" aria-pressed="false">Día</button><button class="chip" data-dmode="semana" aria-pressed="false">Semana</button><button class="chip" data-dmode="diario" aria-pressed="false">📒 Clientes</button></div>
      <button class="chip" data-fsc title="Pantalla completa">⛶ Pantalla completa</button>`, 'Un bloque, sus tareas y nada más');
-  const {hoy, now, its, actual, sig, ev, cargando} = focoDatos();
+  const {hoy, now, its, works, actual, sig, ev, cargando} = focoDatos();
   const frase = `<p class="fo-frase" id="foFrase">${esc(FRASES_FOCO[focoFrase % FRASES_FOCO.length])}</p>`;
+  // navegar entre los bloques de hoy: ‹ anterior · siguiente ›
+  const base = actual ? works.indexOf(actual) : sig ? works.indexOf(sig) - 0.5 : works.length - 0.5;
+  if (focoSel != null && (focoSel < 0 || focoSel >= works.length)) focoSel = null;
+  const iVer = focoSel;
+  const prev = iVer != null ? iVer - 1 : Math.ceil(base) - 1, next = iVer != null ? iVer + 1 : Math.floor(base) + 1;
+  const nav = works.length ? `<div class="fo-nav"><button type="button" class="chip" data-fnav="${prev}" ${prev < 0 ? 'disabled' : ''}>‹ Bloque anterior</button>
+    ${iVer != null ? '<button type="button" class="chip" data-fnav="ahora">● Ahora</button>' : ''}
+    <button type="button" class="chip" data-fnav="${next}" ${next >= works.length ? 'disabled' : ''}>Bloque siguiente ›</button></div>` : '';
+  if (iVer != null && works[iVer] !== actual){
+    const b = works[iVer], ts = wkTasks(hoy, b, its), pend = ts.filter(t => t.status !== 'done').length, pasado = b.end <= now;
+    return `<div class="foco"><div class="fo-in">${nav}
+      <div class="fo-k">${pasado ? 'Bloque anterior' : 'Bloque siguiente'} · ${toHM(b.start)} – ${toHM(b.end)}${lugarEn(hoy, b.start) ? ' · ' + LUGARES[lugarEn(hoy, b.start)] : ''}</div>
+      <h2 class="fo-t">${esc(b.bname || 'Trabajo')}</h2>
+      <div class="fo-prog${pasado && pend ? ' fo-quedan' : ''}">${!ts.length ? 'Este bloque no tiene tareas' : pasado ? (pend ? `⚠️ Te quedaron ${pend} sin hacer: márcalas o arrástralas al bloque de ahora` : '✓ Todo hecho en este bloque 🎉') : `${ts.length} tarea${ts.length > 1 ? 's' : ''} preparada${ts.length > 1 ? 's' : ''}`}</div>
+      <div class="fo-lista" data-field="slot" data-value="${b.at}" data-day="${hoy}">${ts.map(t => O.card(t, {group: true, status: true})).join('')}</div>
+      ${frase}</div></div>`;
+  }
   if (!actual){
     const queda = sig ? Math.round(sig.start - now) : 0;
-    return `<div class="foco vacio"><div class="fo-in">
+    return `<div class="foco vacio"><div class="fo-in">${nav}
       <div class="fo-k">${cargando ? 'Mirando tu calendario…' : ev ? 'Ahora mismo' : 'Ahora no tienes un bloque de trabajo'}</div>
       ${ev ? `<h2 class="fo-t">${esc(ev.title || '')}</h2><div class="fo-sub">${toHM(ev.start)} – ${toHM(ev.end)}</div>` : ''}
       ${sig ? `<div class="fo-next">Siguiente bloque: <b>${esc(sig.bname || 'Trabajo')}</b> a las ${toHM(sig.start)} · en ${queda >= 60 ? Math.floor(queda / 60) + ' h ' : ''}${queda % 60} min</div>` : '<div class="fo-next">No te quedan bloques de trabajo hoy. Descansa: también es parte del proceso 🌙</div>'}
@@ -733,7 +751,7 @@ function focoView(){
   }
   const ts = wkTasks(hoy, actual, its), hechas = ts.filter(t => t.status === 'done').length;
   const cards = ts.map((t, k) => O.card(t, {group: true, status: true}).replace('class="card ', `class="card fo-t${k} `)).join('');
-  return `<div class="foco"><div class="fo-in">
+  return `<div class="foco"><div class="fo-in">${nav}
     <div class="fo-k">Bloque de ahora · ${toHM(actual.start)} – ${toHM(actual.end)}${lugarEn(hoy, now) ? ' · ' + LUGARES[lugarEn(hoy, now)] : ''}</div>
     <h2 class="fo-t">${esc(actual.bname || 'Trabajo')}</h2>
     <div class="fo-reloj" id="foReloj" data-fin="${actual.end}" data-ini="${actual.start}">--:--</div>
@@ -764,6 +782,8 @@ function focoAfter(){
   tick(); focoTimer = setInterval(tick, 1000);
 }
 document.addEventListener('click', e => {
+  const n = e.target.closest('[data-fnav]'); if (n){ focoSel = n.dataset.fnav === 'ahora' ? null : +n.dataset.fnav; return O.render(); }
+  if (e.target.closest('[data-dmode]')) focoSel = null;
   if (!e.target.closest('[data-fsc]')) return;
   const el = document.documentElement;
   if (document.fullscreenElement) document.exitFullscreen(); else if (el.requestFullscreen) el.requestFullscreen().catch(() => {}); else O.toast('Tu navegador no deja ponerla a pantalla completa');
@@ -850,7 +870,55 @@ miniForm.addEventListener('dragover', e => { const r = e.target.closest && e.tar
 miniForm.addEventListener('drop', e => { const r = e.target.closest && e.target.closest('.medit'); if (mDrag == null || !r) return; e.preventDefault(); const f = mDrag; mDrag = null; mMove(f, +r.dataset.mi); });
 miniForm.addEventListener('dragend', () => { mDrag = null; miniForm.querySelectorAll('.medit').forEach(x => x.classList.remove('over', 'dragging')); });
 miniForm.addEventListener('keydown', e => { if (mDraft && e.key === 'Enter' && e.target.dataset.mtxt != null){ e.preventDefault(); } });
+const REPS = {todos: [1,2,3,4,5,6,0], lab: [1,2,3,4,5], finde: [6,0]};
+let rutNueva = null;   // id de la rutina recién creada (si cancelas, se quita)
+function openRutina(key, day){
+  const r = P().routines.find(x => 'r:' + x.id === key); if (!r) return;
+  miniKey = key; miniDay = null; miniForm.dataset.day = day || '';
+  const mv = day && ((P().moved || {})[day] || {})[key];
+  const s = mv ? mv.start : toMin(r.start), en = mv ? mv.end : toMin(r.end);
+  const dias = r.date ? [] : r.days, igualA = a => a.length === dias.length && a.every(x => dias.includes(x));
+  const rep = r.date ? 'uno' : igualA(REPS.todos) ? 'todos' : igualA(REPS.lab) ? 'lab' : igualA(REPS.finde) ? 'finde' : 'pers';
+  miniForm.dataset.rep = rep;
+  miniForm.innerHTML = `<h2>${rutNueva === r.id ? 'Nuevo bloque fijo' : 'Editar bloque fijo'}</h2>
+    <div class="row rt-nm"><label style="flex:0 0 70px">Icono<input data-rf="icon" value="${esc(r.icon || '')}" maxlength="4"></label><label>Nombre<input data-rf="name" value="${esc(r.name)}" autocomplete="off"></label></div>
+    <div class="row"><label>Empieza<input type="time" step="300" data-rf="s" value="${toHM(s)}"></label><label>Acaba<input type="time" step="300" data-rf="e" value="${toHM(en)}"></label></div>
+    ${day && rutNueva !== r.id ? `<div class="modes rt-alc"><button type="button" class="chip" data-ralc="dia" aria-pressed="${mv ? 'true' : 'false'}">Cambiar la hora solo este día</button><button type="button" class="chip" data-ralc="todos" aria-pressed="${mv ? 'false' : 'true'}">Cambiar la hora de todos</button></div>` : ''}
+    <label>Se repite</label>
+    <div class="modes rt-rep">${[['todos', 'Todos los días'], ['lab', 'Lunes a viernes'], ['finde', 'Fines de semana'], ['pers', 'Personalizado'], ['uno', 'No se repite']].map(([k, v]) => `<button type="button" class="chip" data-rrep="${k}" aria-pressed="${rep === k}">${v}</button>`).join('')}</div>
+    <div class="rt-dias"${rep === 'pers' ? '' : ' hidden'}>${[1,2,3,4,5,6,0].map(d => `<button type="button" class="dchip" data-rdia="${d}" aria-pressed="${dias.includes(d)}">${DAYN[d]}</button>`).join('')}</div>
+    <label>Color (en todos los días)</label>${swatches((P().kcolors || {})[key] || '', 'data-kcol', Object.fromEntries(APPCOL.map(c => [c, c])))}
+    <div class="actions">${rutNueva === r.id ? '' : `${day ? `<button type="button" class="btn" data-rskip>Quitar solo este día</button>` : ''}<button type="button" class="btn danger" data-rborrar>Borrar</button>`}
+      ${mv ? `<button type="button" class="btn" data-unmove="${esc(key)}" data-unday="${day}">↺ Volver a su hora</button>` : ''}<span class="sp"></span>
+      <button type="button" class="btn" data-rcancel>Cancelar</button><button type="button" class="btn primary" data-rsave>Guardar</button></div>`;
+  miniDlg.showModal();
+}
+miniForm.addEventListener('click', e => {
+  if (!miniKey || !miniKey.startsWith('r:')) return;
+  const p = P(), r = p.routines.find(x => 'r:' + x.id === miniKey); if (!r) return;
+  const day = miniForm.dataset.day;
+  const rr = e.target.closest('[data-rrep]');
+  if (rr){ miniForm.dataset.rep = rr.dataset.rrep; miniForm.querySelectorAll('[data-rrep]').forEach(b => b.setAttribute('aria-pressed', b === rr)); miniForm.querySelector('.rt-dias').hidden = rr.dataset.rrep !== 'pers'; return; }
+  const rd = e.target.closest('[data-rdia]'); if (rd){ rd.setAttribute('aria-pressed', rd.getAttribute('aria-pressed') !== 'true'); return; }
+  const ra = e.target.closest('[data-ralc]'); if (ra){ miniForm.querySelectorAll('[data-ralc]').forEach(b => b.setAttribute('aria-pressed', b === ra)); return; }
+  if (e.target.closest('[data-rcancel]')){ if (rutNueva === r.id){ p.routines = p.routines.filter(x => x !== r); O.save(); } rutNueva = null; miniDlg.close(); return; }
+  if (e.target.closest('[data-rskip]')){ r.skip = [...new Set([...(r.skip || []).filter(d => d >= O.today()), day])]; O.save(); miniDlg.close(); O.toast(`${r.name}: quitado solo el ${day.slice(8)}/${day.slice(5, 7)}`); return; }
+  if (e.target.closest('[data-rborrar]')){ if (!confirm(`¿Borrar «${r.name}» de todos los días?`)) return; p.routines = p.routines.filter(x => x !== r); O.save(); miniDlg.close(); return; }
+  if (!e.target.closest('[data-rsave]')) return;
+  const v = k => miniForm.querySelector(`[data-rf="${k}"]`).value, s = toMin(v('s')), en = toMin(v('e'));
+  if (!(en > s)) return O.toast('La hora de fin tiene que ser después del inicio');
+  r.name = v('name').trim() || r.name; r.icon = v('icon').trim();
+  const rep = miniForm.dataset.rep;
+  if (rep === 'uno'){ r.date = day || r.date || O.today(); }
+  else { delete r.date; r.days = rep === 'pers' ? [...miniForm.querySelectorAll('[data-rdia][aria-pressed=true]')].map(b => +b.dataset.rdia) : REPS[rep].slice(); if (!r.days.length) return O.toast('Elige al menos un día'); }
+  const soloDia = day && rutNueva !== r.id && miniForm.querySelector('[data-ralc="dia"]')?.getAttribute('aria-pressed') === 'true';
+  const m = (p.moved = p.moved || {});
+  if (soloDia){ (m[day] = m[day] || {})[miniKey] = {start: s, end: en}; }
+  else { r.start = toHM(s); r.end = toHM(en); if (day && m[day]) delete m[day][miniKey]; }
+  r.on = true; rutNueva = null; O.save(); miniDlg.close();
+});
 function openKColor(key, name, day){
+  if (key.startsWith('r:')) return openRutina(key, day);
   miniKey = key; miniDay = null; miniForm.dataset.day = day || '';
   const mv = day && ((P().moved || {})[day] || {})[key];
   miniForm.innerHTML = `<h2>${esc(name)}</h2><label>Color (en todos los días)</label>${swatches((P().kcolors || {})[key] || '', 'data-kcol', Object.fromEntries(APPCOL.map(c => [c, c])))}
@@ -890,7 +958,7 @@ function wkCreate(day, s, e){
   evCur = {nuevo: true, day, s, e};
   const cals = misCals();
   evForm.innerHTML = `<h2>Nuevo bloque · ${toHM(s)} – ${toHM(e)}</h2>
-    <div class="modes evtype"><button type="button" class="chip" data-evt="work" aria-pressed="false">🧱 Trabajo (tareas)</button><button type="button" class="chip" data-evt="ev" aria-pressed="true">📅 Evento / bloque</button></div>
+    <div class="modes evtype"><button type="button" class="chip" data-evt="work" aria-pressed="false">🧱 Trabajo (tareas)</button><button type="button" class="chip" data-evt="ev" aria-pressed="true">📅 Evento / bloque</button><button type="button" class="chip" data-evt="rut" aria-pressed="false">🔁 Bloque fijo (de la app)</button></div>
     <div class="evfields"><label>Título<input name="title" placeholder="Ej.: Gestiones personales, Grabar reels, Médico…" autocomplete="off"></label>
     <div class="row"><label>Empieza<input type="time" name="s" step="900" value="${toHM(s)}"></label><label>Acaba<input type="time" name="e" step="900" value="${toHM(e)}"></label></div>
     <label>Notas<textarea name="desc" rows="4" placeholder="Lo que quieras apuntar para organizarte en este bloque…"></textarea></label>
@@ -914,7 +982,11 @@ function wkEditEvent(el){
 evForm.addEventListener('click', async e => {
   if (e.target.closest('[data-evcancel]')){ evDlg.close('cancel'); return; }
   const t = e.target.closest('[data-evt]');
-  if (t){ if (t.dataset.evt === 'work'){ const c = evCur; evCur = null; evDlg.close('cancel'); wkAddBlock(c.day, c.s, c.e); } return; }
+  if (t){ if (t.dataset.evt === 'work'){ const c = evCur; evCur = null; evDlg.close('cancel'); wkAddBlock(c.day, c.s, c.e); }
+    if (t.dataset.evt === 'rut'){ const c = evCur; evCur = null; evDlg.close('cancel');
+      const r = {id: Math.random().toString(36).slice(2, 8), name: (evForm.querySelector('[name=title]').value || '').trim() || 'Nuevo', icon: '⏱️', start: toHM(c.s), end: toHM(c.e), days: [O.fromIso(c.day).getDay()], on: true};
+      P().routines.push(r); rutNueva = r.id; O.render(); openRutina('r:' + r.id, c.day); }
+    return; }
   const sw = e.target.closest('[data-gcol]');
   if (sw && evCur){ evCur.color = sw.dataset.gcol; evForm.querySelectorAll('[data-gcol]').forEach(b => b.classList.toggle('on', b === sw)); return; }
   const del = e.target.closest('[data-evdel]');
