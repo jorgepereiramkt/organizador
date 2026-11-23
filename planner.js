@@ -763,6 +763,9 @@ function focoView(){
     ${sig ? `<div class="fo-next">Después: <b>${esc(sig.bname || 'Trabajo')}</b> a las ${toHM(sig.start)}</div>` : ''}
   </div></div>`;
 }
+// redibuja como mucho una vez cada 5 s y nunca desde dentro del propio dibujo (evita bucles)
+let focoUltRender = 0;
+const pideRender = () => { if (Date.now() - focoUltRender < 5000) return; focoUltRender = Date.now(); setTimeout(() => O.render(), 0); };
 function focoAfter(){
   clearInterval(focoTimer);
   const tick = () => {
@@ -771,12 +774,12 @@ function focoAfter(){
     const nowD = new Date(), now = nowD.getHours() * 60 + nowD.getMinutes() + nowD.getSeconds() / 60;
     if (r){
       const fin = +r.dataset.fin, ini = +r.dataset.ini, seg = Math.max(0, Math.round((fin - now) * 60));
-      if (seg <= 0) return O.render();
+      if (seg <= 0) return pideRender();
       const h = Math.floor(seg / 3600), m = Math.floor(seg % 3600 / 60), s = seg % 60;
       r.textContent = (h ? h + ':' + String(m).padStart(2, '0') : m) + ':' + String(s).padStart(2, '0');
       r.classList.toggle('poco', seg < 600);
       if (b) b.style.width = Math.min(100, (now - ini) / (fin - ini) * 100) + '%';
-    } else if (Math.floor(Date.now() / 1000) % 30 === 0) O.render();   // sin bloque: mira cada 30 s si empieza uno
+    } else if (Math.floor(Date.now() / 1000) % 30 === 0) pideRender();   // sin bloque: mira cada 30 s si empieza uno
     if (Math.floor(Date.now() / 1000) % 90 === 0){ focoFrase++; const f = document.getElementById('foFrase'); if (f){ f.classList.remove('in'); void f.offsetWidth; f.textContent = FRASES_FOCO[focoFrase % FRASES_FOCO.length]; f.classList.add('in'); } }
   };
   tick(); focoTimer = setInterval(tick, 1000);
