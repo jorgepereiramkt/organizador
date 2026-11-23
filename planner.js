@@ -532,7 +532,7 @@ function weekView(){
   const Y = m => cum[Math.max(0, Math.min(cum.length - 1, Math.round(m) - H0))];
   wkScale = {H0, H1, cum};
   let hours = '', lines = ''; for (let h = H0; h < H1; h += 60){ hours += `<div class="wk-h" style="top:${Y(h)}px"><span>${toHM(h)}</span></div>`; lines += `<i class="wk-line" style="top:${Y(h)}px"></i>`; }
-  const tpl = days.map(d => d < hoy ? 'minmax(74px,.55fr)' : 'minmax(118px,1fr)').join(' ');
+  const tpl = days.map(d => d < hoy ? 'minmax(74px,.55fr)' : d === hoy ? 'minmax(240px,2.6fr)' : 'minmax(110px,1fr)').join(' ');   // hoy, mucho más ancho
   const cols = per.map(({d, its}) => {
     const blocks = lanes(its.map(i => ({...i}))).map(i => {
       const top = Y(i.start), h = Math.max(16, Y(i.end) - Y(i.start) - 2);
