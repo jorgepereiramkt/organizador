@@ -255,7 +255,7 @@ function buildDay(day, events, auto){
   }
   if (cur < we) gaps.push([cur, we]);
   if (!auto && isManual(day)){
-    for (const b of (dayBlocks(day) || [])) items.push({kind:'work', start:b.start, end:b.end, at:toHM(b.start), bid:b.id});
+    for (const b of (dayBlocks(day) || [])) items.push({kind:'work', start:b.start, end:b.end, at:toHM(b.start), bid:b.id, bname:b.name || ''});
     return items.sort((a,b) => a.start - b.start || (a.kind === 'work') - (b.kind === 'work'));
   }
   for (const [s, e] of gaps){
@@ -335,7 +335,7 @@ O.views.dia = function(){
           <h5>${title}<span>${list.filter(t => t.status === 'done').length}/${list.length}</span></h5>
           <div class="list">${list.map(t => O.card(t)).join('') || `<div class="empty">${emptyTxt}</div>`}</div></div>`;
       body = `<section class="blk work">
-        <header><b>Trabajo</b><span class="rg">${dur(it.end - it.start)}</span>${ts.length ? `<span class="count">${hechas}/${ts.length} ✓</span>` : ''}</header>
+        <header><b>${esc(it.bname || 'Trabajo')}</b>${it.bid ? `<button type="button" class="bname-ed" data-bname="${it.bid}" data-bday="${planDay}" title="Poner nombre al bloque">✏️</button>` : ''}<span class="rg">${dur(it.end - it.start)}</span>${ts.length ? `<span class="count">${hechas}/${ts.length} ✓</span>` : ''}</header>
         ${zone('quick', quick, '⚡ Rápidas · menos de 5 min', 'Quítate primero lo que se hace en menos de 5 min')}
         ${zone('top', top, '🎯 Top 3 · sí o sí', 'Lo que tienes que sacar sí o sí (máx. 3)')}
         ${zone('extra', extra, '💪 Échale huevos · saca también estas', 'Si te da tiempo, también estas')}</section>`;
@@ -530,7 +530,7 @@ function weekView(){
       let cls = 'ev', color = i.color || '#8E8E93', label = esc(i.title || ''), extra = '';
       let inner = '';
       const kcol = (P().kcolors || {});
-      if (i.kind === 'work'){ cls = 'work'; color = kcol.work || 'var(--accent)'; label = 'Trabajo';
+      if (i.kind === 'work'){ cls = 'work'; color = kcol.work || 'var(--accent)'; label = esc(i.bname || 'Trabajo');
         const ts = wkTasks(d, i, its); extra = ts.length ? ` · ${ts.filter(t => t.status === 'done').length}/${ts.length}` : '';
         if (d < hoy){ cls += ' wk-old'; inner = ts.length ? `<span class="wk-sum">✓ ${ts.filter(t => t.status === 'done').length}/${ts.length}</span>` : ''; }
         else inner = `<div class="wk-ts">${ts.map((t, k) => { const c = O.client(t.client);
@@ -542,9 +542,12 @@ function weekView(){
       const gAttr = i.gid && i.mine ? ` data-gid="${esc(i.gid)}" data-gcal="${esc(i.gcal)}" data-gday="${d}" data-gs="${i.start}" data-ge="${i.end}" data-gorig="${i.gstart}"` : '';
       if (gAttr){ cls += ' g-ev'; const nt = plainDesc(i.desc).split('\n').find(x => x.trim()); if (nt && h > 40) inner = `<p class="wk-note">📝 ${esc(nt)}</p>`; }
       const past = d < hoy || (d === hoy && i.end <= nowMin);
-      const xAttr = i.kind === 'morning' ? ` data-wmorn="${d}"` : i.kind === 'routine' ? ` data-wrout="r:${esc(i.id)}" data-wname="${esc(i.title)}"` : '';
+      const canMove = d >= hoy && ((i.kind === 'routine') || (i.kind === 'work' && i.bid));
+      const xAttr = (i.kind === 'morning' ? ` data-wmorn="${d}"` : i.kind === 'routine' ? ` data-wrout="r:${esc(i.id)}" data-wname="${esc(i.title)}"` : '')
+        + (canMove ? ` data-mvday="${d}" data-mvs="${i.start}" data-mve="${i.end}" data-mvkey="${i.kind === 'work' ? 'b:' + i.bid : 'r:' + esc(i.id)}"` : '');
+      if (canMove) cls += ' mv-ev';
       return `<div class="wk-ev ${cls}${past ? ' past' : ''}"${gAttr}${xAttr} ${i.kind === 'work' ? `data-wbuild="${d}" data-field="slot" data-value="${i.at}" data-day="${d}"` : ''} style="--hh:${h}px;top:${top}px;height:${h}px;left:calc(${left}% + 1px);width:calc(${w}% - 3px);--c:${color}" title="${label.replace(/"/g, '')} · ${toHM(i.start)}–${toHM(i.end)}">
-        <b>${label}</b>${h > 26 ? `<small>${toHM(i.start)} – ${toHM(i.end)}${extra}</small>` : ''}${inner}${gAttr ? '<i class="g-res"></i>' : ''}</div>`;
+        <b>${label}</b>${i.kind === 'work' && i.bid && d >= hoy ? `<button type="button" class="bname-ed" data-bname="${i.bid}" data-bday="${d}" title="Poner nombre al bloque">✏️</button>` : ''}${h > 26 ? `<small>${toHM(i.start)} – ${toHM(i.end)}${extra}</small>` : ''}${inner}${gAttr || (canMove) ? '<i class="g-res"></i>' : ''}</div>`;
     }).join('');
     const line = d === hoy && nowMin >= H0 && nowMin <= H1 ? `<i class="wk-now" style="top:${Y(nowMin)}px"></i>` : '';
     return `<div class="wk-col${d === hoy ? ' today' : d < hoy ? ' old' : ''}" data-wday="${d}">${blocks}${line}</div>`;
@@ -584,7 +587,7 @@ document.addEventListener('click', e => {
   const x = e.target.closest('[data-wexp]');
   if (x){ const ev = x.closest('.wk-ev'); const on = ev.classList.toggle('open'); x.textContent = on ? 'Recoger' : x.dataset.lbl; return; }
   const mo = e.target.closest('[data-wmorn]'); if (mo){ openMorning(mo.dataset.wmorn); return; }
-  const rc = e.target.closest('[data-wrout]'); if (rc){ openKColor(rc.dataset.wrout, rc.dataset.wname); return; }
+  const rc = e.target.closest('[data-wrout]'); if (rc){ if (!wkJustMade) openKColor(rc.dataset.wrout, rc.dataset.wname, rc.dataset.mvday); return; }
   const b = !e.target.closest('.card') && !wkJustMade && e.target.closest('[data-wbuild]');
   if (b){ planDay = b.dataset.wbuild; lastEvents = weekEv[planDay] || []; openBuild(planDay); }
 });
@@ -600,18 +603,28 @@ function openMorning(day){
     <div class="actions"><button type="button" class="btn" data-mall>Marcar todo</button><span class="sp"></span><button class="btn primary" value="ok">Listo</button></div>`;
   miniDlg.showModal();
 }
-function openKColor(key, name){
-  miniKey = key; miniDay = null;
+function openKColor(key, name, day){
+  miniKey = key; miniDay = null; miniForm.dataset.day = day || '';
+  const mv = day && ((P().moved || {})[day] || {})[key];
   miniForm.innerHTML = `<h2>${esc(name)}</h2><label>Color (en todos los días)</label>${swatches((P().kcolors || {})[key] || '', 'data-kcol', Object.fromEntries(APPCOL.map(c => [c, c])))}
-    <div class="actions"><span class="sp"></span><button class="btn primary" value="ok">Listo</button></div>`;
+    ${day ? (() => { const el = document.querySelector(`.wk-ev[data-mvkey="${key}"][data-mvday="${day}"]`), s = el ? +el.dataset.mvs : 0, en = el ? +el.dataset.mve : 0;
+      return el ? `<label>Hora solo este día</label><div class="row"><input type="time" step="300" data-mvt="s" value="${toHM(s)}"><input type="time" step="300" data-mvt="e" value="${toHM(en)}"></div>
+      <p class="iahint">También puedes arrastrarla en el calendario con el ratón o el Pencil (y estirarla desde abajo).</p>` : ''; })() : ''}
+    <div class="actions">${mv ? `<button type="button" class="btn" data-unmove="${esc(key)}" data-unday="${day}">↺ Volver a su hora</button>` : ''}<span class="sp"></span><button class="btn primary" value="ok">Listo</button></div>`;
   miniDlg.showModal();
 }
 miniForm.addEventListener('change', e => {
+  const t = e.target.dataset.mvt;
+  if (t){ const um = miniForm.querySelector('[data-mvt="s"]'), ue = miniForm.querySelector('[data-mvt="e"]'), day = miniForm.dataset.day;
+    const a = toMin(um.value), b = toMin(ue.value); if (!day || !(b > a)) return;
+    const m = (P().moved = P().moved || {}); (m[day] = m[day] || {})[miniKey] = {start: a, end: b}; O.save(); O.render(); return; }
   const k = e.target.dataset.mk; if (k === undefined || !miniDay) return;
   const p = P(), set = new Set((p.morningDone = p.morningDone || {})[miniDay] || []);
   e.target.checked ? set.add(+k) : set.delete(+k); p.morningDone[miniDay] = [...set]; O.save();
 });
 miniForm.addEventListener('click', e => {
+  const um = e.target.closest('[data-unmove]');
+  if (um){ const m = (P().moved || {})[um.dataset.unday]; if (m) delete m[um.dataset.unmove]; O.save(); miniDlg.close(); O.render(); return; }
   const c = e.target.closest('[data-kcol]');
   if (c){ const kc = P().kcolors = P().kcolors || {}; kc[miniKey] = c.dataset.kcol; O.save(); miniForm.querySelectorAll('[data-kcol]').forEach(b => b.classList.toggle('on', b === c)); return; }
   if (e.target.closest('[data-mall]') && miniDay){ const p = P(); p.morningDone = p.morningDone || {}; p.morningDone[miniDay] = (p.morning || []).map((_, i) => i); O.save(); miniForm.querySelectorAll('[data-mk]').forEach(x => x.checked = true); }
@@ -726,6 +739,58 @@ document.addEventListener('pointerdown', e => {
   addEventListener('pointermove', mv); addEventListener('pointerup', up); addEventListener('pointercancel', fin);
 }, true);
 
+// Arrastrar la comida/rutinas (solo ese día) y los bloques de trabajo; estirarlos desde el borde de abajo
+document.addEventListener('pointerdown', e => {
+  const el = e.target.closest('.wk-ev.mv-ev'); if (!el || e.button !== 0 || e.target.closest('.card,button')) return;
+  const res = !!e.target.closest('.g-res');
+  if (e.pointerType === 'touch' && !res) return;          // con el dedo se hace scroll; con ratón o Pencil se arrastra
+  const s0 = +el.dataset.mvs, e0 = +el.dataset.mve, len = e0 - s0, y0 = e.clientY, x0 = e.clientX, snap = m => Math.round(m / 5) * 5;
+  const key = el.dataset.mvkey, day0 = el.dataset.mvday, esBloque = key.startsWith('b:');
+  let day = day0, s = s0, en = e0, moved = false;
+  if (res) e.preventDefault();
+  const mv = ev => {
+    if (!moved && Math.hypot(ev.clientX - x0, ev.clientY - y0) < 6) return;
+    if (!moved){ moved = true; el.classList.add('dragging-ev'); }
+    ev.preventDefault();
+    const dy = ev.clientY - y0;
+    if (res){ en = Math.max(s0 + 15, Math.min(24 * 60, snap(wkM(wkY(e0) + dy)))); el.style.height = wkY(en) - wkY(s0) - 2 + 'px'; }
+    else {
+      s = Math.max(0, Math.min(24 * 60 - len, snap(wkM(wkY(s0) + dy)))); en = s + len;
+      if (esBloque){ const col = document.elementsFromPoint(ev.clientX, ev.clientY).find(x => x.classList && x.classList.contains('wk-col'));
+        if (col && col.dataset.wday !== day && col.dataset.wday >= O.today()){ day = col.dataset.wday; col.appendChild(el); } }
+      el.style.top = wkY(s) + 'px'; el.style.height = wkY(en) - wkY(s) - 2 + 'px'; el.style.left = '1px'; el.style.width = 'calc(100% - 3px)';
+    }
+    const sm = el.querySelector('small'); if (sm) sm.textContent = `${toHM(s)} – ${toHM(en)}`;
+  };
+  const fin = () => { removeEventListener('pointermove', mv); removeEventListener('pointerup', up); removeEventListener('pointercancel', fin); el.classList.remove('dragging-ev'); };
+  const up = () => {
+    fin(); if (!moved) return;
+    wkJustMade = true; setTimeout(() => wkJustMade = false, 200);
+    if (day === day0 && s === s0 && en === e0) return O.render();
+    if (esBloque){
+      const id = key.slice(2), from = dayBlocks(day0) || [], b = from.find(x => x.id === id); if (!b) return O.render();
+      b.start = s; b.end = en;
+      if (day !== day0){ P().dayBlocks[day0] = from.filter(x => x !== b);
+        if (!dayBlocks(day)) P().dayBlocks[day] = day >= MANUAL_FROM ? [] : buildDay(day, weekEv[day] || [], true).filter(i => i.kind === 'work').map(i => ({id: Math.random().toString(36).slice(2, 8), start: i.start, end: i.end}));
+        P().dayBlocks[day].push(b); }
+      P().dayBlocks[day].sort((a, c) => a.start - c.start);
+    } else {
+      const m = (P().moved = P().moved || {}); (m[day0] = m[day0] || {})[key] = {start: s, end: en};
+    }
+    O.save(); O.render(); O.toast(`${esBloque ? 'Bloque' : 'Movido'} a ${toHM(s)} – ${toHM(en)} ✓`);
+  };
+  addEventListener('pointermove', mv, {passive: false}); addEventListener('pointerup', up); addEventListener('pointercancel', fin);
+}, true);
+// ✏️ Poner nombre a un bloque de trabajo
+document.addEventListener('click', e => {
+  const n = e.target.closest('[data-bname]'); if (!n) return;
+  e.preventDefault(); e.stopPropagation();
+  const b = (dayBlocks(n.dataset.bday) || []).find(x => x.id === n.dataset.bname); if (!b) return;
+  const v = prompt('Nombre del bloque (vacío = «Trabajo»)', b.name || '');
+  if (v === null) return;
+  b.name = v.trim().slice(0, 60); O.save(); O.render();
+  if (typeof drawGrid === 'function' && document.querySelector('dialog[open] .bgrid, dialog[open] #bgrid')) drawGrid();
+}, true);
 function wkAddBlock(day, s, e){
   const blocks = P().dayBlocks = P().dayBlocks || {};
   if (!blocks[day]) blocks[day] = day >= MANUAL_FROM ? [] : buildDay(day, weekEv[day] || [], true).filter(i => i.kind === 'work').map(i => ({id: Math.random().toString(36).slice(2, 8), start: i.start, end: i.end}));
@@ -889,8 +954,8 @@ function drawGrid(){
       <b>${f.isCall ? '📞 ' : ''}${esc(f.title)}</b><small>${toHM(f.start)}–${toHM(f.end)}${f.moved ? ' · movido' : ''}</small>${movable ? '<i class="bres" data-bres></i>' : ''}</div>`;
   }
   for (const b of dayBlocks(bDay)) h += `<div class="bblk" data-bid="${b.id}" style="top:${(b.start - G0) * PX}px;height:${(b.end - b.start) * PX}px">
-      <b>Trabajo</b><small>${toHM(b.start)}–${toHM(b.end)} · ${dur(b.end - b.start)}</small>
-      <button type="button" class="bdel" data-bdel aria-label="Quitar bloque">×</button><i class="bres" data-bres></i></div>`;
+      <b>${esc(b.name || 'Trabajo')}</b><small>${toHM(b.start)}–${toHM(b.end)} · ${dur(b.end - b.start)}</small>
+      <button type="button" class="bname-ed" data-bname="${b.id}" data-bday="${bDay}" title="Poner nombre al bloque">✏️</button><button type="button" class="bdel" data-bdel aria-label="Quitar bloque">×</button><i class="bres" data-bres></i></div>`;
   bgrid.style.height = (G1 - G0) * PX + 'px';
   bgrid.innerHTML = h;
 }
