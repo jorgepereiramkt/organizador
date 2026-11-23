@@ -117,5 +117,5 @@
     const [t, f] = o.dataset.fopen.split('|'); abrir(t, f);
   }, true);
 
-  O.filesOf = lista;
+  O.filesOf = lista; O.filesVincular = vincular; O.filesPuede = puede;
 })();

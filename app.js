@@ -327,7 +327,7 @@ async function pushCreate(t){
     if (S.tasks.some(x => x.id === res.id && x !== cur)) S.tasks = S.tasks.filter(x => x !== cur);   // ClickUp ya la trajo: fuera la copia local
     else Object.assign(cur, {id: res.id, url: res.url, cu: true, listId: l.id, listName: l.name});
     if (t !== cur) Object.assign(t, {id: res.id, url: res.url, cu: true, listId: l.id, listName: l.name});
-    for (const m of [S.slots, (S.plan && S.plan.tnotes) || {}, (S.plan && S.plan.proc) || {}]) if (m[oldId] !== undefined){ m[res.id] = m[oldId]; delete m[oldId]; }
+    for (const m of [S.slots, (S.plan && S.plan.tnotes) || {}, (S.plan && S.plan.proc) || {}, (S.plan && S.plan.timgs) || {}, (S.plan && S.plan.tfiles) || {}]) if (m[oldId] !== undefined){ m[res.id] = m[oldId]; delete m[oldId]; }
     save(); render();
     toast(`Guardada en ClickUp · ${c.name} › ${l.name}`);
   }).finally(() => subiendo.delete(oldId));
@@ -1052,5 +1052,5 @@ if (online()) sync(true);
 // Mantener PC y móvil al día: cada 60 s con la app abierta y al volver a ella
 setInterval(() => { if (document.visibilityState === 'visible') sync(true); }, 60000);
 document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') sync(true); });
-window.__org = {editingId: () => editing, S, isApartado, byClientOrder, GROUP, clientColor, URG, urgRank, parse, pushCreate, uid, maxOrder, clientLists, online, PALETA, cu, listInfo, norm, isRegTask, applyCloud, cloudEmpty, cloudReady, wipeLocal, toast, views, render, save, card, setToolbar, visibleTasks, client, task, esc, iso, fromIso, addDays, today, dayLabel, DIAS_L, MESES, pad, byOrder};
+window.__org = {editingId: () => editing, setNote, noteLinks, S, isApartado, byClientOrder, GROUP, clientColor, URG, urgRank, parse, pushCreate, uid, maxOrder, clientLists, online, PALETA, cu, listInfo, norm, isRegTask, applyCloud, cloudEmpty, cloudReady, wipeLocal, toast, views, render, save, card, setToolbar, visibleTasks, client, task, esc, iso, fromIso, addDays, today, dayLabel, DIAS_L, MESES, pad, byOrder};
 })();

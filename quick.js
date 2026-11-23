@@ -19,11 +19,42 @@ dlg.innerHTML = `<form method="dialog" class="sheet" id="quickForm">
 </div>
   <div><div class="qlbl">Cliente</div><div class="qchips" id="qClients"></div></div>
   <div><div class="qlbl">Urgencia</div><div class="qseg" id="qUrg"></div></div>
-  <div class="actions"><button class="btn" value="cancel" formnovalidate>Cancelar</button><span class="sp"></span>
+  <div class="qrow2"><label class="qlbl">Día<input type="date" id="qDay"></label><label class="check"><input type="checkbox" id="qHoy"> Para hoy</label></div>
+  <label class="qlbl">Notas y enlaces<textarea id="qNotes" rows="3" placeholder="Recursos, enlaces de Drive, lo que te han pasado… (pega capturas con ⌘V)"></textarea></label>
+  <div class="edlinks" id="qLinks"></div>
+  <div class="edimgs" id="qImgs"></div>
+  <div class="fchips" id="qFiles"></div>
+  <div class="fbtns"><button type="button" class="btn" data-qf="file">📎 Vincular archivo</button><button type="button" class="btn" data-qf="dir">📁 Vincular carpeta</button><label class="btn qimgbtn">📷 Añadir imagen<input type="file" accept="image/*" multiple hidden id="qImgIn"></label></div>
+  <div class="actions"><button type="button" class="btn" data-qcancel>Cancelar</button><span class="sp"></span>
     <button class="btn" value="more" id="qMore">Añadir y otra</button><button class="btn primary" value="ok">Añadir</button></div>
 </form>`;
 document.body.appendChild(dlg);
-const txt = $('#qText');
+const txt = $('#qText'), notas = $('#qNotes');
+let imgs = [], hs = [];   // capturas y archivos esperando a que se cree la tarea
+function pintaExtras(){
+  $('#qLinks').innerHTML = O.noteLinks ? O.noteLinks(notas.value) : '';
+  $('#qImgs').innerHTML = imgs.map((x, i) => `<span class="imth"><img alt="" src="${x.url}"><button type="button" data-qidel="${i}" aria-label="Quitar imagen">×</button></span>`).join('');
+  $('#qFiles').innerHTML = hs.map((h, i) => `<span class="fchip"><a>${h.kind === 'directory' ? '📁' : '📎'} ${esc(h.name)}</a><button type="button" data-qfdel="${i}" aria-label="Quitar">×</button></span>`).join('');
+}
+function meteImgs(files){
+  for (const f of files){ const fr = new FileReader(); fr.onload = () => { imgs.push({f, url: fr.result}); pintaExtras(); }; fr.readAsDataURL(f); }
+}
+notas.addEventListener('input', pintaExtras);
+notas.addEventListener('paste', e => {
+  const fs = [...(e.clipboardData && e.clipboardData.items || [])].filter(i => i.kind === 'file' && i.type.startsWith('image/')).map(i => i.getAsFile()).filter(Boolean);
+  if (fs.length){ e.preventDefault(); meteImgs(fs); }
+});
+$('#qImgIn').addEventListener('change', e => { meteImgs([...e.target.files]); e.target.value = ''; });
+dlg.addEventListener('dragover', e => { if ([...(e.dataTransfer.types || [])].includes('Files')) e.preventDefault(); });
+dlg.addEventListener('drop', async e => {
+  if (![...(e.dataTransfer.types || [])].includes('Files')) return;
+  e.preventDefault();
+  const its = [...e.dataTransfer.items].filter(i => i.kind === 'file');
+  const imgF = its.filter(i => i.type.startsWith('image/')).map(i => i.getAsFile()).filter(Boolean);
+  if (imgF.length) return meteImgs(imgF);
+  if (!its[0] || !its[0].getAsFileSystemHandle) return O.toast('Arrastrar archivos solo funciona en Chrome en el Mac');
+  hs.push(...(await Promise.all(its.map(i => i.getAsFileSystemHandle()))).filter(Boolean)); pintaExtras();
+});
 
 function recent(){
   // Clientes con más tareas recientes primero
@@ -43,7 +74,7 @@ function drawUrg(){
     `<button type="button" class="seg u-${k}" data-qu="${k}" aria-pressed="${urg === k}">${O.URG[k].icon} ${O.URG[k].label}</button>`).join('');
 }
 function open(){
-  urg = 'baja'; cid = ''; txt.value = '';
+  urg = 'baja'; cid = ''; txt.value = ''; notas.value = ''; imgs = []; hs = []; $('#qDay').value = ''; $('#qHoy').checked = false; pintaExtras();
   drawClients(); drawUrg(); dlg.showModal(); setTimeout(() => txt.focus(), 50);
 }
 btn.addEventListener('click', open);
@@ -55,6 +86,16 @@ txt.addEventListener('input', () => {
   if (p.priority !== 'baja' && p.priority !== urg){ urg = p.priority; drawUrg(); }
 });
 dlg.addEventListener('click', e => {
+  if (e.target.closest('[data-qcancel]')) return dlg.close('cancel');
+  const qi = e.target.closest('[data-qidel]'); if (qi){ imgs.splice(+qi.dataset.qidel, 1); pintaExtras(); return; }
+  const qd = e.target.closest('[data-qfdel]'); if (qd){ hs.splice(+qd.dataset.qfdel, 1); pintaExtras(); return; }
+  const qf = e.target.closest('[data-qf]');
+  if (qf){
+    if (!O.filesPuede) return O.toast('Vincular archivos del ordenador solo funciona en Chrome en el Mac');
+    (async () => { try { hs.push(...(qf.dataset.qf === 'dir' ? [await window.showDirectoryPicker({mode: 'read'})] : await window.showOpenFilePicker({multiple: true}))); pintaExtras(); }
+      catch (err) { if (err.name !== 'AbortError') O.toast('No se pudo vincular: ' + err.message); } })();
+    return;
+  }
   const c = e.target.closest('[data-qc]'); if (c){ cid = c.dataset.qc; drawClients(); return; }
   const u = e.target.closest('[data-qu]'); if (u){ urg = u.dataset.qu; drawUrg(); return; }
   if (e.target === dlg) dlg.close('cancel');
@@ -64,15 +105,25 @@ txt.addEventListener('keydown', e => { if (e.key === 'Enter'){ e.preventDefault(
 function add(){
   const raw = txt.value.trim(); if (!raw) return false;
   const p = O.parse(raw)[0] || {title: raw};
-  const t = {id: O.uid(), title: p.title || raw, client: cid || null, day: null, status: 'todo', priority: urg, order: O.maxOrder() + 1, doneAt: null};
-  S.tasks.push(t); O.save(); O.render();
-  if (O.online()) O.pushCreate(t);
+  const dia = $('#qDay').value || null;
+  const t = {id: O.uid(), title: p.title || raw, client: cid || null, day: dia, status: 'todo', priority: urg, order: O.maxOrder() + 1, doneAt: null};
+  if ($('#qHoy').checked) t.today = O.today();
+  S.tasks.push(t);
+  if (notas.value.trim() && O.setNote) O.setNote(t.id, notas.value);
+  O.save(); O.render();
+  // Primero se guardan capturas y archivos con la tarea; luego (si es de la agencia) va a ClickUp
+  const misImgs = imgs.map(x => x.f), misHs = hs.slice();
+  (async () => {
+    if (misHs.length && O.filesVincular) await O.filesVincular(t.id, misHs).catch(() => {});
+    if (misImgs.length && O.imgAnadir) await O.imgAnadir(t.id, misImgs).catch(() => {});
+    if (O.online()) O.pushCreate(t);
+  })();
   O.toast(`Añadida${t.client ? ' a ' + O.client(t.client).name : ''} · ${O.URG[urg].label}`);
   return true;
 }
 dlg.addEventListener('close', () => {
   if (dlg.returnValue === 'ok') add();
-  if (dlg.returnValue === 'more'){ if (add()) { txt.value = ''; urg = 'baja'; drawUrg(); dlg.showModal(); setTimeout(() => txt.focus(), 50); } }
+  if (dlg.returnValue === 'more'){ if (add()) { txt.value = ''; notas.value = ''; imgs = []; hs = []; pintaExtras(); urg = 'baja'; drawUrg(); dlg.showModal(); setTimeout(() => txt.focus(), 50); } }
 });
 
 

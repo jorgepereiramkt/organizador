@@ -108,5 +108,5 @@
     const im = lista(o.dataset.imgopen); if (im.length) ver(im[0].id);
   }, true);
 
-  O.imgsOf = lista;
+  O.imgsOf = lista; O.imgAnadir = anadir;
 })();
