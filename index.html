@@ -6,7 +6,7 @@
 <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' https://www.gstatic.com https://apis.google.com https://accounts.google.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://accounts.google.com; font-src https://fonts.gstatic.com; connect-src https://api.clickup.com https://script.google.com https://script.googleusercontent.com https://accounts.google.com https://firestore.googleapis.com https://identitytoolkit.googleapis.com https://securetoken.googleapis.com https://www.googleapis.com https://apis.google.com; frame-src 'self' https://organizador-jp.firebaseapp.com https://accounts.google.com; img-src 'self' data: https://lh3.googleusercontent.com https://www.google.com; manifest-src 'self'; base-uri 'none'; form-action 'self'; object-src 'none'">
 <meta name="referrer" content="no-referrer">
 <meta name="robots" content="noindex, nofollow">
-<link rel="manifest" href="manifest.json?v=20261123223742">
+<link rel="manifest" href="manifest.json?v=20261123224445">
 <link rel="icon" href="icon-192.png">
 <link rel="apple-touch-icon" href="icon-180.png">
 <meta name="theme-color" content="#0a0a0b">
@@ -107,7 +107,7 @@ button{cursor:pointer;border:0;background:none}
 .card.dragging{opacity:.3}
 .card.ins::before{content:"";position:absolute;left:0;right:0;top:-6px;height:3px;border-radius:3px;background:var(--accent)}
 .card.done .tt{text-decoration:line-through;color:var(--faint)}
-.chk{flex:none;width:20px;height:20px;margin-top:1px;border-radius:50%;border:2px solid var(--faint);display:grid;place-items:center}
+.chk{flex:none;width:20px;height:20px;min-width:20px;max-width:20px;aspect-ratio:1/1;padding:0;box-sizing:border-box;-webkit-appearance:none;appearance:none;margin-top:1px;border-radius:50%;border:2px solid var(--faint);display:grid;place-items:center}
 .chk:hover{border-color:var(--ok)}
 .card.done .chk{background:var(--ok);border-color:var(--ok)}
 .card.done .chk::after{content:"";width:8px;height:4px;border:2px solid #0a0a0b;border-top:0;border-right:0;transform:rotate(-45deg) translate(1px,-1px)}
@@ -639,7 +639,7 @@ a.btn{display:inline-flex;align-items:center;text-decoration:none;color:var(--te
 .wk-side [data-wk=hoy] .card .tt{font-size:12.5px;line-height:1.25;display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden}
 .wk-side [data-wk=hoy] .card .meta{margin-top:4px;gap:4px}
 .wk-side [data-wk=hoy] .card .meta>*{font-size:10.5px;padding:1px 6px}
-.wk-side [data-wk=hoy] .card .chk{width:16px;height:16px;min-width:16px}
+.wk-side [data-wk=hoy] .card .chk{width:16px;height:16px;min-width:16px;max-width:16px}
 .wk-side{position:sticky;top:76px;max-height:calc(100vh - 96px);overflow-y:auto}
 .wk-side .urg{border-top:1px solid var(--line)}
 @media (max-width:1100px){ .wk-wrap{grid-template-columns:1fr} .wk-side{position:static;max-height:none} }
@@ -662,7 +662,7 @@ a.btn{display:inline-flex;align-items:center;text-decoration:none;color:var(--te
 .wk-ev.work.open .wk-ts,.wk-ev.work.wk-many:hover .wk-ts{overflow:visible}
 .wk-ev.work.wk-many:hover .wk-more:not(:focus){display:none}
 .wk-ev.work.open .wk-more{display:inline-block!important}
-.wk-ev .card.wk-t .chk{flex:0 0 auto;width:12px;height:12px;min-width:12px;margin:0;border-width:1.5px}
+.wk-ev .card.wk-t .chk{flex:0 0 auto;width:12px;height:12px;min-width:12px;max-width:12px;margin:0;border-width:1.5px}
 .wk-ev .card.wk-t.done .tt{text-decoration:line-through;opacity:.55}
 .wk-now{position:absolute;left:-4px;right:0;height:2px;background:#E5484D;z-index:2}
 .wk-now::before{content:'';position:absolute;left:-2px;top:-4px;width:10px;height:10px;border-radius:50%;background:#E5484D}
@@ -898,7 +898,7 @@ a.btn{display:inline-flex;align-items:center;text-decoration:none;color:var(--te
   .card{padding:12px 10px}
   .card .tt{font-size:15px}
   .pick{height:36px;padding:0 14px;font-size:13px}
-  .chk{width:24px;height:24px}
+  .chk{width:24px;height:24px;min-width:24px;max-width:24px}
   .iarev{padding:12px}
   .iarev-l{grid-template-columns:1fr}
   .iarev .card{flex-wrap:wrap}
@@ -1296,7 +1296,7 @@ textarea.over{box-shadow:0 0 0 2px var(--accent)}
 .fo-lista{width:100%;display:flex;flex-direction:column;gap:10px;margin-top:14px;text-align:left;min-height:40px}
 .fo-lista .card{padding:16px 18px;font-size:16px}
 .fo-lista .card .tt{font-size:17px!important;font-weight:600}
-.fo-lista .card .chk{width:24px;height:24px;min-width:24px}
+.fo-lista .card .chk{width:24px;height:24px;min-width:24px;max-width:24px}
 .fo-lista .card.done{opacity:.45}
 .fo-lista .card.done .tt{text-decoration:line-through}
 .fo-frase{margin:22px 0 0;font-size:18px;font-style:italic;color:var(--muted);max-width:560px}
@@ -1314,6 +1314,20 @@ textarea.over{box-shadow:0 0 0 2px var(--accent)}
 .wk-lugar.l-work{border-style:solid;border-color:#4F8CFF;background:color-mix(in srgb,#4F8CFF 16%,transparent);color:var(--text)}
 .salcasa{margin:0 0 12px;padding:12px 16px;border-radius:14px;background:linear-gradient(90deg,color-mix(in srgb,#FFB347 22%,var(--surface)),var(--surface));border:1px solid color-mix(in srgb,#FFB347 40%,transparent);font-size:14px}
 .salcasa.ok{background:linear-gradient(90deg,color-mix(in srgb,#3DDC97 18%,var(--surface)),var(--surface));border-color:color-mix(in srgb,#3DDC97 40%,transparent)}
+
+/* iPad y pantallas medianas */
+.toolbar{flex-wrap:wrap;row-gap:8px}
+@media (max-width:1300px){ .wk-grid{min-width:0} }
+@media (max-width:1100px){ .toolbar .hint{display:none} }
+.wk-wrap>.wk{min-width:0}
+.planner{grid-template-columns:minmax(0,1fr) 400px}
+.planner .side .urg .list{display:grid;grid-template-columns:1fr 1fr;gap:6px}
+.planner .side .urg .list>.empty{grid-column:1/-1}
+.planner .side .urg .card{padding:8px 8px 8px 7px;gap:7px;min-width:0;margin:0}
+.planner .side .urg .card .tt{font-size:12.5px;line-height:1.25;display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden}
+.planner .side .urg .card .meta{margin-top:4px;gap:4px}
+.planner .side .urg .card .meta>*{font-size:10.5px;padding:1px 6px}
+@media (max-width:1100px){ .planner{grid-template-columns:1fr} .planner .side{position:static;max-height:none;order:-1} }
 </style>
 </head>
 <body>
@@ -1396,16 +1410,16 @@ textarea.over{box-shadow:0 0 0 2px var(--accent)}
 
 <div class="toast" id="toast"></div>
 
-<script src="app.js?v=20261123223742"></script>
-<script src="planner.js?v=20261123223742"></script>
-<script src="clients.js?v=20261123223742"></script>
-<script src="quick.js?v=20261123223742"></script>
-<script src="ia.js?v=20261123223742"></script>
-<script src="hours.js?v=20261123223742"></script>
-<script src="cliente.js?v=20261123223742"></script>
-<script src="diario.js?v=20261123223742"></script>
-<script src="imagenes.js?v=20261123223742"></script>
-<script src="archivos.js?v=20261123223742"></script>
-<script type="module" src="cloud.js?v=20261123223742"></script>
+<script src="app.js?v=20261123224445"></script>
+<script src="planner.js?v=20261123224445"></script>
+<script src="clients.js?v=20261123224445"></script>
+<script src="quick.js?v=20261123224445"></script>
+<script src="ia.js?v=20261123224445"></script>
+<script src="hours.js?v=20261123224445"></script>
+<script src="cliente.js?v=20261123224445"></script>
+<script src="diario.js?v=20261123224445"></script>
+<script src="imagenes.js?v=20261123224445"></script>
+<script src="archivos.js?v=20261123224445"></script>
+<script type="module" src="cloud.js?v=20261123224445"></script>
 </body>
 </html>

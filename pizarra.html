@@ -10,7 +10,8 @@
 <title>Pizarra</title>
 <style>
   html, body { margin: 0; height: 100%; overflow: hidden; background: #f6f6f8; font-family: -apple-system, system-ui, sans-serif; overscroll-behavior: none; }
-  #app { position: fixed; inset: 0; }
+  #app { position: fixed; inset: 0; touch-action: none; }
+  html, body { touch-action: none; -webkit-user-select: none; }
   #bar { position: fixed; z-index: 10; left: 50%; transform: translateX(-50%); bottom: calc(env(safe-area-inset-bottom) + 14px);
          display: flex; gap: 8px; align-items: center; background: rgba(255,255,255,.92); backdrop-filter: blur(10px);
          border: 1px solid rgba(0,0,0,.08); box-shadow: 0 6px 24px rgba(0,0,0,.12); border-radius: 999px; padding: 6px 8px 6px 14px; font-size: 14px; }
@@ -35,11 +36,11 @@
 <div id="msg">Cargando la pizarra…</div>
 <div id="app"></div>
 <div id="bar" hidden><span class="dot" id="dot"></span><b id="nm"></b><span id="st">…</span><button id="limpio" type="button" class="sec" title="Convierte la letra a mano en texto y los dibujos en cuadros y flechas (si seleccionas algo, solo eso)">✨ Pasar a limpio</button><button id="close" type="button">Cerrar</button></div>
-<script src="pizarra-cfg.js?v=20261123223742"></script>
+<script src="pizarra-cfg.js?v=20261123224445"></script>
 <script src="https://unpkg.com/react@18.2.0/umd/react.production.min.js"></script>
 <script src="https://unpkg.com/react-dom@18.2.0/umd/react-dom.production.min.js"></script>
 <script src="https://unpkg.com/@excalidraw/excalidraw@0.17.6/dist/excalidraw.production.min.js"></script>
-<script src="pizarra-limpio.js?v=20261123223742"></script>
-<script src="pizarra.js?v=20261123223742"></script>
+<script src="pizarra-limpio.js?v=20261123224445"></script>
+<script src="pizarra.js?v=20261123224445"></script>
 </body>
 </html>

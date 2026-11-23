@@ -124,6 +124,25 @@
       }
     });
     ReactDOM.createRoot($('#app')).render(el);
+    // Pellizcar con dos dedos (iPad): acerca/aleja y mueve el lienzo; Safari no se lo pasa bien a Excalidraw
+    (() => {
+      let p0 = null;
+      const dos = t => { const a = t[0], b = t[1]; return { d: Math.hypot(a.clientX - b.clientX, a.clientY - b.clientY), x: (a.clientX + b.clientX) / 2, y: (a.clientY + b.clientY) / 2 }; };
+      const stop = e => { if (e.cancelable) e.preventDefault(); };
+      ['gesturestart', 'gesturechange', 'gestureend'].forEach(n => document.addEventListener(n, stop, { passive: false }));
+      document.addEventListener('touchstart', e => {
+        if (e.touches.length !== 2 || !api) { p0 = null; return; }
+        const st = api.getAppState(), g = dos(e.touches);
+        p0 = { ...g, z: st.zoom.value, sx: g.x / st.zoom.value - st.scrollX, sy: g.y / st.zoom.value - st.scrollY };
+      }, { passive: true, capture: true });
+      document.addEventListener('touchmove', e => {
+        if (!p0 || e.touches.length !== 2 || !api) return;
+        stop(e);
+        const g = dos(e.touches), z = Math.min(30, Math.max(0.1, p0.z * g.d / (p0.d || 1)));
+        api.updateScene({ appState: { zoom: { value: z }, scrollX: g.x / z - p0.sx, scrollY: g.y / z - p0.sy } });
+      }, { passive: false, capture: true });
+      document.addEventListener('touchend', e => { if (e.touches.length < 2) p0 = null; }, { passive: true, capture: true });
+    })();
     msg('');
     $('#bar').hidden = false;
     if (!$('#st').textContent || $('#st').textContent === '…') setSt('Guardado ✓');
