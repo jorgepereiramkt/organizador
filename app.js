@@ -1132,3 +1132,25 @@ setInterval(() => { if (document.visibilityState === 'visible') sync(true); }, 6
 document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') sync(true); });
 window.__org = {cliEf, syncCU: s => sync(s), mergeCloud, cloudSaved, editingId: () => editing, setNote, noteLinks, S, isApartado, byClientOrder, GROUP, clientColor, URG, urgRank, parse, pushCreate, uid, maxOrder, clientLists, online, PALETA, cu, listInfo, norm, isRegTask, applyCloud, cloudEmpty, cloudReady, wipeLocal, toast, views, render, save, card, setToolbar, visibleTasks, client, task, esc, iso, fromIso, addDays, today, dayLabel, DIAS_L, MESES, pad, byOrder};
 })();
+
+/* ---------- Versión nueva: se actualiza sola en todos los dispositivos ---------- */
+(() => {
+  const mia = ((document.querySelector('script[src*="app.js?v="]') || {}).src || '').split('v=')[1] || '';
+  let avisada = false;
+  async function nueva(){
+    try { const r = await fetch('version.json?_=' + Date.now(), {cache: 'no-store'}); if (!r.ok) return null; const j = await r.json(); return j.v && mia && j.v !== mia ? j.v : null; } catch(e){ return null; }
+  }
+  const recarga = v => { try { sessionStorage.setItem('jp-ver', v); } catch(e){} location.replace(location.pathname + '?v=' + v); };
+  // ¿estás escribiendo o con una ventana abierta? entonces no se recarga sola: avisa
+  const ocupado = () => !!document.querySelector('dialog[open]') || (document.activeElement && document.activeElement.matches('input,textarea,[contenteditable]'));
+  async function mira(forzar){
+    const v = await nueva(); if (!v) return false;
+    if (forzar || !ocupado()) { recarga(v); return true; }
+    if (!avisada){ avisada = true; toast('Hay una versión nueva de la app: pulsa ↻ (arriba a la derecha) para actualizar'); }
+    return false;
+  }
+  window.__org.buscaVersion = mira;
+  setTimeout(() => mira(false), 3000);
+  setInterval(() => { if (document.visibilityState === 'visible') mira(false); }, 5 * 60e3);
+  document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') mira(false); });
+})();

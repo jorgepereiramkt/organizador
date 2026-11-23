@@ -1286,7 +1286,9 @@ O.importInbox = importInbox;
 // ↻ Actualizar todo: vuelve a pedir el calendario (y la lista de calendarios), ClickUp, el buzón y la nube
 document.getElementById('refreshAll').addEventListener('click', async () => {
   const b = document.getElementById('refreshAll'); if (b.classList.contains('girando')) return;
-  b.classList.add('girando'); O.toast('Actualizando todo…');
+  b.classList.add('girando');
+  if (O.buscaVersion && await O.buscaVersion(true)) return;   // hay versión nueva de la app: se recarga con ella
+  O.toast('Actualizando todo…');
   for (const k in weekEv) delete weekEv[k]; clearCache(); lastEvents = []; calError = '';
   const tareas = [
     refrescaCalsPuente(),
