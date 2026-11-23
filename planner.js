@@ -680,9 +680,16 @@ evForm.addEventListener('click', async e => {
     wkReload(c.day);
   }
 });
-evDlg.addEventListener('close', async () => {
+// Se crea/guarda al enviar el formulario (botón o Intro); el «close» queda de respaldo
+evForm.addEventListener('submit', e => {
+  e.preventDefault();
+  const v = (e.submitter && e.submitter.value) || 'ok';
+  evDlg.close(v); evDone(v);
+});
+evDlg.addEventListener('close', () => evDone(evDlg.returnValue));
+async function evDone(rv){
   const c = evCur; evCur = null;
-  if (evDlg.returnValue !== 'ok' || !c) return;
+  if (rv !== 'ok' || !c) return;
   const f = evForm, val = n => (f.querySelector(`[name=${n}]`) || {}).value;
   const s = hmIn(val('s')), en = hmIn(val('e'));
   if (en <= s) return O.toast('La hora de fin tiene que ser después del inicio');
@@ -702,7 +709,7 @@ evDlg.addEventListener('close', async () => {
       O.toast('Guardado en tu Google Calendar ✓'); wkReload(c.day, day);
     }
   } catch(err){ O.toast('Google Calendar: ' + err.message); }
-});
+}
 evDlg.addEventListener('click', e => { if (e.target === evDlg) evDlg.close('cancel'); });
 // Arrastrar un evento (cambiarlo de hora o de día) o estirarlo desde el borde de abajo
 document.addEventListener('pointerdown', e => {
