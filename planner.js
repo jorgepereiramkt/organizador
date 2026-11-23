@@ -289,7 +289,7 @@ function calStatus(){
 }
 O.views.dia = function(){
   const d = O.fromIso(planDay), isToday = planDay === O.today();
-  O.setToolbar('Día', `${O.DIAS_L[d.getDay()]} ${d.getDate()} ${O.MESES[d.getMonth()]}`,
+  O.setToolbar('Calendario', `${O.DIAS_L[d.getDay()]} ${d.getDate()} ${O.MESES[d.getMonth()]}`,
     `<button class="icon" data-pday="-1" aria-label="Día anterior"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m15 18-6-6 6-6"/></svg></button>
      <button class="chip" data-pday="0">Hoy</button>
      <button class="icon" data-pday="1" aria-label="Día siguiente"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m9 18 6-6-6-6"/></svg></button>
@@ -868,7 +868,7 @@ document.addEventListener('pointerdown', e => {
   const up = () => { fin(); wkJustMade = true; setTimeout(() => wkJustMade = false, 100); if (en - s >= 15) wkCreate(day, s, en); };
   addEventListener('pointermove', mv); addEventListener('pointerup', up); addEventListener('pointercancel', fin);
 });
-try { S.diaMode = localStorage.getItem('jp-diamode') || 'dia'; } catch(e){ S.diaMode = 'dia'; }
+S.diaMode = S.diaMode || 'semana';   // al abrir la app, Semana; al recargar se respeta donde estabas
 // al guardar bloques o refrescar el calendario, la semana se recarga
 setInterval(() => { if (S.view === 'dia' && S.diaMode === 'semana' && !document.querySelector('dialog[open]')){ for (const k in weekEv) delete weekEv[k]; clearCache(); loadWeek(); } }, 5 * 60e3);
 /* ---------- Buzón: tareas que Claude deja en un calendario ---------- */
