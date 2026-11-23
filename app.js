@@ -1023,7 +1023,7 @@ document.addEventListener('click', e => { const b = e.target.closest('[data-them
 // Al abrir la app se empieza en el Día; al RECARGAR (misma ventana) se vuelve a donde estabas, con el mismo scroll
 const NAV = 'jp-nav';
 let nav = null; try { nav = JSON.parse(sessionStorage.getItem(NAV) || localStorage.getItem(NAV) || 'null'); if (nav && nav.at && Date.now() - nav.at > 10 * 60e3 && !sessionStorage.getItem(NAV)) nav = null; } catch(e){}
-S.view = (nav && nav.view) || 'dia'; S.clientMode = (nav && nav.cmode) || 'tareas';
+S.view = (nav && nav.view) || 'dia'; S.clientMode = (nav && nav.cmode) || 'fichas';   // en Clientes se empieza por Fichas
 if (nav && nav.dmode) S.diaMode = nav.dmode;
 const guardaNav = () => { try { const v = JSON.stringify({view: S.view, cmode: S.clientMode, dmode: S.diaMode, y: scrollY, bx: main.querySelector('.board')?.scrollLeft || 0, at: Date.now()}); sessionStorage.setItem(NAV, v); localStorage.setItem(NAV, v); } catch(e){} };
 setInterval(() => { if (document.visibilityState === 'visible') guardaNav(); }, 30e3);

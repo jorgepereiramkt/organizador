@@ -52,9 +52,9 @@ O.views.clientes.after = () => {
   if (tb.querySelector('.modes')) return;
   const sw = document.createElement('div');
   sw.className = 'modes';
-  sw.innerHTML = `<button class="chip" data-cmode="tareas" aria-pressed="${S.clientMode !== 'fichas'}">Tareas</button>
-    <button class="chip" data-cmode="hoy" aria-pressed="${S.clientMode === 'hoy'}">Tareas hoy</button>
-    <button class="chip" data-cmode="fichas" aria-pressed="${S.clientMode === 'fichas'}">Fichas</button>`;
+  sw.innerHTML = `<button class="chip" data-cmode="fichas" aria-pressed="${S.clientMode === 'fichas'}">Fichas</button>
+    <button class="chip" data-cmode="tareas" aria-pressed="${S.clientMode === 'tareas'}">Tareas</button>
+    <button class="chip" data-cmode="hoy" aria-pressed="${S.clientMode === 'hoy'}">Tareas hoy</button>`;
   tb.insertBefore(sw, tb.querySelector('.sp'));
 };
 $('#toolbar').addEventListener('click', e => {
