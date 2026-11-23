@@ -544,7 +544,7 @@ function card(t, hide={}){
 function column({title, sub='', field, value='', tasks, hide, cls='', dot, undone=false, empty='Arrastra aquí', add, byUrg}){
   const listHtml = !byUrg ? tasks.map(t => card(t, hide)).join('') : Object.entries(URG).map(([k, u]) => {
     const ts = tasks.filter(t => (URG[t.priority] ? t.priority : 'normal') === k);
-    return ts.length ? `<div class="ugrp u-${k}"><div class="uh">${u.icon} ${u.label} <span>${ts.length}</span></div>${ts.map(t => card(t, hide)).join('')}</div>` : '';
+    return `<div class="ugrp u-${k}${ts.length ? '' : ' vacia'}" data-urgk="${k}"><div class="uh">${u.icon} ${u.label} <span>${ts.length}</span></div>${ts.map(t => card(t, hide)).join('') || '<div class="empty mini">Suelta aquí</div>'}</div>`;
   }).join('');
   return `<section class="col ${cls}" data-field="${field}" data-value="${value}" ${undone?'data-undone="1"':''} ${dot?`style="--cc:${dot}"`:''}>
     <header><h3>${dot?`<span class="colname">${esc(title)}</span>`:esc(title)} ${sub?`<span class="csub">${esc(sub)}</span>`:''}</h3><span class="count">${tasks.length}</span></header>
@@ -710,6 +710,8 @@ function beginDrag(cardEl, x, y){
 function hitTest(){
   const el = document.elementFromPoint(D.x, D.y);
   const zone = el && el.closest('[data-field]');
+  const ug = el && el.closest('[data-urgk]'); D.ugk = ug && zone && zone.contains(ug) ? ug.dataset.urgk : null;
+  if (D.ug !== ug){ D.ug && D.ug.classList.remove('ugover'); ug && zone && zone.contains(ug) && ug.classList.add('ugover'); D.ug = ug; }
   if (zone !== D.zone){ D.zone && D.zone.classList.remove('over'); zone && zone.classList.add('over'); D.zone = zone; }
   let before = null;
   if (zone){
@@ -727,23 +729,26 @@ function moveDrag(x, y){
 }
 function endDrag(){
   cancelAnimationFrame(D.raf);
-  const {zone, before, id, ghost, cardEl} = D;
+  const {zone, before, id, ghost, cardEl, ugk, ug} = D; ug && ug.classList.remove('ugover');
   ghost.remove(); cardEl.classList.remove('dragging'); document.body.classList.remove('is-dragging');
   zone && zone.classList.remove('over'); before && before.classList.remove('ins');
   D = null; justDragged = true; setTimeout(() => justDragged = false, 80);
   if (!zone) return;
   const t = task(id), f = zone.dataset.field, v = zone.dataset.value;
+  const wasU = t && snap(t);
+  // soltarla en otro grupo de urgencia de una columna: cambia la urgencia
+  if (t && f === 'client' && ugk && URG[ugk]) t.priority = ugk;
   // tarea de ClickUp → proyecto: se queda en ClickUp y aquí se ve en el proyecto
   if (f === 'client' && t && t.cu){
     const dest = client(v), m = S.plan && (S.plan.tproy = S.plan.tproy || {});
-    if (m && dest && dest.proyecto){ m[t.id] = v; save(); S._keepScroll = true; render(); return toast(`En el proyecto «${dest.name}» (en ClickUp sigue igual)`); }
-    if (m && m[t.id]){ delete m[t.id]; if (v === t.client){ save(); S._keepScroll = true; render(); return toast('Vuelve a su cliente'); } }
+    if (m && dest && dest.proyecto){ const ya = m[t.id] === v; m[t.id] = v; save(); S._keepScroll = true; render(); afterChange(t, wasU); return ya ? null : toast(`En el proyecto «${dest.name}» (en ClickUp sigue igual)`); }
+    if (m && m[t.id]){ delete m[t.id]; if (v === t.client){ save(); S._keepScroll = true; render(); afterChange(t, wasU); return toast('Vuelve a su cliente'); } }
   }
   const list = [...zone.querySelectorAll('.card')].filter(c => c !== cardEl).map(c => task(c.dataset.id));
   const idx = before ? list.indexOf(task(before.dataset.id)) : list.length;
   const prev = list[idx-1], next = list[idx];
   t.order = prev && next ? (prev.order + next.order)/2 : prev ? prev.order + 1 : next ? next.order - 1 : maxOrder() + 1;
-  const was = snap(t);
+  const was = wasU || snap(t);
   if (f === 'day'){ t.day = v || null; if (zone.dataset.undone && t.status === 'done') setStatus(t,'todo'); }
   if (f === 'status') setStatus(t, v);
   if (f === 'client') t.client = v || null;
