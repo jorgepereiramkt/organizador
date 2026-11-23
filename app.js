@@ -343,6 +343,8 @@ const snap = t => ({title:t.title, day:t.day, status:t.status, priority:t.priori
 
 // Una tarea de ClickUp puede «verse» dentro de un proyecto sin salir de ClickUp (solo en esta app)
 const cliEf = t => ((S.plan && S.plan.tproy) || {})[t.id] || t.client;
+// interno de la agencia: tus proyectos y la carpeta personal de ClickUp (Jorge Personal)
+const esInterno = c => !!c && c.group === 'agency' && (c.proyecto || c.interno || /^jorge\b/i.test(c.name || ''));
 const isAgency = id => { const c = client(id); return !!(c && c.group === 'agency' && !c.proyecto); };   // los proyectos son de la agencia pero solo viven en la app
 
 // Regla de oro: solo se sube a ClickUp lo que es de un cliente marcado como «Agencia». Lo tuyo nunca sale de la app.
@@ -637,11 +639,16 @@ const views = {
       }).sort((a, b) => (b.pend.length > 0) - (a.pend.length > 0) || a.i - b.i);
       const conT = cols.filter(x => x.pend.length).length, gc = g === 'mine' ? 'mine' : 'ag', sel = S.cliSel && client(S.cliSel) ? S.cliSel : null;
       if (sel){ for (const {c, pend, hechas} of cols) if (c.id === sel) html += column({title:c.name, sub: hechas ? `${hechas} hecha${hechas>1?'s':''}` : '', field:'client', value:c.id, tasks:pend, hide:{client:true, urg:true, group:true, pick:true}, dot:clientColor(c), add: c.id, cls: `cg-${gc} solo`, byUrg:true}); continue; }
-      html += `<div class="sep sep-${gc}"><b>${g === 'mine' ? '🔒 Mis clientes' : '🏢 Agencia'}</b>${g === 'agency' ? '<button type="button" class="btn nproy" data-nproy>+ Proyecto</button>' : ''}<span>${conT} con tareas · ${cols.length - conT} sin pendientes${apartados ? ` · ${apartados} pausado${apartados > 1 ? 's' : ''} o antiguo${apartados > 1 ? 's' : ''} (en Fichas)` : ''}</span></div>`;
-      guia += `<div class="cg-grp cg-${gc}"><b>${g === 'mine' ? '🔒 Mis clientes' : '🏢 Agencia'}</b>${cols.map(({c, pend}) =>
-        `<button type="button" class="cg-it${pend.length ? '' : ' vacio'}${sel === c.id ? ' on' : ''}" aria-pressed="${sel === c.id}" data-cgo="${esc(c.id)}" style="--cc:${clientColor(c)}"><i></i><span>${c.proyecto ? '📁 ' : ''}${esc(c.name)}</span>${pend.length ? `<em>${pend.length}</em>` : ''}</button>`).join('')}</div>`;
-      for (const {c, pend, hechas} of cols)
-        html += column({title:(c.proyecto ? '📁 ' : '') + c.name, sub: hechas ? `${hechas} hecha${hechas>1?'s':''}` : '', field:'client', value:c.id, tasks:pend, hide:{client:true, urg:true, group:true, pick:true}, dot:clientColor(c), add: hoyMode ? undefined : c.id, cls: `cg-${gc} ${pend.length ? '' : 'quiet'}`, byUrg:true});
+      html += `<div class="sep sep-${gc}"><b>${g === 'mine' ? '🔒 Mis clientes' : '🏢 Agencia'}</b><span>${conT} con tareas · ${cols.length - conT} sin pendientes${apartados ? ` · ${apartados} pausado${apartados > 1 ? 's' : ''} o antiguo${apartados > 1 ? 's' : ''} (en Fichas)` : ''}</span></div>`;
+      // En la agencia, dos subbloques: primero los clientes y debajo lo interno (proyectos y Jorge Personal)
+      const subs = g === 'agency' ? [['👥 Clientes', cols.filter(x => !esInterno(x.c))], ['📁 Proyectos internos', cols.filter(x => esInterno(x.c))]] : [['', cols]];
+      const item = ({c, pend}) => `<button type="button" class="cg-it${pend.length ? '' : ' vacio'}${sel === c.id ? ' on' : ''}" aria-pressed="${sel === c.id}" data-cgo="${esc(c.id)}" style="--cc:${clientColor(c)}"><i></i><span>${c.proyecto ? '📁 ' : ''}${esc(c.name)}</span>${pend.length ? `<em>${pend.length}</em>` : ''}</button>`;
+      guia += `<div class="cg-grp cg-${gc}"><b>${g === 'mine' ? '🔒 Mis clientes' : '🏢 Agencia'}</b>${subs.map(([t, xs]) => (t && xs.length ? `<small class="cg-sub">${t}</small>` : '') + xs.map(item).join('')).join('')}</div>`;
+      for (const [t, xs] of subs){
+        if (t && (xs.length || !hoyMode)) html += `<div class="subsep">${t}<span>${xs.length}</span>${t.includes('Proyectos') && !hoyMode ? '<button type="button" class="btn nproy" data-nproy>+ Proyecto</button>' : ''}</div>`;
+        for (const {c, pend, hechas} of xs)
+          html += column({title:(c.proyecto ? '📁 ' : '') + c.name, sub: hechas ? `${hechas} hecha${hechas>1?'s':''}` : '', field:'client', value:c.id, tasks:pend, hide:{client:true, urg:true, group:true, pick:true}, dot:clientColor(c), add: hoyMode ? undefined : c.id, cls: `cg-${gc} ${pend.length ? '' : 'quiet'}`, byUrg:true});
+      }
     }
     const sin = T.filter(x => (!cliEf(x) || !client(cliEf(x))) && x.status !== 'done');
     if (S.group === 'all' && sin.length && !(S.cliSel && client(S.cliSel))) html += column({title:'Sin cliente', field:'client', value:'', tasks:sin, hide:{client:true, pick:true}, dot:'var(--faint)', byUrg:true});
