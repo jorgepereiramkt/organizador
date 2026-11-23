@@ -34,7 +34,7 @@
       ${S.diarioCfg === c.id ? cfgPanel(c) : ''}
       ${ks.map(k => `<div class="dmet"><span class="dlab">${esc(nombre(k))}</span>
         <div class="dniv${esInv(k) ? ' inv' : ''}">${nivDe(k).map(([n, ic, t]) => `<button type="button" class="dbt n-${n}${m[k] === n ? ' on' : ''}" data-dset="${c.id}|${esc(k)}|${n}" title="${t}">${esInv(k) ? ic : ''}<span>${t}</span></button>`).join('')}</div></div>`).join('')}
-      <textarea class="dnote" data-dnote="${c.id}" rows="2" placeholder="Nota del día: qué ha pasado, qué ha ido mal, qué cambiar…">${esc(e.n || '')}</textarea>
+      <textarea class="dnote" data-dnote="${c.id}" rows="1" placeholder="✍️ Nota del día (opcional)…">${esc(e.n || '')}</textarea>
       ${prev.length ? `<details class="dprev"><summary>Notas anteriores (${prev.length})</summary>${prev.map(d => `<p><b>${O.fromIso(d).getDate()} ${O.MESES[O.fromIso(d).getMonth()].slice(0, 3)}</b> ${esc(D().log[d][c.id].n)}</p>`).join('')}</details>` : ''}
     </article>`;
   }

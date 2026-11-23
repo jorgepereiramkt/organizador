@@ -6,7 +6,7 @@
 <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' https://www.gstatic.com https://apis.google.com https://accounts.google.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://accounts.google.com; font-src https://fonts.gstatic.com; connect-src https://api.clickup.com https://script.google.com https://script.googleusercontent.com https://accounts.google.com https://firestore.googleapis.com https://identitytoolkit.googleapis.com https://securetoken.googleapis.com https://www.googleapis.com https://apis.google.com; frame-src 'self' https://organizador-jp.firebaseapp.com https://accounts.google.com; img-src 'self' data: https://lh3.googleusercontent.com https://www.google.com; manifest-src 'self'; base-uri 'none'; form-action 'self'; object-src 'none'">
 <meta name="referrer" content="no-referrer">
 <meta name="robots" content="noindex, nofollow">
-<link rel="manifest" href="manifest.json?v=20261123111337">
+<link rel="manifest" href="manifest.json?v=20261123112414">
 <link rel="icon" href="icon-192.png">
 <link rel="apple-touch-icon" href="icon-180.png">
 <meta name="theme-color" content="#0a0a0b">
@@ -1215,6 +1215,24 @@ textarea.over{box-shadow:0 0 0 2px var(--accent)}
 .card.tf.done{opacity:.55}
 .tfichas.mini .card.tf{min-height:60px}
 .tsec.u-super h3{color:#e5484d}.tsec.u-alta h3{color:#ef4444}
+
+.cvbtns{display:flex;gap:6px;margin-top:5px;flex-wrap:wrap}.cvbtns .chip{font-size:12px;padding:4px 10px;background:var(--surface);cursor:pointer}
+#reuVis{width:min(900px,94vw);max-width:94vw;max-height:90vh;padding:0;border:0;border-radius:20px;background:var(--bg)}
+#reuVis::backdrop{background:rgba(0,0,0,.5)}
+.rv header{display:flex;align-items:flex-start;gap:10px;padding:18px 20px 10px;position:sticky;top:0;background:var(--bg);z-index:1}
+.rv h2{margin:0;font:800 21px var(--head)}.rv header p{margin:4px 0 0;color:var(--muted);font-size:13px}
+.rvtabs{padding:0 20px 10px}
+.rvbus{margin:0 20px 10px;width:calc(100% - 40px);height:38px}
+.rvbody{padding:0 20px 20px}
+.rvres{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:14px 16px;font-size:14.5px;line-height:1.55}
+.rvbody h4{margin:14px 0 6px}
+.rvtr{display:flex;flex-direction:column;gap:6px;font-size:14px;line-height:1.5}
+.rvtr p{margin:0;padding:6px 10px;border-radius:10px;background:var(--surface)}
+.rvt{font-size:11.5px;color:var(--faint);margin-right:8px;font-variant-numeric:tabular-nums}
+/* Nota del diario más bonita */
+.dnote{width:100%;box-sizing:border-box;border:1px solid var(--line)!important;border-radius:12px!important;background:var(--bg)!important;padding:10px 12px!important;font:14px/1.45 var(--body)!important;color:var(--text);resize:vertical;outline:none;min-height:46px;transition:border-color .15s,box-shadow .15s}
+.dnote:focus{border-color:var(--c)!important;box-shadow:0 0 0 3px color-mix(in srgb,var(--c) 22%,transparent);background:var(--surface)!important}
+.dnote::placeholder{color:var(--faint)}
 </style>
 </head>
 <body>
@@ -1297,16 +1315,16 @@ textarea.over{box-shadow:0 0 0 2px var(--accent)}
 
 <div class="toast" id="toast"></div>
 
-<script src="app.js?v=20261123111337"></script>
-<script src="planner.js?v=20261123111337"></script>
-<script src="clients.js?v=20261123111337"></script>
-<script src="quick.js?v=20261123111337"></script>
-<script src="ia.js?v=20261123111337"></script>
-<script src="hours.js?v=20261123111337"></script>
-<script src="cliente.js?v=20261123111337"></script>
-<script src="diario.js?v=20261123111337"></script>
-<script src="imagenes.js?v=20261123111337"></script>
-<script src="archivos.js?v=20261123111337"></script>
-<script type="module" src="cloud.js?v=20261123111337"></script>
+<script src="app.js?v=20261123112414"></script>
+<script src="planner.js?v=20261123112414"></script>
+<script src="clients.js?v=20261123112414"></script>
+<script src="quick.js?v=20261123112414"></script>
+<script src="ia.js?v=20261123112414"></script>
+<script src="hours.js?v=20261123112414"></script>
+<script src="cliente.js?v=20261123112414"></script>
+<script src="diario.js?v=20261123112414"></script>
+<script src="imagenes.js?v=20261123112414"></script>
+<script src="archivos.js?v=20261123112414"></script>
+<script type="module" src="cloud.js?v=20261123112414"></script>
 </body>
 </html>
