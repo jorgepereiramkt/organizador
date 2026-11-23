@@ -564,7 +564,7 @@ function weekView(){
   // el día «ampliado»: hoy, o el que toques; desde las 18:00, mañana (para dejarlo organizado)
   const manana = O.iso(O.addDays(new Date(), 1));
   const ancho = S.wkAncho && days.includes(S.wkAncho) && S.wkAncho >= hoy ? S.wkAncho : (nowMin >= 18 * 60 && days.includes(manana) && S.wkAncho !== hoy ? manana : hoy);
-  const tpl = days.map(d => d < hoy ? (peq ? 'minmax(44px,.45fr)' : 'minmax(74px,.55fr)') : d === ancho ? (peq ? 'minmax(170px,2.2fr)' : 'minmax(240px,2.6fr)') : d === hoy ? (peq ? 'minmax(90px,1.2fr)' : 'minmax(130px,1.3fr)') : (peq ? 'minmax(72px,1fr)' : 'minmax(110px,1fr)')).join(' ');
+  const tpl = days.map(d => d < hoy ? (peq ? 'minmax(36px,.35fr)' : 'minmax(74px,.55fr)') : d === ancho ? (peq ? 'minmax(260px,4fr)' : 'minmax(240px,2.6fr)') : d === hoy ? (peq ? 'minmax(70px,1fr)' : 'minmax(130px,1.3fr)') : (peq ? 'minmax(58px,1fr)' : 'minmax(110px,1fr)')).join(' ');
   const cols = per.map(({d, its}) => {
     const blocks = lanes(its.map(i => ({...i}))).map(i => {
       const top = Y(i.start), h = Math.max(16, Y(i.end) - Y(i.start) - 2);

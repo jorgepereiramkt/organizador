@@ -6,7 +6,7 @@
 <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' https://www.gstatic.com https://apis.google.com https://accounts.google.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://accounts.google.com; font-src https://fonts.gstatic.com; connect-src https://api.clickup.com https://script.google.com https://script.googleusercontent.com https://accounts.google.com https://firestore.googleapis.com https://identitytoolkit.googleapis.com https://securetoken.googleapis.com https://www.googleapis.com https://apis.google.com; frame-src 'self' https://organizador-jp.firebaseapp.com https://accounts.google.com; img-src 'self' data: https://lh3.googleusercontent.com https://www.google.com; manifest-src 'self'; base-uri 'none'; form-action 'self'; object-src 'none'">
 <meta name="referrer" content="no-referrer">
 <meta name="robots" content="noindex, nofollow">
-<link rel="manifest" href="manifest.json?v=20261124001909">
+<link rel="manifest" href="manifest.json?v=20261124002053">
 <link rel="icon" href="icon-192.png">
 <link rel="apple-touch-icon" href="icon-180.png">
 <meta name="theme-color" content="#0a0a0b">
@@ -1363,7 +1363,7 @@ textarea.over{box-shadow:0 0 0 2px var(--accent)}
 .wk-clis{list-style:none;margin:0;padding:4px 6px;border-radius:6px;background:color-mix(in srgb,var(--surface) 70%,transparent);display:flex;flex-direction:column;gap:3px;counter-reset:cli;align-self:start}
 .wk-clis li{counter-increment:cli;font:700 10.5px/1.2 var(--body);display:flex;gap:5px;align-items:baseline;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .wk-clis li::before{content:counter(cli);flex:none;width:14px;height:14px;border-radius:50%;background:var(--c);color:#fff;font-size:9px;display:inline-grid;place-items:center}
-.wk-head.ancha b{color:var(--accent)}
+.wk-head.ancha:not(.today) b{color:var(--accent)}
 .wk-head:not(.old){cursor:zoom-in}
 .wk-head.ancha{cursor:default}
 .wk-abrir{display:inline-block;margin-top:4px;font:600 11px var(--body);color:var(--muted);padding:2px 8px;border-radius:99px;border:1px solid var(--line);cursor:pointer}
@@ -1393,6 +1393,30 @@ textarea.over{box-shadow:0 0 0 2px var(--accent)}
 body.is-dragging .col:not(.wk-side) .ugrp.vacia{display:flex}
 .col .ugrp.ugover{outline:2px dashed var(--accent);outline-offset:3px;border-radius:10px;background:color-mix(in srgb,var(--accent) 6%,transparent)}
 .col .ugrp .empty.mini{padding:8px;font-size:11.5px;border:1px dashed var(--line);border-radius:10px;text-align:center;color:var(--faint)}
+
+/* iPad (≤1300 px): panel derecho más estrecho y compacto, y el día ampliado mucho más ancho */
+@media (max-width:1300px) and (min-width:1101px){
+  .wk-wrap{grid-template-columns:minmax(0,1fr) 290px;gap:12px}
+}
+@media (max-width:1300px){
+  .wk-side{padding:10px}
+  .wk-side h3{font-size:14px}
+  .wk-side .wk-n2{display:block;margin:2px 0 0;font-size:11px}
+  .wk-side [data-wk=hoy] .ugrp,.wk-side [data-wk=atr] .list{grid-template-columns:1fr}
+  .wk-side [data-wk] .card{padding:7px 8px 7px 7px;gap:6px}
+  .wk-side [data-wk] .card .tt{font-size:12.5px;-webkit-line-clamp:2}
+  .wk-side [data-wk] .card .meta{margin-top:3px;gap:3px}
+  .wk-side [data-wk] .card .meta>*{font-size:10px;padding:0 5px}
+  .wk-side [data-wk] .card .npeek{display:none}
+  .wk-side .picks{flex-direction:row;gap:3px}
+  .wk-side .picks .pick{height:22px;padding:0 7px;font-size:10.5px}
+  .wk-side .picks .pick.man{display:none}
+  .wk-head b{font-size:18px}
+  .wk-head.today b{width:32px;height:32px}
+}
+@media (max-width:1100px){
+  .wk-side [data-wk=hoy] .ugrp,.wk-side [data-wk=atr] .list{grid-template-columns:1fr 1fr}
+}
 </style>
 </head>
 <body>
@@ -1476,16 +1500,16 @@ body.is-dragging .col:not(.wk-side) .ugrp.vacia{display:flex}
 
 <div class="toast" id="toast"></div>
 
-<script src="app.js?v=20261124001909"></script>
-<script src="planner.js?v=20261124001909"></script>
-<script src="clients.js?v=20261124001909"></script>
-<script src="quick.js?v=20261124001909"></script>
-<script src="ia.js?v=20261124001909"></script>
-<script src="hours.js?v=20261124001909"></script>
-<script src="cliente.js?v=20261124001909"></script>
-<script src="diario.js?v=20261124001909"></script>
-<script src="imagenes.js?v=20261124001909"></script>
-<script src="archivos.js?v=20261124001909"></script>
-<script type="module" src="cloud.js?v=20261124001909"></script>
+<script src="app.js?v=20261124002053"></script>
+<script src="planner.js?v=20261124002053"></script>
+<script src="clients.js?v=20261124002053"></script>
+<script src="quick.js?v=20261124002053"></script>
+<script src="ia.js?v=20261124002053"></script>
+<script src="hours.js?v=20261124002053"></script>
+<script src="cliente.js?v=20261124002053"></script>
+<script src="diario.js?v=20261124002053"></script>
+<script src="imagenes.js?v=20261124002053"></script>
+<script src="archivos.js?v=20261124002053"></script>
+<script type="module" src="cloud.js?v=20261124002053"></script>
 </body>
 </html>
