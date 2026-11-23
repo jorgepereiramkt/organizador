@@ -649,7 +649,7 @@ function wkCreate(day, s, e){
     <label>Notas<textarea name="desc" rows="4" placeholder="Lo que quieras apuntar para organizarte en este bloque…"></textarea></label>
     ${cals.length > 1 ? `<label>Calendario<select name="cal">${cals.map(c => `<option value="${esc(c.id)}" ${c.on ? 'selected' : ''}>${esc(c.name)}</option>`).join('')}</select></label>` : ''}
     <p class="iahint">Se crea en tu Google Calendar (cuenta personal).</p></div>
-    <div class="actions"><span class="sp"></span><button class="btn" value="cancel" formnovalidate>Cancelar</button><button class="btn primary" value="ok">Crear</button></div>`;
+    <div class="actions"><span class="sp"></span><button type="button" class="btn" data-evcancel>Cancelar</button><button class="btn primary" value="ok">Crear</button></div>`;
   evDlg.showModal(); setTimeout(() => evForm.querySelector('[name=title]').focus(), 50);
 }
 function wkEditEvent(el){
@@ -661,10 +661,11 @@ function wkEditEvent(el){
     <label>Notas<textarea name="desc" rows="6" placeholder="Apunta aquí lo que necesites…">${esc(plainDesc(ev.desc))}</textarea></label>
     <label>Color</label>${swatches(ev.ecolor || '', 'data-gcol', GCOL)}
     <p class="iahint">Los cambios se guardan en tu Google Calendar.${ev.rec ? ' Este evento se repite: los cambios de hora y color son solo para este día.' : ''}</p>
-    <div class="actions">${ev.rec ? '<button type="button" class="btn danger" data-evdel>Borrar solo este</button><button type="button" class="btn danger" data-evdel="all">Borrar todos</button>' : '<button type="button" class="btn danger" data-evdel>Borrar</button>'}<span class="sp"></span><button class="btn" value="cancel" formnovalidate>Cancelar</button><button class="btn primary" value="ok">Guardar</button></div>`;
+    <div class="actions">${ev.rec ? '<button type="button" class="btn danger" data-evdel>Borrar solo este</button><button type="button" class="btn danger" data-evdel="all">Borrar todos</button>' : '<button type="button" class="btn danger" data-evdel>Borrar</button>'}<span class="sp"></span><button type="button" class="btn" data-evcancel>Cancelar</button><button class="btn primary" value="ok">Guardar</button></div>`;
   evDlg.showModal();
 }
 evForm.addEventListener('click', async e => {
+  if (e.target.closest('[data-evcancel]')){ evDlg.close('cancel'); return; }
   const t = e.target.closest('[data-evt]');
   if (t){ if (t.dataset.evt === 'work'){ const c = evCur; evCur = null; evDlg.close('cancel'); wkAddBlock(c.day, c.s, c.e); } return; }
   const sw = e.target.closest('[data-gcol]');
