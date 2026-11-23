@@ -4,9 +4,12 @@
 // Se guarda en S.plan.diario = { cfg: {cid: [claves]}, log: {día: {cid: {m: {clave: 'g'|'y'|'r'}, v: {clave: texto}, n: nota}}} }
 (() => {
   const O = window.__org, S = O.S, esc = O.esc;
-  const CAT = { f: 'Facturación', rm: 'ROAS Meta', rg: 'ROAS Google', l: 'Leads', cpl: 'Coste por lead', p: 'Pedidos', g: 'Gasto / ritmo de inversión' };
-  const PH = { f: 'Ej.: 1.250 €', rm: 'Ej.: 3,2', rg: 'Ej.: 4,1', l: 'Ej.: 12', cpl: 'Ej.: 8 €', p: 'Ej.: 23', g: 'Ej.: 300 €' };
+  const CAT = { f: 'Facturación', rm: 'ROAS Meta', rg: 'ROAS Google', inv: 'Inversión', rent: 'Rentabilidad general', l: 'Leads', cpl: 'Coste por lead', p: 'Pedidos' };
   const NIV = [['g', '🟢', 'Buena'], ['y', '🟡', 'Media'], ['r', '🔴', 'Mala']];
+  // la inversión no es buena ni mala: alta / media / baja (en azules)
+  const NIV_INV = [['g', '⬆️', 'Alta'], ['y', '➖', 'Media'], ['r', '⬇️', 'Baja']];
+  const esInv = k => k === 'inv' || k === 'g';
+  const nivDe = k => esInv(k) ? NIV_INV : NIV;
   const nombre = k => CAT[k] || (k.startsWith('x:') ? k.slice(2) : k);
   const D = () => { S.plan.diario = S.plan.diario || { cfg: {}, log: {} }; const d = S.plan.diario; d.cfg = d.cfg || {}; d.log = d.log || {}; return d; };
   const cfgDe = c => D().cfg[c.id] || ['f', 'rm'];
@@ -24,14 +27,13 @@
 
   /* ---------- Tarjeta de cada cliente ---------- */
   function tarjeta(c, day){
-    const e = entrada(day, c.id) || {}, m = e.m || {}, v = e.v || {}, ks = cfgDe(c);
+    const e = entrada(day, c.id) || {}, m = e.m || {}, ks = cfgDe(c);
     const prev = Object.keys(D().log).filter(d => d < day && D().log[d][c.id] && D().log[d][c.id].n).sort().reverse().slice(0, 5);
     return `<article class="dcard${revisado(day, c) ? ' ok' : ''}" data-dcid="${c.id}" style="--c:${O.clientColor(c)}">
       <header><i></i><b>${esc(c.name)}</b>${revisado(day, c) ? '<span class="dok">✓ Revisado</span>' : ''}<span class="sp"></span><button type="button" class="dcfg-btn" data-dcfg="${c.id}" title="Elegir qué apartados revisas de este cliente">⚙︎</button></header>
       ${S.diarioCfg === c.id ? cfgPanel(c) : ''}
       ${ks.map(k => `<div class="dmet"><span class="dlab">${esc(nombre(k))}</span>
-        <div class="dniv">${NIV.map(([n, ic, t]) => `<button type="button" class="dbt n-${n}${m[k] === n ? ' on' : ''}" data-dset="${c.id}|${esc(k)}|${n}" title="${t}">${ic}<span>${t}</span></button>`).join('')}</div>
-        <input class="dval" data-dval="${c.id}|${esc(k)}" value="${esc(v[k] || '')}" placeholder="${esc(PH[k] || 'Valor (opcional)')}" autocomplete="off"></div>`).join('')}
+        <div class="dniv${esInv(k) ? ' inv' : ''}">${nivDe(k).map(([n, ic, t]) => `<button type="button" class="dbt n-${n}${m[k] === n ? ' on' : ''}" data-dset="${c.id}|${esc(k)}|${n}" title="${t}">${esInv(k) ? ic : ''}<span>${t}</span></button>`).join('')}</div></div>`).join('')}
       <textarea class="dnote" data-dnote="${c.id}" rows="2" placeholder="Nota del día: qué ha pasado, qué ha ido mal, qué cambiar…">${esc(e.n || '')}</textarea>
       ${prev.length ? `<details class="dprev"><summary>Notas anteriores (${prev.length})</summary>${prev.map(d => `<p><b>${O.fromIso(d).getDate()} ${O.MESES[O.fromIso(d).getMonth()].slice(0, 3)}</b> ${esc(D().log[d][c.id].n)}</p>`).join('')}</details>` : ''}
     </article>`;
@@ -58,16 +60,18 @@
           const pre = `${y}-${O.pad(i + 1)}-`, vals = Object.keys(D().log).filter(d => d.startsWith(pre)).map(d => (((D().log[d][c.id] || {}).m) || {})[k]).filter(Boolean);
           vals.forEach(x => cuenta[x]++);
           const a = vals.length ? vals.reduce((s, x) => s + SC[x], 0) / vals.length : null;
-          return `<i class="dot n-${col(a)}" title="${O.MESES[i]}: ${vals.length ? `🟢${vals.filter(x => x === 'g').length} 🟡${vals.filter(x => x === 'y').length} 🔴${vals.filter(x => x === 'r').length}` : 'sin datos'}"></i>`;
+          const L = nivDe(k);
+          return `<i class="dot n-${col(a)}" title="${O.MESES[i]}: ${vals.length ? L.map(([n, , t]) => `${t} ${vals.filter(x => x === n).length}`).join(' · ') : 'sin datos'}"></i>`;
         }).join('');
       } else {
         puntos = dias.map(d => {
           const e = (D().log[d] || {})[c.id] || {}, n = (e.m || {})[k]; if (n) cuenta[n]++;
-          const tip = `${O.fromIso(d).getDate()} ${O.MESES[mo].slice(0, 3)}${n ? ' · ' + NIV.find(x => x[0] === n)[2] : ''}${(e.v || {})[k] ? ' · ' + e.v[k] : ''}${e.n ? ' · 📝 ' + e.n : ''}`;
+          const tip = `${O.fromIso(d).getDate()} ${O.MESES[mo].slice(0, 3)}${n ? ' · ' + nivDe(k).find(x => x[0] === n)[2] : ''}${e.n ? ' · 📝 ' + e.n : ''}`;
           return `<i class="dot n-${n || 'none'}${d === day ? ' hoy' : ''}${e.n ? ' nota' : ''}" data-dgo="${d}" title="${esc(tip)}"></i>`;
         }).join('');
       }
-      return `<div class="drow"><span class="dlab2">${esc(nombre(k))}</span><span class="dots${anual ? ' ano' : ''}">${puntos}</span><span class="dcnt">🟢 ${cuenta.g} · 🟡 ${cuenta.y} · 🔴 ${cuenta.r}</span></div>`;
+      const cnt = esInv(k) ? `Alta ${cuenta.g} · Media ${cuenta.y} · Baja ${cuenta.r}` : `🟢 ${cuenta.g} · 🟡 ${cuenta.y} · 🔴 ${cuenta.r}`;
+      return `<div class="drow${esInv(k) ? ' inv' : ''}"><span class="dlab2">${esc(nombre(k))}</span><span class="dots${anual ? ' ano' : ''}">${puntos}</span><span class="dcnt">${cnt}</span></div>`;
     }).join('');
     return `<section class="dres"><header><h3>📊 Resumen · ${titulo}</h3><span class="sp"></span>
       <div class="modes"><button class="chip" data-dres="mes" aria-pressed="${!anual}">Mes</button><button class="chip" data-dres="ano" aria-pressed="${anual}">Año</button></div></header>
@@ -130,8 +134,6 @@
   document.addEventListener('input', e => {
     const n = e.target.closest && e.target.closest('[data-dnote]');
     if (n){ const en = entrada(dia(), n.dataset.dnote, true); en.n = n.value.slice(0, 2000); limpia(dia(), n.dataset.dnote); return guarda(); }
-    const v = e.target.closest && e.target.closest('[data-dval]');
-    if (v){ const [cid, k] = v.dataset.dval.split('|'), en = entrada(dia(), cid, true); en.v = en.v || {}; if (v.value.trim()) en.v[k] = v.value.slice(0, 40); else delete en.v[k]; limpia(dia(), cid); return guarda(); }
   });
   document.addEventListener('keydown', e => { if (e.key === 'Enter' && e.target.matches && e.target.matches('[data-dcnew]')){ e.preventDefault(); e.target.closest('.dcard').querySelector('[data-dcadd]').click(); } });
 })();

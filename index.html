@@ -6,7 +6,7 @@
 <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' https://www.gstatic.com https://apis.google.com https://accounts.google.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://accounts.google.com; font-src https://fonts.gstatic.com; connect-src https://api.clickup.com https://script.google.com https://script.googleusercontent.com https://accounts.google.com https://firestore.googleapis.com https://identitytoolkit.googleapis.com https://securetoken.googleapis.com https://www.googleapis.com https://apis.google.com; frame-src 'self' https://organizador-jp.firebaseapp.com https://accounts.google.com; img-src 'self' data: https://lh3.googleusercontent.com https://www.google.com; manifest-src 'self'; base-uri 'none'; form-action 'self'; object-src 'none'">
 <meta name="referrer" content="no-referrer">
 <meta name="robots" content="noindex, nofollow">
-<link rel="manifest" href="manifest.json?v=20261123110754">
+<link rel="manifest" href="manifest.json?v=20261123111142">
 <link rel="icon" href="icon-192.png">
 <link rel="apple-touch-icon" href="icon-180.png">
 <meta name="theme-color" content="#0a0a0b">
@@ -1137,13 +1137,16 @@ textarea.over{box-shadow:0 0 0 2px var(--accent)}
 .dmet{display:grid;grid-template-columns:1fr auto;gap:6px 8px;align-items:center}
 .dlab{font-weight:600;font-size:14px}
 .dniv{display:flex;gap:4px}
-.dbt{border:1px solid var(--line);background:var(--bg);border-radius:99px;padding:5px 9px;cursor:pointer;font-size:12.5px;display:inline-flex;gap:4px;align-items:center;color:var(--muted);opacity:.75}
+.dbt{border:1px solid var(--line);background:var(--bg);border-radius:99px;padding:6px 12px;cursor:pointer;font-size:12.5px;display:inline-flex;gap:4px;align-items:center;color:var(--muted);opacity:.75}
 .dbt:hover{opacity:1}
 .dbt.on{opacity:1;color:var(--text);font-weight:700}
 .dbt.n-g.on{background:color-mix(in srgb,#22c55e 22%,var(--surface));border-color:#22c55e}
 .dbt.n-y.on{background:color-mix(in srgb,#eab308 22%,var(--surface));border-color:#eab308}
 .dbt.n-r.on{background:color-mix(in srgb,#ef4444 20%,var(--surface));border-color:#ef4444}
-.dval{grid-column:1/-1;height:32px;font-size:13px;padding:0 10px}
+.dniv.inv .dbt.n-g.on{background:color-mix(in srgb,#2563eb 24%,var(--surface));border-color:#2563eb}
+.dniv.inv .dbt.n-y.on{background:color-mix(in srgb,#60a5fa 24%,var(--surface));border-color:#60a5fa}
+.dniv.inv .dbt.n-r.on{background:color-mix(in srgb,#bfdbfe 50%,var(--surface));border-color:#93c5fd}
+.drow.inv .dot.n-g{background:#2563eb}.drow.inv .dot.n-y{background:#60a5fa}.drow.inv .dot.n-r{background:#bfdbfe}
 .dnote{font-size:13.5px;min-height:54px}
 .dprev summary{cursor:pointer;color:var(--muted);font-size:12.5px}
 .dprev p{margin:6px 0 0;font-size:13px;color:var(--muted)}.dprev p b{color:var(--text);margin-right:4px}
@@ -1276,16 +1279,16 @@ textarea.over{box-shadow:0 0 0 2px var(--accent)}
 
 <div class="toast" id="toast"></div>
 
-<script src="app.js?v=20261123110754"></script>
-<script src="planner.js?v=20261123110754"></script>
-<script src="clients.js?v=20261123110754"></script>
-<script src="quick.js?v=20261123110754"></script>
-<script src="ia.js?v=20261123110754"></script>
-<script src="hours.js?v=20261123110754"></script>
-<script src="cliente.js?v=20261123110754"></script>
-<script src="diario.js?v=20261123110754"></script>
-<script src="imagenes.js?v=20261123110754"></script>
-<script src="archivos.js?v=20261123110754"></script>
-<script type="module" src="cloud.js?v=20261123110754"></script>
+<script src="app.js?v=20261123111142"></script>
+<script src="planner.js?v=20261123111142"></script>
+<script src="clients.js?v=20261123111142"></script>
+<script src="quick.js?v=20261123111142"></script>
+<script src="ia.js?v=20261123111142"></script>
+<script src="hours.js?v=20261123111142"></script>
+<script src="cliente.js?v=20261123111142"></script>
+<script src="diario.js?v=20261123111142"></script>
+<script src="imagenes.js?v=20261123111142"></script>
+<script src="archivos.js?v=20261123111142"></script>
+<script type="module" src="cloud.js?v=20261123111142"></script>
 </body>
 </html>
