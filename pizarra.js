@@ -147,7 +147,7 @@
         r.flechas && r.flechas + ' flecha' + (r.flechas > 1 ? 's' : ''), r.lineas && r.lineas + ' línea' + (r.lineas > 1 ? 's' : '')].filter(Boolean);
       setSt('✨ ' + (p.join(', ') || 'nada') + (r.sinTocar ? ' · ' + r.sinTocar + ' trazos siguen como dibujo' : '') + ' · ↶ para deshacer');
       schedule(800);
-    } catch (e) { setSt('No he podido: ' + e.message); }
+    } catch (e) { setSt('No he podido: ' + e.message); b.disabled = false; return; }
     b.disabled = false;
   });
   window.addEventListener('pagehide', () => { clearTimeout(timer); save(); });

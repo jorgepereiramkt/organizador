@@ -74,9 +74,11 @@
 
   window.pasarALimpio = async api => {
     const { convertToExcalidrawElements } = window.ExcalidrawLib;
-    const sel = api.getAppState().selectedElementIds || {}, haySel = Object.keys(sel).length > 0;
+    const sel = api.getAppState().selectedElementIds || {};
     const escena = api.getSceneElementsIncludingDeleted();
-    const trazos = escena.filter(e => !e.isDeleted && e.type === 'freedraw' && e.points.length > 1 && (!haySel || sel[e.id])).map(info);
+    const aMano = escena.filter(e => !e.isDeleted && e.type === 'freedraw' && e.points.length > 1);
+    const haySel = aMano.some(e => sel[e.id]);          // si has seleccionado trazos, solo esos; si no, todos
+    const trazos = aMano.filter(e => !haySel || sel[e.id]).map(info);
     if (!trazos.length) throw new Error(haySel ? 'en lo que has seleccionado no hay trazos a mano' : 'no hay nada dibujado a mano con el lápiz');
 
     const medH = median(trazos.filter(s => s.h < 150).map(s => s.h)) || 30, H = Math.max(medH, 18);
