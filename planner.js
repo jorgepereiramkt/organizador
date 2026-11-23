@@ -509,6 +509,12 @@ function weekView(){
     // ☀️ Arranque del día: cada día a las 08:30 (con su lista para marcar)
     const mi = P().morning || [], md = new Set((P().morningDone || {})[d] || []);
     if (mi.length) its.push({kind: 'morning', start: 510, end: 540, title: `☀️ Arranque ${md.size}/${mi.length}`, morning: true});
+    // Si un bloque de trabajo se pisa con un evento solo por un extremo, se recorta para que queden uno debajo del otro
+    for (const w of its.filter(x => x.kind === 'work')) for (const o of its){
+      if (o === w || o.kind === 'work' || o.kind === 'free' || o.end <= o.start) continue;
+      if (o.start > w.start && o.start < w.end && o.end >= w.end && o.start - w.start >= 15) w.end = o.start;
+      else if (o.end > w.start && o.end < w.end && o.start <= w.start && w.end - o.end >= 15) w.start = o.end;
+    }
     return {d, allDay: evs.filter(e => e.allDay), its};
   });
   const all = per.flatMap(p => p.its);
