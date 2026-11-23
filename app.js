@@ -592,17 +592,18 @@ const views = {
         const pend = ts.filter(x => x.status !== 'done').sort((a,b) => urgRank(a) - urgRank(b) || byOrder(a,b));
         return {c, i, pend, hechas: ts.length - pend.length};
       }).sort((a, b) => (b.pend.length > 0) - (a.pend.length > 0) || a.i - b.i);
-      const conT = cols.filter(x => x.pend.length).length, gc = g === 'mine' ? 'mine' : 'ag';
+      const conT = cols.filter(x => x.pend.length).length, gc = g === 'mine' ? 'mine' : 'ag', sel = S.cliSel && client(S.cliSel) ? S.cliSel : null;
+      if (sel){ for (const {c, pend, hechas} of cols) if (c.id === sel) html += column({title:c.name, sub: hechas ? `${hechas} hecha${hechas>1?'s':''}` : '', field:'client', value:c.id, tasks:pend, hide:{client:true, urg:true, group:true, pick:true}, dot:clientColor(c), add: c.id, cls: `cg-${gc} solo`, byUrg:true}); continue; }
       html += `<div class="sep sep-${gc}"><b>${g === 'mine' ? '🔒 Mis clientes' : '🏢 Agencia'}</b><span>${conT} con tareas · ${cols.length - conT} sin pendientes${apartados ? ` · ${apartados} pausado${apartados > 1 ? 's' : ''} o antiguo${apartados > 1 ? 's' : ''} (en Fichas)` : ''}</span></div>`;
       guia += `<div class="cg-grp cg-${gc}"><b>${g === 'mine' ? '🔒 Mis clientes' : '🏢 Agencia'}</b>${cols.map(({c, pend}) =>
-        `<button type="button" class="cg-it${pend.length ? '' : ' vacio'}" data-cgo="${esc(c.id)}" style="--cc:${clientColor(c)}"><i></i><span>${esc(c.name)}</span>${pend.length ? `<em>${pend.length}</em>` : ''}</button>`).join('')}</div>`;
+        `<button type="button" class="cg-it${pend.length ? '' : ' vacio'}${sel === c.id ? ' on' : ''}" aria-pressed="${sel === c.id}" data-cgo="${esc(c.id)}" style="--cc:${clientColor(c)}"><i></i><span>${esc(c.name)}</span>${pend.length ? `<em>${pend.length}</em>` : ''}</button>`).join('')}</div>`;
       for (const {c, pend, hechas} of cols)
         html += column({title:c.name, sub: hechas ? `${hechas} hecha${hechas>1?'s':''}` : '', field:'client', value:c.id, tasks:pend, hide:{client:true, urg:true, group:true, pick:true}, dot:clientColor(c), add: hoyMode ? undefined : c.id, cls: `cg-${gc} ${pend.length ? '' : 'quiet'}`, byUrg:true});
     }
     const sin = T.filter(x => (!x.client || !client(x.client)) && x.status !== 'done');
-    if (S.group === 'all' && sin.length) html += column({title:'Sin cliente', field:'client', value:'', tasks:sin, hide:{client:true, pick:true}, dot:'var(--faint)', byUrg:true});
+    if (S.group === 'all' && sin.length && !(S.cliSel && client(S.cliSel))) html += column({title:'Sin cliente', field:'client', value:'', tasks:sin, hide:{client:true, pick:true}, dot:'var(--faint)', byUrg:true});
     // Guía a la izquierda: pulsa un cliente y te lleva a sus tareas
-    return html.replace('<div class="board grid">', `<div class="cliwrap"><nav class="cliguia" aria-label="Ir a un cliente">${guia}</nav><div class="board grid">`) + '</div></div>';
+    return html.replace('<div class="board grid">', `<div class="cliwrap"><nav class="cliguia" aria-label="Filtrar por cliente"><button type="button" class="cg-it cg-todos${S.cliSel && client(S.cliSel) ? '' : ' on'}" data-cgo="">☰ <span>Todos los clientes</span></button>${guia}</nav><div class="board grid">`) + '</div></div>';
   },
 };
 
@@ -737,11 +738,9 @@ main.addEventListener('contextmenu', e => { if (e.target.closest('.card')) e.pre
 
 main.addEventListener('click', e => {
   const g = e.target.closest('[data-cgo]'); if (!g) return;
-  const col = main.querySelector(`.col[data-field="client"][data-value="${CSS.escape(g.dataset.cgo)}"]`); if (!col) return;
-  const tope = (document.querySelector('.cliguia')?.getBoundingClientRect().height || 0) * (innerWidth <= 900 ? 1 : 0) + 16;
-  window.scrollTo({top: Math.max(0, col.getBoundingClientRect().top + scrollY - tope), behavior: 'instant'});
-  col.classList.remove('flash'); void col.offsetWidth; col.classList.add('flash');
-  setTimeout(() => col.classList.remove('flash'), 1600);
+  S.cliSel = g.dataset.cgo && S.cliSel !== g.dataset.cgo ? g.dataset.cgo : null;   // otro clic en el mismo = quitar filtro
+  render(); guardaNav();
+  const w = main.querySelector('.cliwrap'); if (w && w.getBoundingClientRect().top < 0) window.scrollTo({top: w.getBoundingClientRect().top + scrollY - 16, behavior: 'instant'});
 });
 main.addEventListener('click', window.__cardClick = e => {
   if (justDragged) return;
@@ -1035,9 +1034,9 @@ document.addEventListener('click', e => { const b = e.target.closest('[data-them
 // Al abrir la app se empieza en el Día; al RECARGAR (misma ventana) se vuelve a donde estabas, con el mismo scroll
 const NAV = 'jp-nav';
 let nav = null; try { nav = JSON.parse(sessionStorage.getItem(NAV) || localStorage.getItem(NAV) || 'null'); if (nav && nav.at && Date.now() - nav.at > 10 * 60e3 && !sessionStorage.getItem(NAV)) nav = null; } catch(e){}
-S.view = (nav && nav.view) || 'dia'; S.clientMode = (nav && nav.cmode) || 'fichas';   // en Clientes se empieza por Fichas
+S.view = (nav && nav.view) || 'dia'; S.clientMode = (nav && nav.cmode) || 'fichas'; S.cliSel = (nav && nav.csel) || null;   // en Clientes se empieza por Fichas
 if (nav && nav.dmode) S.diaMode = nav.dmode;
-const guardaNav = () => { try { const v = JSON.stringify({view: S.view, cmode: S.clientMode, dmode: S.diaMode, y: scrollY, bx: main.querySelector('.board')?.scrollLeft || 0, at: Date.now()}); sessionStorage.setItem(NAV, v); localStorage.setItem(NAV, v); } catch(e){} };
+const guardaNav = () => { try { const v = JSON.stringify({view: S.view, cmode: S.clientMode, dmode: S.diaMode, csel: S.cliSel || null, y: scrollY, bx: main.querySelector('.board')?.scrollLeft || 0, at: Date.now()}); sessionStorage.setItem(NAV, v); localStorage.setItem(NAV, v); } catch(e){} };
 setInterval(() => { if (document.visibilityState === 'visible') guardaNav(); }, 30e3);
 let navT = null; addEventListener('scroll', () => { clearTimeout(navT); navT = setTimeout(guardaNav, 200); }, {passive: true});
 addEventListener('pagehide', guardaNav); document.addEventListener('click', () => setTimeout(guardaNav, 50));
