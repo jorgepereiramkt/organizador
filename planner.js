@@ -532,7 +532,10 @@ function weekView(){
     const its = buildDay(d, evs).filter(i => i.end > i.start);
     // ☀️ Arranque del día: cada día a las 08:30 (con su lista para marcar)
     const mi = P().morning || [], md = new Set((P().morningDone || {})[d] || []);
-    if (mi.length) its.push({kind: 'morning', start: 510, end: 540, title: `☀️ Arranque ${md.size}/${mi.length}`, morning: true});
+    // el Arranque va dentro del primer bloque de trabajo del día, como primera tarea
+    const w1 = its.filter(x => x.kind === 'work').sort((a, b) => a.start - b.start)[0];
+    if (mi.length && w1) w1.arr = {hechos: md.size, total: mi.length};
+    else if (mi.length) its.push({kind: 'morning', start: 510, end: 540, title: `☀️ Arranque ${md.size}/${mi.length}`, morning: true});
     // Si un bloque de trabajo se pisa con un evento solo por un extremo, se recorta para que queden uno debajo del otro
     for (const w of its.filter(x => x.kind === 'work')) for (const o of its){
       if (o === w || o.kind === 'work' || o.kind === 'free' || o.end <= o.start) continue;
@@ -549,7 +552,7 @@ function weekView(){
   const ROWH = 38, w = new Array(H1 - H0).fill(PXM);
   for (const {d, its} of per){ if (d < hoy) continue;
     for (const b of its.filter(x => x.kind === 'work')){
-      const tb = wkTasks(d, b, its), n = tb.length, aviso = (d < hoy || (d === hoy && b.end <= nowMin)) && tb.some(t => t.status !== 'done') ? 28 : 0, need = 48 + aviso + n * ROWH, have = (b.end - b.start) * PXM;
+      const tb = wkTasks(d, b, its), n = tb.length + (b.arr ? 1 : 0), aviso = (d < hoy || (d === hoy && b.end <= nowMin)) && tb.some(t => t.status !== 'done') ? 28 : 0, need = 48 + aviso + n * ROWH, have = (b.end - b.start) * PXM;
       if (n && need > have){ const extra = (need - have) / (b.end - b.start); for (let m = Math.max(H0, b.start); m < Math.min(H1, b.end); m++) w[m - H0] = Math.max(w[m - H0], PXM + extra); }
     } }
   // los eventos cortos (15–20 min) también tienen sitio para leerse sin taparse con el siguiente
@@ -575,7 +578,7 @@ function weekView(){
       if (i.kind === 'work'){ cls = 'work'; color = kcol.work || 'var(--accent)'; label = esc(i.bname || 'Trabajo');
         const ts = wkTasks(d, i, its); pendN = ts.filter(t => t.status !== 'done').length; extra = ts.length ? ` · ${ts.filter(t => t.status === 'done').length}/${ts.length}` : '';
         if (d < hoy){ cls += ' wk-old'; inner = pendN ? '' : ts.length ? `<span class="wk-sum">✓ ${ts.length}/${ts.length}</span>` : ''; }
-        else inner = (d === ancho && ts.length ? `<div class="wk-split"><ol class="wk-clis" title="Clientes de este bloque, en orden">${[...new Map(ts.map(t => [O.cliEf(t) || '', O.client(O.cliEf(t))])).values()].map(c => `<li style="--c:${O.clientColor(c)}">${c ? esc(c.name) : 'Sin cliente'}</li>`).join('')}</ol>` : '') + `<div class="wk-ts">${ts.map((t, k) => { const c = O.client(O.cliEf(t));
+        else inner = (d === ancho && ts.length ? `<div class="wk-split"><ol class="wk-clis" title="Clientes de este bloque, en orden">${[...new Map(ts.map(t => [O.cliEf(t) || '', O.client(O.cliEf(t))])).values()].map(c => `<li style="--c:${O.clientColor(c)}">${c ? esc(c.name) : 'Sin cliente'}</li>`).join('')}</ol>` : '') + `<div class="wk-ts">${i.arr ? `<div class="wk-t wk-arr${i.arr.hechos >= i.arr.total ? ' done' : ''}" data-wmorn="${d}" role="button" tabindex="0" title="Tu arranque del día: toca para marcarlo"><span class="wk-n">#0</span><span class="wk-tx"><span class="tt">☀️ Arranque del día</span><span class="wk-cl">${i.arr.hechos}/${i.arr.total} hecho</span></span></div>` : ''}${ts.map((t, k) => { const c = O.client(O.cliEf(t));
           return `<article class="card wk-t${t.status === 'done' ? ' done' : ''}" data-id="${t.id}" style="--c:${O.clientColor(c)}"><span class="wk-n">#${k + 1}</span><button class="chk" aria-label="Completar"></button><span class="wk-tx"><span class="tt">${esc(t.title)}</span><span class="wk-cl">${c ? esc(c.name) : 'Sin cliente'}</span></span></article>`; }).join('')}</div>` + (d === ancho && ts.length ? '</div>' : ''); }
       else if (i.kind === 'routine'){ cls = 'rout'; color = kcol['r:' + i.id] || ROUTC[i.id] || '#A3A3AD'; }
       else if (i.kind === 'morning'){ cls = 'morn'; color = kcol.morning || '#FFC93D'; }
@@ -761,7 +764,9 @@ function focoView(){
       ${frase}</div></div>`;
   }
   const ts = wkTasks(hoy, actual, its), hechas = ts.filter(t => t.status === 'done').length;
-  const cards = ts.map((t, k) => O.card(t, {group: true, status: true}).replace('class="card ', `class="card fo-t${k} `)).join('');
+  const mi = P().morning || [], md = new Set((P().morningDone || {})[hoy] || []);
+  const arr = works[0] === actual && mi.length ? `<div class="fo-arr${md.size >= mi.length ? ' done' : ''}" data-wmorn="${hoy}" role="button" tabindex="0"><span class="tt">☀️ Arranque del día · ${md.size}/${mi.length}</span></div>` : '';
+  const cards = arr + ts.map((t, k) => O.card(t, {group: true, status: true}).replace('class="card ', `class="card fo-t${k} `)).join('');
   return `<div class="foco"><div class="fo-in">${nav}
     <div class="fo-k">Bloque de ahora · ${toHM(actual.start)} – ${toHM(actual.end)}${lugarEn(hoy, now) ? ' · ' + LUGARES[lugarEn(hoy, now)] : ''}</div>
     <h2 class="fo-t">${esc(actual.bname || 'Trabajo')}</h2>
@@ -1093,7 +1098,7 @@ document.addEventListener('pointerdown', e => {
 
 // Arrastrar la comida/rutinas (solo ese día) y los bloques de trabajo; estirarlos desde el borde de abajo
 document.addEventListener('pointerdown', e => {
-  const el = e.target.closest('.wk-ev.mv-ev'); if (!el || e.button !== 0 || e.target.closest('.card,button,[data-lugar]')) return;
+  const el = e.target.closest('.wk-ev.mv-ev'); if (!el || e.button !== 0 || e.target.closest('.card,button,[data-lugar],.wk-arr')) return;
   const res = !!e.target.closest('.g-res');
   if (e.pointerType === 'touch' && !res) return;          // con el dedo se hace scroll; con ratón o Pencil se arrastra
   const s0 = +el.dataset.mvs, e0 = +el.dataset.mve, len = e0 - s0, y0 = e.clientY, x0 = e.clientX, snap = m => Math.round(m / 5) * 5;

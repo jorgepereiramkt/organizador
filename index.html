@@ -6,7 +6,7 @@
 <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' https://www.gstatic.com https://apis.google.com https://accounts.google.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://accounts.google.com; font-src https://fonts.gstatic.com; connect-src 'self' https://api.clickup.com https://script.google.com https://script.googleusercontent.com https://accounts.google.com https://firestore.googleapis.com https://identitytoolkit.googleapis.com https://securetoken.googleapis.com https://www.googleapis.com https://apis.google.com; frame-src 'self' https://organizador-jp.firebaseapp.com https://accounts.google.com; img-src 'self' data: https://lh3.googleusercontent.com https://www.google.com; manifest-src 'self'; base-uri 'none'; form-action 'self'; object-src 'none'">
 <meta name="referrer" content="no-referrer">
 <meta name="robots" content="noindex, nofollow">
-<link rel="manifest" href="manifest.json?v=20261124002827">
+<link rel="manifest" href="manifest.json?v=20261124002950">
 <link rel="icon" href="icon-192.png">
 <link rel="apple-touch-icon" href="icon-180.png">
 <meta name="theme-color" content="#0a0a0b">
@@ -1417,6 +1417,14 @@ body.is-dragging .col:not(.wk-side) .ugrp.vacia{display:flex}
 @media (max-width:1100px){
   .wk-side [data-wk=hoy] .ugrp,.wk-side [data-wk=atr] .list{grid-template-columns:1fr 1fr}
 }
+
+/* Arranque como primera tarea del primer bloque */
+.wk-ev .wk-arr{display:flex;align-items:flex-start;gap:5px;padding:2px 4px;border-radius:5px;background:color-mix(in srgb,#FFC93D 30%,var(--surface));border-left:3px solid #FFC93D;font-size:11px;line-height:1.2;cursor:pointer;min-height:25px;box-sizing:border-box;flex-shrink:0}
+.wk-ev .wk-arr .tt{font-weight:600;font-size:11px;line-height:13px}
+.wk-ev .wk-arr.done{opacity:.55}
+.wk-ev .wk-arr.done .tt{text-decoration:line-through}
+.fo-arr{cursor:pointer;padding:16px 18px;border-radius:14px;background:color-mix(in srgb,#FFC93D 22%,var(--surface));border-left:4px solid #FFC93D;font-size:17px;font-weight:600}
+.fo-arr.done{opacity:.5}
 </style>
 </head>
 <body>
@@ -1500,16 +1508,16 @@ body.is-dragging .col:not(.wk-side) .ugrp.vacia{display:flex}
 
 <div class="toast" id="toast"></div>
 
-<script src="app.js?v=20261124002827"></script>
-<script src="planner.js?v=20261124002827"></script>
-<script src="clients.js?v=20261124002827"></script>
-<script src="quick.js?v=20261124002827"></script>
-<script src="ia.js?v=20261124002827"></script>
-<script src="hours.js?v=20261124002827"></script>
-<script src="cliente.js?v=20261124002827"></script>
-<script src="diario.js?v=20261124002827"></script>
-<script src="imagenes.js?v=20261124002827"></script>
-<script src="archivos.js?v=20261124002827"></script>
-<script type="module" src="cloud.js?v=20261124002827"></script>
+<script src="app.js?v=20261124002950"></script>
+<script src="planner.js?v=20261124002950"></script>
+<script src="clients.js?v=20261124002950"></script>
+<script src="quick.js?v=20261124002950"></script>
+<script src="ia.js?v=20261124002950"></script>
+<script src="hours.js?v=20261124002950"></script>
+<script src="cliente.js?v=20261124002950"></script>
+<script src="diario.js?v=20261124002950"></script>
+<script src="imagenes.js?v=20261124002950"></script>
+<script src="archivos.js?v=20261124002950"></script>
+<script type="module" src="cloud.js?v=20261124002950"></script>
 </body>
 </html>
