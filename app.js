@@ -582,7 +582,7 @@ const views = {
     // En filas que se adaptan a la pantalla (sin deslizar). Primero los clientes con tareas pendientes, luego el resto.
     html += '<div class="board grid">';
     let guia = '';
-    for (const [g, label] of [['mine','Mis clientes'],['agency','Agencia']]){
+    for (const [g, label] of [['agency','Agencia'],['mine','Mis clientes']]){   // primero la agencia
       let cs = visibleClients().filter(c => c.group === g);
       const apartados = S.clients.filter(c => c.group === g && isApartado(c)).length;
       if (hoyMode) cs = cs.filter(c => T.some(x => x.client === c.id && x.status !== 'done'));
