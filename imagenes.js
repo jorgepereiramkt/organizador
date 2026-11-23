@@ -17,15 +17,19 @@
   /* ---------- Reducir la imagen (máx. 1600 px, JPEG) ---------- */
   function reducir(file){
     return new Promise((ok, ko) => {
-      const url = URL.createObjectURL(file), img = new Image();
+      const fr = new FileReader();
+      fr.onerror = () => ko(new Error('no se pudo leer'));
+      fr.onload = () => cargarImg(fr.result);
+      fr.readAsDataURL(file);
+      const cargarImg = url => { const img = new Image();
       img.onload = () => {
         const k = Math.min(1, 1600 / Math.max(img.width, img.height)), c = document.createElement('canvas');
         c.width = Math.round(img.width * k); c.height = Math.round(img.height * k);
         const g = c.getContext('2d'); g.fillStyle = '#fff'; g.fillRect(0, 0, c.width, c.height); g.drawImage(img, 0, 0, c.width, c.height);
-        URL.revokeObjectURL(url); ok({ data: c.toDataURL('image/jpeg', 0.82), w: c.width, h: c.height });
+        ok({ data: c.toDataURL('image/jpeg', 0.82), w: c.width, h: c.height });
       };
-      img.onerror = () => { URL.revokeObjectURL(url); ko(new Error('no es una imagen')); };
-      img.src = url;
+      img.onerror = () => ko(new Error('no es una imagen'));
+      img.src = url; };
     });
   }
   async function post(body){
