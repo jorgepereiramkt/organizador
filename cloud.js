@@ -80,15 +80,20 @@ onAuthStateChanged(auth, user => {
     ready: false,                                         // no se sube nada hasta tener la versión del servidor
     save: async data => {
       if (!window.__cloud || !window.__cloud.ready) throw Object.assign(new Error('aún no tengo la versión de la nube'), { code: 'wait' });
-      let rev = 0;
+      let rev = 0, sube = data, mezclado = false;
       await runTransaction(db, async tx => {
         const s = await tx.get(ref), cur = s.exists() ? (s.data().rev || 0) : 0;
-        // Si otro dispositivo guardó algo más nuevo, NO se pisa: se carga lo suyo
-        if (s.exists() && cur !== baseRev) throw Object.assign(new Error('había cambios más nuevos en otro dispositivo'), { code: 'stale' });
+        sube = data; mezclado = false;
+        // Si otro dispositivo guardó algo más nuevo mientras tanto, se JUNTAN los dos cambios (no se pierde ninguno)
+        if (s.exists() && cur !== baseRev) {
+          const remoto = { ...s.data() }; delete remoto.rev; delete remoto.by; delete remoto.at;
+          sube = window.__org.mergeCloud(remoto, data); mezclado = true;
+        }
         rev = cur + 1;
-        tx.set(ref, { ...data, rev, by: DEVICE, at: serverTimestamp() });
+        tx.set(ref, { ...sube, rev, by: DEVICE, at: serverTimestamp() });
       });
       baseRev = rev;
+      window.__org.cloudSaved(sube, mezclado);
     },
     logout: async () => { await signOut(auth); window.__org.wipeLocal(); location.reload(); }
   };

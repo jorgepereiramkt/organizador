@@ -55,7 +55,42 @@ function save(){ saveLocal(); scheduleCloud(); }
 /* ---------- Sincronización con tu cuenta de Google (cloud.js) ---------- */
 // Se sube: tus clientes, tus tareas (no las de ClickUp, que ya viven allí) y el token de ClickUp.
 const DEMO_IDS = new Set(['mio-1','mio-2','ag-a','ag-b','ag-int']);
-let lastSent = '', cloudTimer = null;
+let lastSent = '', cloudTimer = null, cloudBase = null;   // cloudBase: lo último que este dispositivo sabe que hay en la nube
+// Mezcla a tres bandas: lo que había (b), lo de este dispositivo (l) y lo que hay ahora en la nube (r).
+// Así, si otro dispositivo guardó algo mientras tanto, se juntan los dos cambios en vez de perder uno.
+const esObj = v => v && typeof v === 'object' && !Array.isArray(v);
+const igual = (a, b) => JSON.stringify(a) === JSON.stringify(b);
+const conIds = a => Array.isArray(a) && a.every(x => esObj(x) && x.id != null);
+function merge3(b, l, r){
+  if (igual(l, r) || igual(r, b)) return l;
+  if (igual(l, b)) return r;
+  if (esObj(l) && esObj(r)){
+    const bb = esObj(b) ? b : {}, out = {};
+    for (const k of new Set([...Object.keys(r), ...Object.keys(l)])){
+      const inL = k in l, inR = k in r;
+      if (!inL){ if (k in bb && igual(r[k], bb[k])) continue; out[k] = r[k]; continue; }   // lo borraste aquí
+      if (!inR){ if (k in bb && igual(l[k], bb[k])) continue; out[k] = l[k]; continue; }   // lo borraron allí
+      out[k] = merge3(bb[k], l[k], r[k]);
+    }
+    return out;
+  }
+  if (conIds(l) && conIds(r) && (l.length || r.length)){
+    const mb = new Map((conIds(b) ? b : []).map(x => [x.id, x])), ml = new Map(l.map(x => [x.id, x])), mr = new Map(r.map(x => [x.id, x]));
+    const out = [];
+    for (const id of [...r.map(x => x.id), ...l.map(x => x.id).filter(id => !mr.has(id))]){
+      if (!ml.has(id)){ if (mb.has(id) && igual(mr.get(id), mb.get(id))) continue; out.push(mr.get(id)); continue; }
+      if (!mr.has(id)){ if (mb.has(id) && igual(ml.get(id), mb.get(id))) continue; out.push(ml.get(id)); continue; }
+      out.push(merge3(mb.get(id), ml.get(id), mr.get(id)));
+    }
+    return out;
+  }
+  return l;   // el mismo dato cambiado en los dos sitios: gana lo último que hiciste aquí
+}
+function mergeCloud(remote, local){ return JSON.parse(JSON.stringify(merge3(cloudBase, local, remote))); }
+function cloudSaved(data, mezclado){
+  cloudBase = JSON.parse(JSON.stringify(data));
+  if (mezclado){ applyCloud(data); toast('Juntado con lo que habías hecho en otro dispositivo ✓'); }
+}
 function cloudData(){
   return JSON.parse(JSON.stringify({
     clients: S.clients.map(({id,name,group,color,keywords,listId,auto,services,hours,notes,estado,fee,feeMin,feeMax,since,ord,tier,ingreso,fixTxt,varTxt,varOn,varBase,agFeeTxt,ccustom}) => ({id,name,group,color,keywords,listId,auto,services,hours,notes,estado,fee,feeMin,feeMax,since,ord,tier,ingreso,fixTxt,varTxt,varOn,varBase,agFeeTxt,ccustom})),
@@ -74,7 +109,6 @@ function scheduleCloud(){
     window.__cloud.save(data).catch(e => {
       lastSent = '';
       if (e.code === 'wait') return scheduleCloud();
-      if (e.code === 'stale') return toast('Había cambios más nuevos en otro dispositivo: los he cargado (repite lo último si no aparece)');
       toast('No se pudo guardar en tu cuenta: ' + (e.code || e.message));
     });
   }, 700);
@@ -113,6 +147,7 @@ function applyCloud(d){
   const tokenChanged = (d.token || '') !== (S.cu.token || '');
   if (tokenChanged && !d.token){ S.cu = CU_DEFAULT(); S.tasks = S.tasks.filter(t => !t.cu); }
   lastSent = JSON.stringify({...cloudData(), token: d.token || ''});
+  cloudBase = JSON.parse(lastSent);
   saveLocal(); render(); preview();
   if (typeof st !== 'undefined' && st.open) renderClients();
   if (tokenChanged && d.token) adoptToken(d.token);
@@ -1052,5 +1087,5 @@ if (online()) sync(true);
 // Mantener PC y móvil al día: cada 60 s con la app abierta y al volver a ella
 setInterval(() => { if (document.visibilityState === 'visible') sync(true); }, 60000);
 document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') sync(true); });
-window.__org = {editingId: () => editing, setNote, noteLinks, S, isApartado, byClientOrder, GROUP, clientColor, URG, urgRank, parse, pushCreate, uid, maxOrder, clientLists, online, PALETA, cu, listInfo, norm, isRegTask, applyCloud, cloudEmpty, cloudReady, wipeLocal, toast, views, render, save, card, setToolbar, visibleTasks, client, task, esc, iso, fromIso, addDays, today, dayLabel, DIAS_L, MESES, pad, byOrder};
+window.__org = {mergeCloud, cloudSaved, editingId: () => editing, setNote, noteLinks, S, isApartado, byClientOrder, GROUP, clientColor, URG, urgRank, parse, pushCreate, uid, maxOrder, clientLists, online, PALETA, cu, listInfo, norm, isRegTask, applyCloud, cloudEmpty, cloudReady, wipeLocal, toast, views, render, save, card, setToolbar, visibleTasks, client, task, esc, iso, fromIso, addDays, today, dayLabel, DIAS_L, MESES, pad, byOrder};
 })();

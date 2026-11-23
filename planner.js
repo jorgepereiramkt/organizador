@@ -582,14 +582,13 @@ function weekView(){
         + (canMove ? ` data-mvday="${d}" data-mvs="${i.start}" data-mve="${i.end}" data-mvkey="${i.kind === 'work' ? 'b:' + i.bid : 'r:' + esc(i.id)}"` : '');
       if (canMove) cls += ' mv-ev';
       return `<div class="wk-ev ${cls}${past ? ' past' + (pend ? ' pend' : '') : d === hoy ? ' hoy' : ' fut'}"${gAttr}${xAttr} ${i.kind === 'work' ? `data-wbuild="${d}" data-field="slot" data-value="${i.at}" data-day="${d}"` : ''} style="--hh:${h}px;top:${top}px;height:${h}px;left:calc(${left}% + 1px);width:calc(${w}% - 3px);--c:${color}" title="${label.replace(/"/g, '')} · ${toHM(i.start)}–${toHM(i.end)}">
-        <b>${label}</b>${i.kind === 'work' && i.bid && d >= hoy ? `<button type="button" class="bname-ed" data-bname="${i.bid}" data-bday="${d}" title="Poner nombre al bloque">✏️</button>` : ''}${h > 26 ? `<small>${toHM(i.start)} – ${toHM(i.end)}${extra}</small>` : ''}${inner}${gAttr || (canMove) ? '<i class="g-res"></i>' : ''}</div>`;
+        <b>${i.kind === 'work' && d >= hoy && !past ? lugarChip(d, i) : ''}${label}</b>${i.kind === 'work' && i.bid && d >= hoy ? `<button type="button" class="bname-ed" data-bname="${i.bid}" data-bday="${d}" title="Poner nombre al bloque">✏️</button>` : ''}${h > 26 ? `<small>${toHM(i.start)} – ${toHM(i.end)}${extra}</small>` : ''}${inner}${gAttr || (canMove) ? '<i class="g-res"></i>' : ''}</div>`;
     }).join('');
     const line = d === hoy && nowMin >= H0 && nowMin <= H1 ? `<i class="wk-now" style="top:${Y(nowMin)}px"></i>` : '';
     return `<div class="wk-col${d === hoy ? ' today' : d < hoy ? ' old' : ''}" data-wday="${d}">${blocks}${line}</div>`;
   }).join('');
   const heads = per.map(({d, allDay}) => { const x = O.fromIso(d);
     return `<button type="button" class="wk-head${d === hoy ? ' today' : d < hoy ? ' old' : ''}" data-wopen="${d}"><small>${O.DIAS_L[x.getDay()].slice(0, 3).toUpperCase()}</small><b>${x.getDate()}</b>
-      ${d >= hoy ? lugarChip(d) : ''}
       ${allDay.slice(0, 2).map(e => `<span class="wk-all" style="--c:${e.color || '#8E8E93'}">${esc(e.title)}</span>`).join('')}</button>`; }).join('');
   const msg = (calError ? `<div class="note warnbox">${esc(calError)}</div>` : weekLoading ? '<div class="note">Cargando la semana…</div>' : '') + salCasa();
   return `${msg}${O.statsBar ? O.statsBar() : ''}<div class="wk-wrap"><div class="wk"><div class="wk-grid" style="grid-template-columns:52px ${tpl}"><div class="wk-corner"></div>${heads}
@@ -619,13 +618,17 @@ let giroT = null; addEventListener('resize', () => { clearTimeout(giroT); giroT 
 
 /* ---------- 📍 Dónde trabajo cada día (y el empujón para salir de casa) ---------- */
 const LUGARES = {casa: '🏠 Casa', cafe: '☕ Cafetería', work: '💼 Work Café'};
-const lugarDe = d => ((P().lugar || {})[d]) || '';
-function lugarChip(d){ const l = lugarDe(d);
-  return `<span class="wk-lugar${l ? ' l-' + l : ''}" role="button" tabindex="0" data-lugar="${d}" title="¿Dónde vas a trabajar? Toca para cambiar">${l ? LUGARES[l] : '📍 ¿Dónde?'}</span>`; }
+// cada bloque de trabajo tiene su sitio (clave: día|inicio del bloque)
+const lugarKey = (d, b) => d + '|' + b.start;
+const lugarDe = k => ((P().lugar || {})[k]) || '';
+const ICONL = {casa: '🏠', cafe: '☕', work: '💼'};
+function lugarChip(d, b){ const k = lugarKey(d, b), l = lugarDe(k);
+  return `<span class="wk-lugar${l ? ' l-' + l : ''}" role="button" tabindex="0" data-lugar="${k}" title="${l ? LUGARES[l] + ' · toca para cambiar' : '¿Dónde vas a trabajar en este bloque?'}">${l ? ICONL[l] : '📍'}</span>`; }
 function salCasa(){
-  const hoy = O.today(), l = lugarDe(hoy), man = O.iso(O.addDays(new Date(), 1)), lm = lugarDe(man);
-  if (l === 'cafe' || l === 'work') return `<div class="salcasa ok">✅ Hoy trabajas en <b>${LUGARES[l]}</b>. Buen plan: cambiar de sitio activa la cabeza.${!lm ? ' · ¿Y mañana? Elige el sitio en su día.' : ''}</div>`;
-  return `<div class="salcasa">🚶 <b>Sal de casa.</b> Aunque te parezca poco tiempo, lo vas a notar: más foco, más energía y el día se te hace tuyo. ${l === 'casa' ? 'Hoy está puesto «Casa»: ¿un bloque en la cafetería o el Work Café?' : 'Elige dónde trabajas hoy tocando «📍 ¿Dónde?» encima del día.'}</div>`;
+  const hoy = O.today(), ls = Object.entries(P().lugar || {}).filter(([k]) => k.startsWith(hoy + '|')).map(([, v]) => v);
+  const fuera = ls.filter(l => l === 'cafe' || l === 'work');
+  if (fuera.length) return `<div class="salcasa ok">✅ Hoy trabajas fuera en ${fuera.length} bloque${fuera.length > 1 ? 's' : ''} (${[...new Set(fuera)].map(l => LUGARES[l]).join(', ')}). Buen plan: cambiar de sitio activa la cabeza.</div>`;
+  return `<div class="salcasa">🚶 <b>Sal de casa.</b> Aunque te parezca poco tiempo, lo vas a notar: más foco, más energía y el día se te hace tuyo. ${ls.length ? 'Hoy lo tienes todo en casa: ¿un bloque en la cafetería o el Work Café?' : 'Toca el 📍 de cada bloque de trabajo para elegir dónde lo haces.'}</div>`;
 }
 document.addEventListener('click', e => {
   const b = e.target.closest('[data-lugar]'); if (!b) return;
@@ -633,7 +636,7 @@ document.addEventListener('click', e => {
   const d = b.dataset.lugar, orden = ['', 'casa', 'cafe', 'work'], m = P().lugar = P().lugar || {};
   const sig = orden[(orden.indexOf(m[d] || '') + 1) % orden.length];
   if (sig) m[d] = sig; else delete m[d];
-  for (const k of Object.keys(m)) if (k < O.iso(O.addDays(new Date(), -30))) delete m[k];
+  for (const k of Object.keys(m)) if (k.slice(0, 10) < O.iso(O.addDays(new Date(), -30)) || !k.includes('|')) delete m[k];
   O.save(); O.render();
 }, true);
 
@@ -685,14 +688,14 @@ function focoView(){
   const ts = wkTasks(hoy, actual, its), hechas = ts.filter(t => t.status === 'done').length;
   const cards = ts.map((t, k) => O.card(t, {group: true, status: true}).replace('class="card ', `class="card fo-t${k} `)).join('');
   return `<div class="foco"><div class="fo-in">
-    <div class="fo-k">Bloque de ahora · ${toHM(actual.start)} – ${toHM(actual.end)}</div>
+    <div class="fo-k">Bloque de ahora · ${toHM(actual.start)} – ${toHM(actual.end)}${lugarDe(lugarKey(hoy, actual)) ? ' · ' + LUGARES[lugarDe(lugarKey(hoy, actual))] : ''}</div>
     <h2 class="fo-t">${esc(actual.bname || 'Trabajo')}</h2>
     <div class="fo-reloj" id="foReloj" data-fin="${actual.end}" data-ini="${actual.start}">--:--</div>
     <div class="fo-barra"><i id="foBarra"></i></div>
     <div class="fo-prog">${ts.length ? `${hechas} de ${ts.length} tareas hechas${hechas === ts.length ? ' · ¡bloque completado! 🎉' : ''}` : 'Este bloque no tiene tareas: arrástralas desde «Para hoy» en la Semana'}</div>
     <div class="fo-lista" data-field="slot" data-value="${actual.at}" data-day="${hoy}">${cards}</div>
     ${frase}
-    ${['cafe', 'work'].includes(lugarDe(hoy)) ? '' : `<div class="fo-next">🚶 Si estás en casa: el próximo bloque, fuera. Lo vas a notar.</div>`}
+    ${['cafe', 'work'].includes(lugarDe(lugarKey(hoy, actual))) ? '' : `<div class="fo-next">🚶 Si estás en casa: el próximo bloque, fuera. Lo vas a notar.</div>`}
     ${sig ? `<div class="fo-next">Después: <b>${esc(sig.bname || 'Trabajo')}</b> a las ${toHM(sig.start)}</div>` : ''}
   </div></div>`;
 }
@@ -947,7 +950,7 @@ document.addEventListener('pointerdown', e => {
 
 // Arrastrar la comida/rutinas (solo ese día) y los bloques de trabajo; estirarlos desde el borde de abajo
 document.addEventListener('pointerdown', e => {
-  const el = e.target.closest('.wk-ev.mv-ev'); if (!el || e.button !== 0 || e.target.closest('.card,button')) return;
+  const el = e.target.closest('.wk-ev.mv-ev'); if (!el || e.button !== 0 || e.target.closest('.card,button,[data-lugar]')) return;
   const res = !!e.target.closest('.g-res');
   if (e.pointerType === 'touch' && !res) return;          // con el dedo se hace scroll; con ratón o Pencil se arrastra
   const s0 = +el.dataset.mvs, e0 = +el.dataset.mve, len = e0 - s0, y0 = e.clientY, x0 = e.clientX, snap = m => Math.round(m / 5) * 5;
