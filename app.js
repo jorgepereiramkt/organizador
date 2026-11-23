@@ -567,6 +567,18 @@ const views = {
         <p class="iahint">Toca una tarea para corregir el texto, el cliente o la urgencia antes de aprobarla.</p></div>`;
     }
     if (hoyMode && !nHoy) html += '<div class="empty big">Aún no has elegido nada para hoy. En «Tareas», pulsa <b>Hoy</b> en las que vayas a hacer.</div>';
+    // «Tareas hoy»: por urgencia, con el aspecto de las fichas. Arrastra una tarea a otra sección para cambiar su urgencia
+    if (hoyMode){
+      const pend = T.filter(x => x.status !== 'done'), hechas = T.filter(x => x.status === 'done');
+      const SUB = {super: 'para ya, antes que nada', alta: 'hoy sin falta', normal: 'cuando acabes las urgentes', baja: 'si te da tiempo'};
+      for (const [k, u] of Object.entries(URG)){
+        const ts = pend.filter(t => (URG[t.priority] ? t.priority : 'normal') === k).sort((a, b) => byOrder(a, b));
+        html += `<div class="tsec u-${k}"><h3>${u.icon} ${u.label} <span>${ts.length} · ${SUB[k]}</span></h3>
+          <div class="tfichas" data-field="priority" data-value="${k}">${ts.map(t => card(t, {urg: true, pick: true}).replace('class="card ', 'class="card tf ')).join('') || '<div class="empty">Arrastra aquí una tarea</div>'}</div></div>`;
+      }
+      if (hechas.length) html += `<div class="tsec hechas"><h3>✓ Hechas hoy <span>${hechas.length}</span></h3><div class="tfichas mini">${hechas.map(t => card(t, {urg: true, pick: true}).replace('class="card ', 'class="card tf ')).join('')}</div></div>`;
+      return html;
+    }
     // En filas que se adaptan a la pantalla (sin deslizar). Primero los clientes con tareas pendientes, luego el resto.
     html += '<div class="board grid">';
     for (const [g, label] of [['mine','Mis clientes'],['agency','Agencia']]){
@@ -674,6 +686,7 @@ function endDrag(){
   if (f === 'day'){ t.day = v || null; if (zone.dataset.undone && t.status === 'done') setStatus(t,'todo'); }
   if (f === 'status') setStatus(t, v);
   if (f === 'client') t.client = v || null;
+  if (f === 'priority' && URG[v]) t.priority = v;
   // Planificador: meter/sacar la tarea de un bloque del día (no toca la fecha ni ClickUp)
   if (f === 'slot'){
     let tier = zone.dataset.tier || null;
@@ -1009,10 +1022,11 @@ document.getElementById('themeBtn').addEventListener('click', () => { const dark
 document.addEventListener('click', e => { const b = e.target.closest('[data-themebtn]'); if (!b) return; try { localStorage.setItem('jp-theme', b.dataset.themebtn); } catch(err){} applyTheme(); });
 // Al abrir la app se empieza en el Día; al RECARGAR (misma ventana) se vuelve a donde estabas, con el mismo scroll
 const NAV = 'jp-nav';
-let nav = null; try { nav = JSON.parse(sessionStorage.getItem(NAV) || 'null'); } catch(e){}
+let nav = null; try { nav = JSON.parse(sessionStorage.getItem(NAV) || localStorage.getItem(NAV) || 'null'); if (nav && nav.at && Date.now() - nav.at > 10 * 60e3 && !sessionStorage.getItem(NAV)) nav = null; } catch(e){}
 S.view = (nav && nav.view) || 'dia'; S.clientMode = (nav && nav.cmode) || 'tareas';
 if (nav && nav.dmode) S.diaMode = nav.dmode;
-const guardaNav = () => { try { sessionStorage.setItem(NAV, JSON.stringify({view: S.view, cmode: S.clientMode, dmode: S.diaMode, y: scrollY, bx: main.querySelector('.board')?.scrollLeft || 0})); } catch(e){} };
+const guardaNav = () => { try { const v = JSON.stringify({view: S.view, cmode: S.clientMode, dmode: S.diaMode, y: scrollY, bx: main.querySelector('.board')?.scrollLeft || 0, at: Date.now()}); sessionStorage.setItem(NAV, v); localStorage.setItem(NAV, v); } catch(e){} };
+setInterval(() => { if (document.visibilityState === 'visible') guardaNav(); }, 30e3);
 let navT = null; addEventListener('scroll', () => { clearTimeout(navT); navT = setTimeout(guardaNav, 200); }, {passive: true});
 addEventListener('pagehide', guardaNav); document.addEventListener('click', () => setTimeout(guardaNav, 50));
 render(); modeIdle();
