@@ -930,7 +930,11 @@ async function importDrive(ib){
       for (const f of (r.files || []).sort((a, b) => a.created - b.created)){
         if (seen[f.id]) continue; seen[f.id] = Date.now();
         const title = (f.name || '').replace(/\.(txt|md)$/i, '').replace(/^[📥\s]+/u, '').trim(); if (!title) continue;
-        S.tasks.push(parseInbox(title, f.text || '')); n++;
+        // id fijo sacado del archivo: si dos dispositivos lo importan a la vez, sigue siendo la misma tarea (no se duplica)
+        const tid = 'ib' + String(f.id).replace(/[^\w]/g, '').slice(-14);
+        const t = parseInbox(title, f.text || ''); t.id = tid;
+        if (S.tasks.some(x => x.id === tid || (x.ia && x.title === t.title && (x.meeting || '') === (t.meeting || '')))) continue;
+        S.tasks.push(t); n++;
       }
       O.save(); if (n){ O.render(); O.toast(`🤖 ${n} tarea${n > 1 ? 's' : ''} nueva${n > 1 ? 's' : ''} por revisar`); }
     } catch(e){}
