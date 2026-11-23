@@ -1212,6 +1212,14 @@ async function importInbox(){
   } catch(e){ /* sin conexión o permiso caducado: se reintenta luego */ }
   importing = false;
 }
+// ¿Ya la tienes? Misma tarea (mismo texto y cliente) aunque ya la aprobaste, la hiciste o la descartaste → no se vuelve a proponer
+function iaRepetida(t, tid){
+  const k = O.norm(t.title) + '|' + (t.client || '');
+  if ((P().iaVistas || {})[k]) return true;
+  return S.tasks.some(x => x.id === tid || (O.norm(x.title) === O.norm(t.title) && (x.client || '') === (t.client || '')));
+}
+O.iaVista = t => { const m = P().iaVistas = P().iaVistas || {}; m[O.norm(t.title) + '|' + (t.client || '')] = O.today();
+  const lim = O.iso(O.addDays(new Date(), -90)); for (const k in m) if (m[k] < lim) delete m[k]; };
 // Buzón de Drive: cada archivo de la carpeta = una tarea. Nombre = la tarea. Contenido: «cliente: …», «urgencia: …», «nota: …».
 function parseInbox(title, desc){
   const get = k => { const m = desc.match(new RegExp('^\\s*' + k + '\\s*:\\s*(.*)$', 'im')); return m ? m[1].trim() : ''; };
@@ -1238,7 +1246,7 @@ async function importDrive(ib){
         // id fijo sacado del archivo: si dos dispositivos lo importan a la vez, sigue siendo la misma tarea (no se duplica)
         const tid = 'ib' + String(f.id).replace(/[^\w]/g, '').slice(-14);
         const t = parseInbox(title, f.text || ''); t.id = tid;
-        if (S.tasks.some(x => x.id === tid || (x.ia && x.title === t.title && (x.meeting || '') === (t.meeting || '')))) continue;
+        if (iaRepetida(t, tid)) continue;
         S.tasks.push(t); n++;
       }
       O.save(); if (n){ O.render(); O.toast(`🤖 ${n} tarea${n > 1 ? 's' : ''} nueva${n > 1 ? 's' : ''} por revisar`); }
@@ -1264,7 +1272,9 @@ async function importDrive(ib){
       seen[f.id] = Date.now();
       const title = f.name.replace(/\.(txt|md)$/i, '').replace(/^[📥\s]+/u, '').trim();
       if (!title) continue;
-      S.tasks.push(parseInbox(title, txt)); n++;
+      const t2 = parseInbox(title, txt); if (iaRepetida(t2, 'ib' + String(f.id).replace(/[^\w]/g, '').slice(-14))) continue;
+      t2.id = 'ib' + String(f.id).replace(/[^\w]/g, '').slice(-14);
+      S.tasks.push(t2); n++;
     }
     for (const [k, t] of Object.entries(seen)) if (t < Date.now() - 60 * 864e5) delete seen[k];
     O.save();

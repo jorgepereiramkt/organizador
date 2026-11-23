@@ -799,12 +799,13 @@ main.addEventListener('click', window.__cardClick = e => {
     return;
   }
   if (e.target.closest('[data-iaall]')){
-    const ts = S.tasks.filter(t => t.ia); ts.forEach(t => t.ia = false); save(); render(); ts.forEach(pushCreate);
+    const ts = S.tasks.filter(t => t.ia); ts.forEach(t => { t.ia = false; if (window.__org.iaVista) window.__org.iaVista(t); }); save(); render(); ts.forEach(pushCreate);
     toast(`${ts.length} aprobadas`); return;
   }
   const iaB = e.target.closest('[data-iaok],[data-iano]');
   if (iaB){
     const t = task(iaB.closest('.card').dataset.id);
+    if (window.__org.iaVista) window.__org.iaVista(t);   // no volver a proponerla
     if (iaB.dataset.iano !== undefined){ S.tasks = S.tasks.filter(x => x !== t); save(); render(); toast('Descartada'); return; }
     t.ia = false; save(); render(); pushCreate(t); toast(`Aprobada${t.client ? ' · ' + client(t.client).name : ''}`); return;
   }
