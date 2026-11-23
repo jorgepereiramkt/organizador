@@ -341,6 +341,8 @@ const PRIO = {super:1, alta:2, normal:3, baja:4};
 const dueMs = day => { const d = fromIso(day); d.setHours(12); return d.getTime(); };
 const snap = t => ({title:t.title, day:t.day, status:t.status, priority:t.priority, client:t.client});
 
+// Una tarea de ClickUp puede «verse» dentro de un proyecto sin salir de ClickUp (solo en esta app)
+const cliEf = t => ((S.plan && S.plan.tproy) || {})[t.id] || t.client;
 const isAgency = id => { const c = client(id); return !!(c && c.group === 'agency' && !c.proyecto); };   // los proyectos son de la agencia pero solo viven en la app
 
 // Regla de oro: solo se sube a ClickUp lo que es de un cliente marcado como «Agencia». Lo tuyo nunca sale de la app.
@@ -517,7 +519,7 @@ function notePeek(id){
 }
 const manana = () => iso(addDays(new Date(), 1));
 function card(t, hide={}){
-  const c = client(t.client), done = t.status === 'done', late = !done && t.day && t.day < today();
+  const c = client(cliEf(t)), done = t.status === 'done', late = !done && t.day && t.day < today();
   const g = groupOf(c);
   const meta = [];
   // marcada para un día que ya pasó y sin hacer: «pendiente de ayer»
@@ -626,10 +628,10 @@ const views = {
     for (const [g, label] of [['agency','Agencia'],['mine','Mis clientes']]){   // primero la agencia
       let cs = visibleClients().filter(c => c.group === g);
       const apartados = S.clients.filter(c => c.group === g && isApartado(c)).length;
-      if (hoyMode) cs = cs.filter(c => T.some(x => x.client === c.id && x.status !== 'done'));
+      if (hoyMode) cs = cs.filter(c => T.some(x => cliEf(x) === c.id && x.status !== 'done'));
       if (!cs.length) continue;
       const cols = cs.map((c, i) => {
-        const ts = T.filter(x => x.client === c.id);
+        const ts = T.filter(x => cliEf(x) === c.id);
         const pend = ts.filter(x => x.status !== 'done').sort((a,b) => urgRank(a) - urgRank(b) || byOrder(a,b));
         return {c, i, pend, hechas: ts.length - pend.length};
       }).sort((a, b) => (b.pend.length > 0) - (a.pend.length > 0) || a.i - b.i);
@@ -641,7 +643,7 @@ const views = {
       for (const {c, pend, hechas} of cols)
         html += column({title:(c.proyecto ? '📁 ' : '') + c.name, sub: hechas ? `${hechas} hecha${hechas>1?'s':''}` : '', field:'client', value:c.id, tasks:pend, hide:{client:true, urg:true, group:true, pick:true}, dot:clientColor(c), add: hoyMode ? undefined : c.id, cls: `cg-${gc} ${pend.length ? '' : 'quiet'}`, byUrg:true});
     }
-    const sin = T.filter(x => (!x.client || !client(x.client)) && x.status !== 'done');
+    const sin = T.filter(x => (!cliEf(x) || !client(cliEf(x))) && x.status !== 'done');
     if (S.group === 'all' && sin.length && !(S.cliSel && client(S.cliSel))) html += column({title:'Sin cliente', field:'client', value:'', tasks:sin, hide:{client:true, pick:true}, dot:'var(--faint)', byUrg:true});
     // Guía a la izquierda: pulsa un cliente y te lleva a sus tareas
     return html.replace('<div class="board grid">', `<div class="cliwrap"><nav class="cliguia" aria-label="Filtrar por cliente"><button type="button" class="cg-it cg-todos${S.cliSel && client(S.cliSel) ? '' : ' on'}" data-cgo="">☰ <span>Todos los clientes</span></button>${guia}</nav><div class="board grid">`) + '</div></div>';
@@ -724,6 +726,12 @@ function endDrag(){
   D = null; justDragged = true; setTimeout(() => justDragged = false, 80);
   if (!zone) return;
   const t = task(id), f = zone.dataset.field, v = zone.dataset.value;
+  // tarea de ClickUp → proyecto: se queda en ClickUp y aquí se ve en el proyecto
+  if (f === 'client' && t && t.cu){
+    const dest = client(v), m = S.plan && (S.plan.tproy = S.plan.tproy || {});
+    if (m && dest && dest.proyecto){ m[t.id] = v; save(); S._keepScroll = true; render(); return toast(`En el proyecto «${dest.name}» (en ClickUp sigue igual)`); }
+    if (m && m[t.id]){ delete m[t.id]; if (v === t.client){ save(); S._keepScroll = true; render(); return toast('Vuelve a su cliente'); } }
+  }
   const list = [...zone.querySelectorAll('.card')].filter(c => c !== cardEl).map(c => task(c.dataset.id));
   const idx = before ? list.indexOf(task(before.dataset.id)) : list.length;
   const prev = list[idx-1], next = list[idx];
@@ -1100,5 +1108,5 @@ if (online()) sync(true);
 // Mantener PC y móvil al día: cada 60 s con la app abierta y al volver a ella
 setInterval(() => { if (document.visibilityState === 'visible') sync(true); }, 60000);
 document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') sync(true); });
-window.__org = {syncCU: s => sync(s), mergeCloud, cloudSaved, editingId: () => editing, setNote, noteLinks, S, isApartado, byClientOrder, GROUP, clientColor, URG, urgRank, parse, pushCreate, uid, maxOrder, clientLists, online, PALETA, cu, listInfo, norm, isRegTask, applyCloud, cloudEmpty, cloudReady, wipeLocal, toast, views, render, save, card, setToolbar, visibleTasks, client, task, esc, iso, fromIso, addDays, today, dayLabel, DIAS_L, MESES, pad, byOrder};
+window.__org = {cliEf, syncCU: s => sync(s), mergeCloud, cloudSaved, editingId: () => editing, setNote, noteLinks, S, isApartado, byClientOrder, GROUP, clientColor, URG, urgRank, parse, pushCreate, uid, maxOrder, clientLists, online, PALETA, cu, listInfo, norm, isRegTask, applyCloud, cloudEmpty, cloudReady, wipeLocal, toast, views, render, save, card, setToolbar, visibleTasks, client, task, esc, iso, fromIso, addDays, today, dayLabel, DIAS_L, MESES, pad, byOrder};
 })();
