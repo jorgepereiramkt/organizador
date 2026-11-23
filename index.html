@@ -6,7 +6,7 @@
 <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' https://www.gstatic.com https://apis.google.com https://accounts.google.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://accounts.google.com; font-src https://fonts.gstatic.com; connect-src https://api.clickup.com https://script.google.com https://script.googleusercontent.com https://accounts.google.com https://firestore.googleapis.com https://identitytoolkit.googleapis.com https://securetoken.googleapis.com https://www.googleapis.com https://apis.google.com; frame-src 'self' https://organizador-jp.firebaseapp.com https://accounts.google.com; img-src 'self' data: https://lh3.googleusercontent.com https://www.google.com; manifest-src 'self'; base-uri 'none'; form-action 'self'; object-src 'none'">
 <meta name="referrer" content="no-referrer">
 <meta name="robots" content="noindex, nofollow">
-<link rel="manifest" href="manifest.json?v=20261123224755">
+<link rel="manifest" href="manifest.json?v=20261123232833">
 <link rel="icon" href="icon-192.png">
 <link rel="apple-touch-icon" href="icon-180.png">
 <meta name="theme-color" content="#0a0a0b">
@@ -1329,6 +1329,20 @@ textarea.over{box-shadow:0 0 0 2px var(--accent)}
 .planner .side .urg .card .meta{margin-top:4px;gap:4px}
 .planner .side .urg .card .meta>*{font-size:10.5px;padding:1px 6px}
 @media (max-width:1100px){ .planner{grid-template-columns:1fr} .planner .side{position:static;max-height:none;order:-1} }
+
+/* 📍 Franja de dónde trabajo (a la izquierda de cada día) */
+.wk-col{--lw:16px}
+.wk-lug{position:absolute;top:0;bottom:0;left:0;width:var(--lw);cursor:cell;background:repeating-linear-gradient(180deg,transparent 0 6px,color-mix(in srgb,var(--text) 4%,transparent) 6px 7px);border-right:1px dashed color-mix(in srgb,var(--text) 10%,transparent);touch-action:none;z-index:1}
+.wk-lug:hover{background-color:color-mix(in srgb,var(--accent) 8%,transparent)}
+.wk-col.old .wk-lug{opacity:.45}
+.wk-tramo{position:absolute;left:1px;right:1px;border-radius:5px;overflow:hidden;cursor:pointer;display:flex;align-items:center;justify-content:center}
+.wk-tramo i{font:700 9.5px/1 var(--body);font-style:normal;white-space:nowrap;writing-mode:vertical-rl;transform:rotate(180deg);color:#fff;letter-spacing:.02em;pointer-events:none}
+.wk-tramo.l-casa{background:#8E8E93}
+.wk-tramo.l-cafe{background:#B9773F}
+.wk-tramo.l-work{background:#3B7BF6}
+.wk-tramo.l-nuevo{background:color-mix(in srgb,var(--accent) 55%,transparent);pointer-events:none}
+.lug-op{display:flex;gap:8px;flex-wrap:wrap;margin:4px 0 6px}
+.lug-op .chip[aria-pressed=true]{background:var(--accent);color:#fff;border-color:var(--accent)}
 </style>
 </head>
 <body>
@@ -1411,16 +1425,16 @@ textarea.over{box-shadow:0 0 0 2px var(--accent)}
 
 <div class="toast" id="toast"></div>
 
-<script src="app.js?v=20261123224755"></script>
-<script src="planner.js?v=20261123224755"></script>
-<script src="clients.js?v=20261123224755"></script>
-<script src="quick.js?v=20261123224755"></script>
-<script src="ia.js?v=20261123224755"></script>
-<script src="hours.js?v=20261123224755"></script>
-<script src="cliente.js?v=20261123224755"></script>
-<script src="diario.js?v=20261123224755"></script>
-<script src="imagenes.js?v=20261123224755"></script>
-<script src="archivos.js?v=20261123224755"></script>
-<script type="module" src="cloud.js?v=20261123224755"></script>
+<script src="app.js?v=20261123232833"></script>
+<script src="planner.js?v=20261123232833"></script>
+<script src="clients.js?v=20261123232833"></script>
+<script src="quick.js?v=20261123232833"></script>
+<script src="ia.js?v=20261123232833"></script>
+<script src="hours.js?v=20261123232833"></script>
+<script src="cliente.js?v=20261123232833"></script>
+<script src="diario.js?v=20261123232833"></script>
+<script src="imagenes.js?v=20261123232833"></script>
+<script src="archivos.js?v=20261123232833"></script>
+<script type="module" src="cloud.js?v=20261123232833"></script>
 </body>
 </html>
