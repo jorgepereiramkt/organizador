@@ -73,7 +73,7 @@
           ${reus === null ? '<p class="iahint">Buscando en tus calendarios…</p>' : !reus.length ? `<p class="iahint">No encuentro reuniones con «${esc(palabras(c).join('», «') || c.name)}» en el título. Puedes añadir palabras clave en ✏️ Editar ficha.</p>` : ''}
           ${fut.length ? `<h4>Próximas</h4><ul class="cvl">${fut.slice().reverse().map(reuRow).join('')}</ul>` : ''}
           ${pas.length ? `<h4>Pasadas</h4><ul class="cvl">${pas.map(reuRow).join('')}</ul>` : ''}
-          ${solas.length ? `<h4>🎙️ Grabadas en Fathom</h4><ul class="cvl">${solas.map(g => `<li><span class="cvd">${fechaTxt(g.fecha)}${g.hora ? ' · ' + g.hora : ''}</span><b>${esc(g.titulo)}</b><span class="cvbtns"><button type="button" class="chip" data-rver="${g.id}|r">📝 Resumen</button><button type="button" class="chip" data-rver="${g.id}|t">💬 Transcripción</button></span></li>`).join('')}</ul>` : ''}
+          ${solas.length ? `<h4>🎙️ Grabadas en Fathom</h4><ul class="cvl">${solas.map(g => `<li><span class="cvd">${fechaTxt(g.fecha)}${g.hora && g.hora !== '00:00' ? ' · ' + g.hora : ''}</span><b>${esc(g.titulo)}</b><span class="cvbtns"><button type="button" class="chip" data-rver="${g.id}|r">📝 Resumen</button><button type="button" class="chip" data-rver="${g.id}|t">💬 Transcripción</button></span></li>`).join('')}</ul>` : ''}
           ${grab === null ? '' : !grab.length ? '<p class="iahint">🎙️ Los resúmenes y transcripciones de Fathom aparecerán aquí cuando la rutina los guarde (cada día laborable a las 14:00 y 20:00).</p>' : ''}
           ${Object.keys(ia).length ? `<h4>🤖 Analizadas por la IA (Fathom)</h4>${Object.entries(ia).map(([m, l]) => `<div class="cvia"><b>📞 ${esc(m)}</b><ul>${l.map(t => `<li class="${t.status === 'done' ? 'done' : ''}">${t.status === 'done' ? '✓' : '○'} ${esc(t.title)}${t.iaNote ? `<small>${esc(t.iaNote)}</small>` : ''}</li>`).join('')}</ul></div>`).join('')}` : ''}
         </section>
@@ -97,14 +97,15 @@
   function pintaVis(){
     const t = textos[rvCur] || '', cab = t.split(/^=== /m)[0], val = k => ((cab.match(new RegExp('^' + k + ':\\s*(.*)$', 'm')) || [])[1] || '').trim();
     vis.querySelector('#rvTit').textContent = val('titulo') || 'Reunión';
-    vis.querySelector('#rvSub').innerHTML = [val('fecha') && fechaTxt(val('fecha')), val('hora'), val('duracion_min') && val('duracion_min') + ' min', val('asistentes')].filter(Boolean).map(esc).join(' · ') + (val('enlace') ? ` · <a href="${esc(val('enlace'))}" target="_blank" rel="noopener">Ver en Fathom ↗</a>` : '');
+    vis.querySelector('#rvSub').innerHTML = [val('fecha') && fechaTxt(val('fecha')), val('hora') !== '00:00' && val('hora'), val('duracion_min') && val('duracion_min') + ' min', val('asistentes')].filter(Boolean).map(esc).join(' · ') + (val('enlace') ? ` · <a href="${esc(val('enlace'))}" target="_blank" rel="noopener">Ver en Fathom ↗</a>` : '');
     vis.querySelectorAll('[data-rvtab]').forEach(b => b.setAttribute('aria-pressed', b.dataset.rvtab === rvTab));
     const bus = vis.querySelector('#rvBus'); bus.hidden = rvTab !== 't';
     const body = vis.querySelector('#rvBody');
     if (!t){ body.innerHTML = '<p class="iahint">Cargando…</p>'; return; }
     if (rvTab === 'r'){
       const res = secc(t, 'resumen'), acc = secc(t, 'puntos');
-      body.innerHTML = `<div class="rvres">${esc(res || '(sin resumen)').replace(/^#+\s*(.+)$/gm, '<b>$1</b>').replace(/\n/g, '<br>')}</div>${acc ? `<h4>✅ Puntos de acción</h4><div class="rvres">${esc(acc).replace(/\n/g, '<br>')}</div>` : ''}`;
+      const md = t => esc(t).replace(/\[([^\]]+)\]\((https?:[^)\s]+)\)/g, '$1').replace(/^#+\s*(.+)$/gm, '<h5>$1</h5>').replace(/\*\*(.+?)\*\*/g, '<b>$1</b>').replace(/\\#/g, '#').replace(/^\s*[-*]\s+/gm, '• ').replace(/\n/g, '<br>').replace(/<\/h5><br>/g, '</h5>');
+      body.innerHTML = `<div class="rvres">${md(res || '(sin resumen)')}</div>${acc ? `<h4>✅ Puntos de acción</h4><div class="rvres">${md(acc)}</div>` : ''}`;
     } else {
       const q = O.norm(bus.value.trim()), lineas = secc(t, 'transcrip').split('\n').filter(l => l.trim());
       body.innerHTML = `<div class="rvtr">${lineas.filter(l => !q || O.norm(l).includes(q)).map(l => { const m = l.match(/^(\d[\d:]*)\s+([^:]{1,40}):\s*(.*)$/); return m ? `<p><span class="rvt">${esc(m[1])}</span><b>${esc(m[2])}</b> ${esc(m[3])}</p>` : `<p>${esc(l)}</p>`; }).join('') || '<p class="iahint">Nada.</p>'}</div>`;
