@@ -473,11 +473,11 @@ const noteOf = id => ((S.plan && S.plan.tnotes) || {})[id] || '';
 function setNote(id, txt){ if (!S.plan) return; const n = S.plan.tnotes = S.plan.tnotes || {}; txt = txt.trim(); if (txt) n[id] = txt; else delete n[id]; }
 const linkHost = u => { try { return new URL(u).hostname.replace(/^www\./, ''); } catch(e){ return 'enlace'; } };
 function notePeek(id){
-  const n = noteOf(id), fs = (window.__org && window.__org.filesOf) ? window.__org.filesOf(id) : [];
-  if (!n && !fs.length) return '';
+  const n = noteOf(id), fs = (window.__org && window.__org.filesOf) ? window.__org.filesOf(id) : [], ims = (window.__org && window.__org.imgsOf) ? window.__org.imgsOf(id) : [];
+  if (!n && !fs.length && !ims.length) return '';
   const links = [...new Set(n.match(URL_RE) || [])];
   const text = n.replace(URL_RE, '').replace(/\s+/g, ' ').trim();
-  return `<div class="npeek">${text ? `<span class="ntx">📝 ${esc(text)}</span>` : ''}${links.slice(0, 2).map(u => `<a class="nlink" href="${esc(u)}" target="_blank" rel="noopener" title="${esc(u)}">🔗 ${esc(linkHost(u))}</a>`).join('')}${links.length > 2 ? `<span class="nmore">+${links.length - 2}</span>` : ''}${fs.slice(0, 2).map(f => `<a class="nlink" href="#" data-fopen="${esc(id)}|${f.id}" title="Abrir ${esc(f.name)}">${f.kind === 'dir' ? '📁' : '📎'} ${esc(f.name)}</a>`).join('')}${fs.length > 2 ? `<span class="nmore">+${fs.length - 2}</span>` : ''}</div>`;
+  return `<div class="npeek">${text ? `<span class="ntx">📝 ${esc(text)}</span>` : ''}${links.slice(0, 2).map(u => `<a class="nlink" href="${esc(u)}" target="_blank" rel="noopener" title="${esc(u)}">🔗 ${esc(linkHost(u))}</a>`).join('')}${links.length > 2 ? `<span class="nmore">+${links.length - 2}</span>` : ''}${fs.slice(0, 2).map(f => `<a class="nlink" href="#" data-fopen="${esc(id)}|${f.id}" title="Abrir ${esc(f.name)}">${f.kind === 'dir' ? '📁' : '📎'} ${esc(f.name)}</a>`).join('')}${fs.length > 2 ? `<span class="nmore">+${fs.length - 2}</span>` : ''}${ims.length ? `<a class="nlink" href="#" data-imgopen="${esc(id)}" title="Ver imágenes">📷 ${ims.length}</a>` : ''}</div>`;
 }
 function card(t, hide={}){
   const c = client(t.client), done = t.status === 'done', late = !done && t.day && t.day < today();
