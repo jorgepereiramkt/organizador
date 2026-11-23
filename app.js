@@ -96,7 +96,7 @@ function cloudData(){
     clients: S.clients.map(({id,name,group,color,keywords,listId,auto,services,hours,notes,estado,fee,feeMin,feeMax,since,ord,tier,ingreso,fixTxt,varTxt,varOn,varBase,agFeeTxt,ccustom}) => ({id,name,group,color,keywords,listId,auto,services,hours,notes,estado,fee,feeMin,feeMax,since,ord,tier,ingreso,fixTxt,varTxt,varOn,varBase,agFeeTxt,ccustom})),
     tasks: S.tasks.filter(t => !t.cu && !t.demo),
     token: S.cu.token || '', hidden: S.cu.hidden || [], plan: S.plan || null, slots: S.slots || {}, hours: S.hours || null, ai: S.ai || null,
-    picks: Object.fromEntries(S.tasks.filter(t => t.cu && t.today && t.today >= today()).map(t => [t.id, t.today])) }));
+    picks: Object.fromEntries(S.tasks.filter(t => t.cu && t.today && t.today >= iso(addDays(new Date(), -7))).map(t => [t.id, t.today])) }));
 }
 function scheduleCloud(){
   if (!window.__cloud) return;
@@ -514,10 +514,14 @@ function notePeek(id){
   const text = n.replace(URL_RE, '').replace(/\s+/g, ' ').trim();
   return `<div class="npeek">${text ? `<span class="ntx">📝 ${esc(text)}</span>` : ''}${links.slice(0, 2).map(u => `<a class="nlink" href="${esc(u)}" target="_blank" rel="noopener" title="${esc(u)}">🔗 ${esc(linkHost(u))}</a>`).join('')}${links.length > 2 ? `<span class="nmore">+${links.length - 2}</span>` : ''}${fs.slice(0, 2).map(f => `<a class="nlink" href="#" data-fopen="${esc(id)}|${f.id}" title="Abrir ${esc(f.name)}">${f.kind === 'dir' ? '📁' : '📎'} ${esc(f.name)}</a>`).join('')}${fs.length > 2 ? `<span class="nmore">+${fs.length - 2}</span>` : ''}${ims.length ? `<a class="nlink" href="#" data-imgopen="${esc(id)}" title="Ver imágenes">📷 ${ims.length}</a>` : ''}</div>`;
 }
+const manana = () => iso(addDays(new Date(), 1));
 function card(t, hide={}){
   const c = client(t.client), done = t.status === 'done', late = !done && t.day && t.day < today();
   const g = groupOf(c);
   const meta = [];
+  // marcada para un día que ya pasó y sin hacer: «pendiente de ayer»
+  const diaPlan = [t.today, (S.slots[t.id] || {}).day].filter(Boolean).sort().pop();
+  if (!done && diaPlan && diaPlan < today()) meta.push(`<span class="ayer">⏪ Sin hacer ${diaPlan === iso(addDays(new Date(), -1)) ? 'ayer' : 'del ' + dayLabel(diaPlan)}</span>`);
   if (!hide.client) meta.push(c ? `<span class="clp">${esc(c.name)}</span>` : `<span class="clp none">Sin cliente</span>`);
   if (g.label && !hide.group) meta.push(`<span class="gb2 ${g.cls}">${g.label === 'Mío' ? '🔒 Mío' : '🏢 Agencia'}</span>`);
   if (!hide.day && t.day) meta.push(`<span class="${late?'late':''}">${late?'Atrasada · ':''}${dayLabel(t.day)}</span>`);
@@ -529,7 +533,8 @@ function card(t, hide={}){
   return `<article class="card ${g.cls} ${done?'done':''} ${t.ia?'ia':''}" data-id="${t.id}" style="--c:${clientColor(c)};--g:${g.color}" tabindex="0">
     <button class="chk" aria-label="${done?'Marcar como pendiente':'Completar'}"></button>
     <div class="body"><p class="tt">${esc(t.title)}</p>${notePeek(t.id)}${meta.length?`<div class="meta">${meta.join('')}</div>`:''}</div>
-    ${hide.pick && !done ? `<button class="pick${t.today === today() ? ' on' : ''}" data-pick aria-label="Para hoy" title="${t.today === today() ? 'Quitar de hoy' : 'Hacer hoy'}">${t.today === today() ? '✓ Hoy' : 'Hoy'}</button>` : ''}</article>`;
+    ${hide.pick && !done ? (() => { const h = t.today === today(), m = t.today === manana();
+      return `<span class="picks"><button class="pick${h ? ' on' : ''}" data-pick="hoy" aria-label="Para hoy" title="${h ? 'Quitar de hoy' : 'Hacer hoy'}">${h ? '✓ Hoy' : 'Hoy'}</button><button class="pick man${m ? ' on' : ''}" data-pick="man" aria-label="Para mañana" title="${m ? 'Quitar de mañana' : 'Hacer mañana'}">${m ? '✓ Mañana' : 'Mañana'}</button></span>`; })() : ''}</article>`;
 }
 function column({title, sub='', field, value='', tasks, hide, cls='', dot, undone=false, empty='Arrastra aquí', add, byUrg}){
   const listHtml = !byUrg ? tasks.map(t => card(t, hide)).join('') : Object.entries(URG).map(([k, u]) => {
@@ -781,11 +786,11 @@ main.addEventListener('click', window.__cardClick = e => {
   if (justDragged) return;
   const pk = e.target.closest('[data-pick]');
   if (pk){
-    const t = task(pk.closest('.card').dataset.id);
-    t.today = t.today === today() ? null : today();
-    if (!t.today) delete S.slots[t.id];
+    const t = task(pk.closest('.card').dataset.id), dia = pk.dataset.pick === 'man' ? manana() : today();
+    t.today = t.today === dia ? null : dia;
+    if (!t.today || (S.slots[t.id] && S.slots[t.id].day !== t.today)) delete S.slots[t.id];
     save(); S._keepScroll = true; render();
-    toast(t.today ? 'Para hoy ✓' : 'Quitada de hoy');
+    toast(t.today ? (dia === today() ? 'Para hoy ✓' : 'Para mañana ✓ (a las 12 de la noche pasa a «hoy»)') : 'Quitada');
     return;
   }
   if (e.target.closest('[data-ibx]')){

@@ -505,7 +505,11 @@ function wkSide(){
     // cada urgencia es una zona: arrastra una tarea a otra para cambiarle la urgencia
     return `<div class="ugrp u-${u}${g.length ? '' : ' vacia'}" data-field="unslot" data-wk="hoy" data-urg="${u}"><div class="uh">${x.icon} ${x.label} <span>${g.length}</span></div>${g.map(t => O.card(t, {urg: true, group: true, status: true})).join('') || '<div class="empty">Arrastra aquí</div>'}</div>`; }).join('');
   // solo las de hoy, en dos columnas (para no agobiarse)
-  return `<aside class="col side wk-side"><header><h3>📌 Para hoy <span class="wk-n2">${hoyTs.length} por colocar</span></h3></header>
+  // lo que marcaste para ayer (o antes) y no hiciste
+  const ayerTs = atr.filter(t => { const sl = S.slots[t.id]; return (t.today && t.today < hoy) || (sl && sl.day < hoy); }).sort(rank);
+  return `<aside class="col side wk-side">${ayerTs.length ? `<header><h3>⏪ Sin hacer de ayer <span class="wk-n2">${ayerTs.length} · pulsa «Hoy» o arrástralas a un bloque</span></h3></header>
+    <div class="urg wk-l" data-field="unslot" data-wk="atr"><div class="list">${ayerTs.map(t => O.card(t, {group: true, status: true, pick: true})).join('')}</div></div>` : ''}
+    <header><h3>📌 Para hoy <span class="wk-n2">${hoyTs.length} por colocar</span></h3></header>
     ${sec('hoy', '', hoyTs, 'Nada por colocar hoy 👌 · marca tareas con «Hoy» en Clientes')}</aside>`;
 }
 let wkScale = {H0: 480, H1: 1440, cum: [0]};
