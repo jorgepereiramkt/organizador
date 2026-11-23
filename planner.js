@@ -479,10 +479,11 @@ function wkSide(){
   const sin = libres.filter(t => !atr.includes(t) && !hoyTs.includes(t) && !t.day && !t.today);
   const rank = (a, b) => O.urgRank(a) - O.urgRank(b) || O.byOrder(a, b);
   const sec = (k, title, ts, empty) => `<div class="urg wk-l" data-field="unslot" data-wk="${k}"><h4>${title}<span>${ts.length}</span></h4>
-    <div class="list">${(k === 'hoy' ? porUrg(ts) : ts.sort(rank).map(t => O.card(t)).join('')) || `<div class="empty">${empty}</div>`}</div></div>`;
+    <div class="list">${(k === 'hoy' ? (ts.length ? '' : `<div class="empty">${empty}</div>`) + porUrg(ts) : ts.sort(rank).map(t => O.card(t)).join('') || `<div class="empty">${empty}</div>`)}</div></div>`;
   // «Para hoy» en subgrupos por urgencia
   const porUrg = ts => Object.entries(O.URG).map(([u, x]) => { const g = ts.filter(t => (O.URG[t.priority] ? t.priority : 'normal') === u).sort(O.byOrder);
-    return g.length ? `<div class="ugrp u-${u}"><div class="uh">${x.icon} ${x.label} <span>${g.length}</span></div>${g.map(t => O.card(t, {urg: true, group: true, status: true})).join('')}</div>` : ''; }).join('');
+    // cada urgencia es una zona: arrastra una tarea a otra para cambiarle la urgencia
+    return `<div class="ugrp u-${u}${g.length ? '' : ' vacia'}" data-field="unslot" data-wk="hoy" data-urg="${u}"><div class="uh">${x.icon} ${x.label} <span>${g.length}</span></div>${g.map(t => O.card(t, {urg: true, group: true, status: true})).join('') || '<div class="empty">Arrastra aquí</div>'}</div>`; }).join('');
   // solo las de hoy, en dos columnas (para no agobiarse)
   return `<aside class="col side wk-side"><header><h3>📌 Para hoy <span class="wk-n2">${hoyTs.length} por colocar</span></h3></header>
     ${sec('hoy', '', hoyTs, 'Nada por colocar hoy 👌 · marca tareas con «Hoy» en Clientes')}</aside>`;
