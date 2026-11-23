@@ -731,6 +731,11 @@ function focoDatos(){
   const ev = its.find(i => i.kind !== 'work' && i.kind !== 'morning' && !i.allDay && now >= i.start && now < i.end) || null;
   return {hoy, now, its, works, actual, sig, ev, cargando: !evs};
 }
+// 🎯 En Foco, la primera tarea del primer bloque de trabajo del día es siempre el Arranque
+function arranqueFoco(d){
+  const mi = P().morning || [], md = new Set((P().morningDone || {})[d] || []); if (!mi.length) return '';
+  return `<div class="fo-arr${md.size >= mi.length ? ' done' : ''}" data-wmorn="${d}" role="button" tabindex="0"><span class="tt">☀️ Arranque del día · ${md.size}/${mi.length}</span></div>`;
+}
 function focoView(){
   const d = new Date();
   O.setToolbar('🎯 Foco', `${O.DIAS_L[d.getDay()]} ${d.getDate()} de ${O.MESES[d.getMonth()]}`,
@@ -752,7 +757,7 @@ function focoView(){
       <div class="fo-k">${pasado ? 'Bloque anterior' : 'Bloque siguiente'} · ${toHM(b.start)} – ${toHM(b.end)}${lugarEn(hoy, b.start) ? ' · ' + LUGARES[lugarEn(hoy, b.start)] : ''}</div>
       <h2 class="fo-t">${esc(b.bname || 'Trabajo')}</h2>
       <div class="fo-prog${pasado && pend ? ' fo-quedan' : ''}">${!ts.length ? 'Este bloque no tiene tareas' : pasado ? (pend ? `⚠️ Te quedaron ${pend} sin hacer: márcalas o arrástralas al bloque de ahora` : '✓ Todo hecho en este bloque 🎉') : `${ts.length} tarea${ts.length > 1 ? 's' : ''} preparada${ts.length > 1 ? 's' : ''}`}</div>
-      <div class="fo-lista" data-field="slot" data-value="${b.at}" data-day="${hoy}">${ts.map(t => O.card(t, {group: true, status: true})).join('')}</div>
+      <div class="fo-lista" data-field="slot" data-value="${b.at}" data-day="${hoy}">${iVer === 0 ? arranqueFoco(hoy) : ''}${ts.map(t => O.card(t, {group: true, status: true})).join('')}</div>
       ${frase}</div></div>`;
   }
   if (!actual){
@@ -764,8 +769,7 @@ function focoView(){
       ${frase}</div></div>`;
   }
   const ts = wkTasks(hoy, actual, its), hechas = ts.filter(t => t.status === 'done').length;
-  const mi = P().morning || [], md = new Set((P().morningDone || {})[hoy] || []);
-  const arr = works[0] === actual && mi.length ? `<div class="fo-arr${md.size >= mi.length ? ' done' : ''}" data-wmorn="${hoy}" role="button" tabindex="0"><span class="tt">☀️ Arranque del día · ${md.size}/${mi.length}</span></div>` : '';
+  const arr = works[0] === actual ? arranqueFoco(hoy) : '';
   const cards = arr + ts.map((t, k) => O.card(t, {group: true, status: true}).replace('class="card ', `class="card fo-t${k} `)).join('');
   return `<div class="foco"><div class="fo-in">${nav}
     <div class="fo-k">Bloque de ahora · ${toHM(actual.start)} – ${toHM(actual.end)}${lugarEn(hoy, now) ? ' · ' + LUGARES[lugarEn(hoy, now)] : ''}</div>
