@@ -36,7 +36,8 @@
     const pend = ts.filter(t => t.status !== 'done').sort(O.byOrder), hechas = ts.filter(t => t.status === 'done' && t.doneAt && t.doneAt >= O.iso(O.addDays(new Date(), -21))).sort((a, b) => (b.doneAt || '').localeCompare(a.doneAt || ''));
     // reuniones analizadas por la IA (Fathom → tareas): se agrupan por reunión
     const ia = {}; ts.filter(t => t.meeting).forEach(t => { (ia[t.meeting] = ia[t.meeting] || []).push(t); });
-    const fut = (reus || []).filter(r => r.day >= hoy), pas = (reus || []).filter(r => r.day < hoy);
+    const ahora = new Date().getHours() * 60 + new Date().getMinutes(), esFut = r => r.day > hoy || (r.day === hoy && r.end > ahora);
+    const fut = (reus || []).filter(esFut), pas = (reus || []).filter(r => !esFut(r));
     const reuRow = r => `<li class="${r.day >= hoy ? 'fut' : ''}"><span class="cvd">${fechaTxt(r.day)} · ${hm(r.start)}–${hm(r.end)}</span><b>${esc(r.title)}</b>${r.cal ? `<small>${esc(r.cal)}</small>` : ''}</li>`;
     const D = (S.plan && S.plan.diario && S.plan.diario.log) || {};
     const dias = [...Array(14)].map((_, i) => O.iso(O.addDays(new Date(), -14 + i)));
@@ -73,6 +74,8 @@
     const c = O.client(id); if (cargando) return; cargando = true;
     try { const r = await cargarReuniones(c); if (cur === id){ reus = r; pinta(); } } finally { cargando = false; }
   };
+  // las tarjetas de tareas funcionan igual que en el tablero (completar, abrir, para hoy…)
+  body.addEventListener('click', e => { if (e.target.closest('.card') && window.__cardClick) window.__cardClick(e); });
   dlg.addEventListener('click', e => {
     if (e.target === dlg || e.target.closest('[data-cvclose]')) return dlg.close();
     if (e.target.closest('[data-cvedit]')){ dlg.close(); return O.openFicha(cur); }

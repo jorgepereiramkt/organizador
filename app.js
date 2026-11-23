@@ -718,7 +718,7 @@ main.addEventListener('touchstart', e => {
 }, {passive:true});
 main.addEventListener('contextmenu', e => { if (e.target.closest('.card')) e.preventDefault(); });
 
-main.addEventListener('click', e => {
+main.addEventListener('click', window.__cardClick = e => {
   if (justDragged) return;
   const pk = e.target.closest('[data-pick]');
   if (pk){
