@@ -105,7 +105,7 @@
     const dark = matchMedia('(prefers-color-scheme: dark)').matches;
     const { Excalidraw } = window.ExcalidrawLib;
     const el = React.createElement(Excalidraw, {
-      excalidrawAPI: a => { api = a; },
+      excalidrawAPI: a => { api = a; window.__pizApi = a; },
       langCode: 'es-ES',
       theme: dark ? 'dark' : 'light',
       initialData: {
@@ -138,6 +138,18 @@
     else if (history.length > 1) history.back(); else location.href = './';
   }
   $('#close').addEventListener('click', cerrar);
+  $('#limpio').addEventListener('click', async () => {
+    if (!api) return;
+    const b = $('#limpio'); b.disabled = true; setSt('Leyendo tu letra…');
+    try {
+      const r = await window.pasarALimpio(api);
+      const p = [r.textos && r.textos + ' texto' + (r.textos > 1 ? 's' : ''), r.formas && r.formas + ' forma' + (r.formas > 1 ? 's' : ''),
+        r.flechas && r.flechas + ' flecha' + (r.flechas > 1 ? 's' : ''), r.lineas && r.lineas + ' línea' + (r.lineas > 1 ? 's' : '')].filter(Boolean);
+      setSt('✨ ' + (p.join(', ') || 'nada') + (r.sinTocar ? ' · ' + r.sinTocar + ' trazos siguen como dibujo' : '') + ' · ↶ para deshacer');
+      schedule(800);
+    } catch (e) { setSt('No he podido: ' + e.message); }
+    b.disabled = false;
+  });
   window.addEventListener('pagehide', () => { clearTimeout(timer); save(); });
   start();
 })();

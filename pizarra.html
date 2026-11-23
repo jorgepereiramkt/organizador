@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
-<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' https://unpkg.com; style-src 'self' 'unsafe-inline' https://unpkg.com; font-src 'self' data: https://unpkg.com; connect-src 'self' https://script.google.com https://script.googleusercontent.com https://unpkg.com; img-src 'self' data: blob: https://unpkg.com; worker-src 'self' blob:; base-uri 'none'; form-action 'none'; object-src 'none'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' https://unpkg.com; style-src 'self' 'unsafe-inline' https://unpkg.com; font-src 'self' data: https://unpkg.com; connect-src 'self' https://inputtools.google.com https://script.google.com https://script.googleusercontent.com https://unpkg.com; img-src 'self' data: blob: https://unpkg.com; worker-src 'self' blob:; base-uri 'none'; form-action 'none'; object-src 'none'">
 <meta name="referrer" content="no-referrer">
 <meta name="robots" content="noindex, nofollow">
 <meta name="apple-mobile-web-app-capable" content="yes">
@@ -20,6 +20,9 @@
   #bar button { border: 0; border-radius: 999px; padding: 8px 14px; font: inherit; font-weight: 600; cursor: pointer; background: #ff5a1f; color: #fff; }
   [hidden] { display: none !important; }
   @media (max-width: 730px) { #bar { bottom: auto; top: calc(env(safe-area-inset-top) + 64px); } }
+  #bar button.sec { background: #1e1e24; }
+  #bar button:disabled { opacity: .6; }
+  @media (max-width: 520px) { #nm { display: none; } }
   #msg { position: fixed; inset: 0; display: grid; place-items: center; color: #6b6b76; font-size: 15px; text-align: center; padding: 24px; }
   @media (prefers-color-scheme: dark) {
     html, body { background: #121214; }
@@ -31,11 +34,12 @@
 <body>
 <div id="msg">Cargando la pizarra…</div>
 <div id="app"></div>
-<div id="bar" hidden><span class="dot" id="dot"></span><b id="nm"></b><span id="st">…</span><button id="close" type="button">Cerrar</button></div>
-<script src="pizarra-cfg.js?v=20261123090109"></script>
+<div id="bar" hidden><span class="dot" id="dot"></span><b id="nm"></b><span id="st">…</span><button id="limpio" type="button" class="sec" title="Convierte la letra a mano en texto y los dibujos en cuadros y flechas (si seleccionas algo, solo eso)">✨ Pasar a limpio</button><button id="close" type="button">Cerrar</button></div>
+<script src="pizarra-cfg.js?v=20261123090816"></script>
 <script src="https://unpkg.com/react@18.2.0/umd/react.production.min.js"></script>
 <script src="https://unpkg.com/react-dom@18.2.0/umd/react-dom.production.min.js"></script>
 <script src="https://unpkg.com/@excalidraw/excalidraw@0.17.6/dist/excalidraw.production.min.js"></script>
-<script src="pizarra.js?v=20261123090109"></script>
+<script src="pizarra-limpio.js?v=20261123090816"></script>
+<script src="pizarra.js?v=20261123090816"></script>
 </body>
 </html>
