@@ -63,7 +63,7 @@
   /* ---------- En el editor ---------- */
   const ed = document.getElementById('ed'), notes = document.querySelector('#edForm [name=notes]');
   const caja = document.createElement('div'); caja.className = 'edimgs';
-  document.getElementById('edLinks').after(caja);
+  notes.closest('label').after(caja);   // justo debajo de las notas
   let actual = null;
   function pintar(taskId){
     if (taskId !== actual) return;
