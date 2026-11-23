@@ -1248,6 +1248,22 @@ async function importDrive(ib){
   importing = false;
 }
 O.importInbox = importInbox;
+// ↻ Actualizar todo: vuelve a pedir el calendario (y la lista de calendarios), ClickUp, el buzón y la nube
+document.getElementById('refreshAll').addEventListener('click', async () => {
+  const b = document.getElementById('refreshAll'); if (b.classList.contains('girando')) return;
+  b.classList.add('girando'); O.toast('Actualizando todo…');
+  for (const k in weekEv) delete weekEv[k]; clearCache(); lastEvents = []; calError = '';
+  const tareas = [
+    refrescaCalsPuente(),
+    loadWeek(true),
+    refresh(),
+    O.syncCU ? O.syncCU(true) : null,
+    importInbox(),
+  ];
+  try { await Promise.allSettled(tareas); } finally {
+    b.classList.remove('girando'); O.render(); O.toast('Todo actualizado ✓');
+  }
+});
 
 /* ---------- Montar bloques (vista de horas, arrastrar / mover / estirar) ---------- */
 const PX = 1.1, SNAP = 15, G0 = 7 * 60, G1 = 22 * 60;   // 1 min = 1,1 px; de 7:00 a 22:00

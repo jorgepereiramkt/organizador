@@ -6,7 +6,7 @@
 <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' https://www.gstatic.com https://apis.google.com https://accounts.google.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://accounts.google.com; font-src https://fonts.gstatic.com; connect-src https://api.clickup.com https://script.google.com https://script.googleusercontent.com https://accounts.google.com https://firestore.googleapis.com https://identitytoolkit.googleapis.com https://securetoken.googleapis.com https://www.googleapis.com https://apis.google.com; frame-src 'self' https://organizador-jp.firebaseapp.com https://accounts.google.com; img-src 'self' data: https://lh3.googleusercontent.com https://www.google.com; manifest-src 'self'; base-uri 'none'; form-action 'self'; object-src 'none'">
 <meta name="referrer" content="no-referrer">
 <meta name="robots" content="noindex, nofollow">
-<link rel="manifest" href="manifest.json?v=20261123233259">
+<link rel="manifest" href="manifest.json?v=20261123233727">
 <link rel="icon" href="icon-192.png">
 <link rel="apple-touch-icon" href="icon-180.png">
 <meta name="theme-color" content="#0a0a0b">
@@ -1351,6 +1351,11 @@ textarea.over{box-shadow:0 0 0 2px var(--accent)}
 .rt-rep,.rt-alc{flex-wrap:wrap;width:auto!important}
 .rt-dias{display:flex;gap:6px;margin:6px 0 4px}
 .rt-dias[hidden]{display:none}
+
+#refreshAll{font-size:19px;font-weight:700}
+#refreshAll.girando{animation:girar 1s linear infinite;pointer-events:none}
+@keyframes girar{to{transform:rotate(360deg)}}
+@media (prefers-reduced-motion:reduce){#refreshAll.girando{animation:none;opacity:.5}}
 </style>
 </head>
 <body>
@@ -1380,6 +1385,7 @@ textarea.over{box-shadow:0 0 0 2px var(--accent)}
       <button class="chip" data-group="mine">Mis clientes</button>
       <button class="chip" data-group="agency">Agencia</button>
     </div>
+    <button class="icon" id="refreshAll" aria-label="Actualizar todo" title="Actualizar todo: calendario, ClickUp, buzón y nube">↻</button>
     <button class="icon" id="themeBtn" aria-label="Cambiar a modo noche" title="Modo día / noche">🌙</button>
     <button class="icon" id="settingsBtn" aria-label="Ajustes"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg></button>
   </header>
@@ -1433,16 +1439,16 @@ textarea.over{box-shadow:0 0 0 2px var(--accent)}
 
 <div class="toast" id="toast"></div>
 
-<script src="app.js?v=20261123233259"></script>
-<script src="planner.js?v=20261123233259"></script>
-<script src="clients.js?v=20261123233259"></script>
-<script src="quick.js?v=20261123233259"></script>
-<script src="ia.js?v=20261123233259"></script>
-<script src="hours.js?v=20261123233259"></script>
-<script src="cliente.js?v=20261123233259"></script>
-<script src="diario.js?v=20261123233259"></script>
-<script src="imagenes.js?v=20261123233259"></script>
-<script src="archivos.js?v=20261123233259"></script>
-<script type="module" src="cloud.js?v=20261123233259"></script>
+<script src="app.js?v=20261123233727"></script>
+<script src="planner.js?v=20261123233727"></script>
+<script src="clients.js?v=20261123233727"></script>
+<script src="quick.js?v=20261123233727"></script>
+<script src="ia.js?v=20261123233727"></script>
+<script src="hours.js?v=20261123233727"></script>
+<script src="cliente.js?v=20261123233727"></script>
+<script src="diario.js?v=20261123233727"></script>
+<script src="imagenes.js?v=20261123233727"></script>
+<script src="archivos.js?v=20261123233727"></script>
+<script type="module" src="cloud.js?v=20261123233727"></script>
 </body>
 </html>
