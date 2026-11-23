@@ -19,7 +19,7 @@
     grabAt = Date.now(); return grab;
   }
   const deCliente = (c, g) => O.norm(g.cliente) === O.norm(c.name) || (!g.cliente && palabras(c).some(w => O.norm(g.titulo).includes(w)));
-  const grabDe = (c, r) => (grab || []).find(g => g.fecha === r.day && (deCliente(c, g) || palabras(c).some(w => O.norm(g.titulo).includes(w))) && Math.abs(toMin(g.hora) - r.start) <= 45);
+  const grabDe = (c, r) => (grab || []).find(g => g.fecha === r.day && (deCliente(c, g) || palabras(c).some(w => O.norm(g.titulo).includes(w))) && (!g.hora || g.hora === '00:00' || Math.abs(toMin(g.hora) - r.start) <= 45));
   const toMin = h => { const [a, b] = String(h || '0:0').split(':').map(Number); return (a || 0) * 60 + (b || 0); };
   const DIAS_ATRAS = 45, DIAS_ADELANTE = 14;
 
