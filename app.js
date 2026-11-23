@@ -636,7 +636,8 @@ const views = {
         const ts = T.filter(x => cliEf(x) === c.id);
         const pend = ts.filter(x => x.status !== 'done').sort((a,b) => urgRank(a) - urgRank(b) || byOrder(a,b));
         return {c, i, pend, hechas: ts.length - pend.length};
-      }).sort((a, b) => (b.pend.length > 0) - (a.pend.length > 0) || a.i - b.i);
+      }).sort((a, b) => { const fa = window.__org.factura ? window.__org.factura(a.c) || 0 : 0, fb = window.__org.factura ? window.__org.factura(b.c) || 0 : 0;   // orden fijo: de más a menos facturación
+        return fb - fa || a.c.name.localeCompare(b.c.name, 'es'); });
       const conT = cols.filter(x => x.pend.length).length, gc = g === 'mine' ? 'mine' : 'ag', sel = S.cliSel && client(S.cliSel) ? S.cliSel : null;
       if (sel){ for (const {c, pend, hechas} of cols) if (c.id === sel) html += column({title:c.name, sub: hechas ? `${hechas} hecha${hechas>1?'s':''}` : '', field:'client', value:c.id, tasks:pend, hide:{client:true, urg:true, group:true, pick:true}, dot:clientColor(c), add: c.id, cls: `cg-${gc} solo`, byUrg:true}); continue; }
       html += `<div class="sep sep-${gc}"><b>${g === 'mine' ? '🔒 Mis clientes' : '🏢 Agencia'}</b><span>${conT} con tareas · ${cols.length - conT} sin pendientes${apartados ? ` · ${apartados} pausado${apartados > 1 ? 's' : ''} o antiguo${apartados > 1 ? 's' : ''} (en Fichas)` : ''}</span></div>`;

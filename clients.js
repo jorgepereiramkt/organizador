@@ -281,6 +281,8 @@ const form = dlg.querySelector('form');
 let cur = null;
 
 O.openFicha = id => openFicha(id);
+// lo que factura al mes (media): tus clientes → lo que te pagan; agencia → lo que pagan a la agencia
+O.factura = c => c.group === 'mine' ? (fmin(c) + fmax(c)) / 2 : agMedia(c);
 O.fichaInfo = c => ({fee: c.group === 'mine' ? (esGratis(c) ? '🎁 Gratis' : feeTxt(c)) : (agPago(c) ? rng(agPago(c).a, agPago(c).b) + ' a la agencia' : ''), tier: c.tier || ''});
 function openFicha(id){
   cur = O.client(id); if (!cur) return;
