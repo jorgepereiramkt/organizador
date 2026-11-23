@@ -532,11 +532,11 @@ function weekView(){
       const top = Y(i.start), h = Math.max(16, Y(i.end) - Y(i.start) - 2);
       const w = 100 / i.ncol, left = i.col * w;
       let cls = 'ev', color = i.color || '#8E8E93', label = esc(i.title || ''), extra = '';
-      let inner = '';
+      let inner = '', pendN = 0;
       const kcol = (P().kcolors || {});
       if (i.kind === 'work'){ cls = 'work'; color = kcol.work || 'var(--accent)'; label = esc(i.bname || 'Trabajo');
-        const ts = wkTasks(d, i, its); extra = ts.length ? ` · ${ts.filter(t => t.status === 'done').length}/${ts.length}` : '';
-        if (d < hoy){ cls += ' wk-old'; inner = ts.length ? `<span class="wk-sum">✓ ${ts.filter(t => t.status === 'done').length}/${ts.length}</span>` : ''; }
+        const ts = wkTasks(d, i, its); pendN = ts.filter(t => t.status !== 'done').length; extra = ts.length ? ` · ${ts.filter(t => t.status === 'done').length}/${ts.length}` : '';
+        if (d < hoy){ cls += ' wk-old'; inner = pendN ? '' : ts.length ? `<span class="wk-sum">✓ ${ts.length}/${ts.length}</span>` : ''; }
         else inner = `<div class="wk-ts">${ts.map((t, k) => { const c = O.client(t.client);
           return `<article class="card wk-t${t.status === 'done' ? ' done' : ''}" data-id="${t.id}" style="--c:${O.clientColor(c)}"><span class="wk-n">#${k + 1}</span><button class="chk" aria-label="Completar"></button><span class="wk-tx"><span class="tt">${esc(t.title)}</span><span class="wk-cl">${c ? esc(c.name) : 'Sin cliente'}</span></span></article>`; }).join('')}</div>`; }
       else if (i.kind === 'routine'){ cls = 'rout'; color = kcol['r:' + i.id] || ROUTC[i.id] || '#A3A3AD'; }
@@ -546,11 +546,14 @@ function weekView(){
       const gAttr = i.gid && i.mine ? ` data-gid="${esc(i.gid)}" data-gcal="${esc(i.gcal)}" data-gday="${d}" data-gs="${i.start}" data-ge="${i.end}" data-gorig="${i.gstart}"` : '';
       if (gAttr){ cls += ' g-ev'; const nt = plainDesc(i.desc).split('\n').find(x => x.trim()); if (nt && h > 40) inner = `<p class="wk-note">📝 ${esc(nt)}</p>`; }
       const past = d < hoy || (d === hoy && i.end <= nowMin);
+      // pasado: casi transparente (salvo bloques con tareas sin hacer, que avisan) · hoy: lo más claro · futuro: intermedio
+      const pend = past && pendN > 0;
+      if (pend) inner = `<span class="wk-pend" title="Tareas de este bloque que no se hicieron">⚠️ ${pendN} sin hacer</span>` + (d === hoy ? inner : '');
       const canMove = d >= hoy && ((i.kind === 'routine') || (i.kind === 'work' && i.bid));
       const xAttr = (i.kind === 'morning' ? ` data-wmorn="${d}"` : i.kind === 'routine' ? ` data-wrout="r:${esc(i.id)}" data-wname="${esc(i.title)}"` : '')
         + (canMove ? ` data-mvday="${d}" data-mvs="${i.start}" data-mve="${i.end}" data-mvkey="${i.kind === 'work' ? 'b:' + i.bid : 'r:' + esc(i.id)}"` : '');
       if (canMove) cls += ' mv-ev';
-      return `<div class="wk-ev ${cls}${past ? ' past' : ''}"${gAttr}${xAttr} ${i.kind === 'work' ? `data-wbuild="${d}" data-field="slot" data-value="${i.at}" data-day="${d}"` : ''} style="--hh:${h}px;top:${top}px;height:${h}px;left:calc(${left}% + 1px);width:calc(${w}% - 3px);--c:${color}" title="${label.replace(/"/g, '')} · ${toHM(i.start)}–${toHM(i.end)}">
+      return `<div class="wk-ev ${cls}${past ? ' past' + (pend ? ' pend' : '') : d === hoy ? ' hoy' : ' fut'}"${gAttr}${xAttr} ${i.kind === 'work' ? `data-wbuild="${d}" data-field="slot" data-value="${i.at}" data-day="${d}"` : ''} style="--hh:${h}px;top:${top}px;height:${h}px;left:calc(${left}% + 1px);width:calc(${w}% - 3px);--c:${color}" title="${label.replace(/"/g, '')} · ${toHM(i.start)}–${toHM(i.end)}">
         <b>${label}</b>${i.kind === 'work' && i.bid && d >= hoy ? `<button type="button" class="bname-ed" data-bname="${i.bid}" data-bday="${d}" title="Poner nombre al bloque">✏️</button>` : ''}${h > 26 ? `<small>${toHM(i.start)} – ${toHM(i.end)}${extra}</small>` : ''}${inner}${gAttr || (canMove) ? '<i class="g-res"></i>' : ''}</div>`;
     }).join('');
     const line = d === hoy && nowMin >= H0 && nowMin <= H1 ? `<i class="wk-now" style="top:${Y(nowMin)}px"></i>` : '';
