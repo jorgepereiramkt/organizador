@@ -975,13 +975,14 @@ function wkCreate(day, s, e){
 }
 function wkEditEvent(el){
   const ev = (weekEv[el.dataset.gday] || []).find(x => x.gid === el.dataset.gid && String(x.gstart) === el.dataset.gorig) || {};
-  evCur = {nuevo: false, day: el.dataset.gday, gid: el.dataset.gid, gcal: el.dataset.gcal, orig: el.dataset.gorig, desc0: plainDesc(ev.desc), title0: ev.title || '', color0: ev.ecolor || '', color: ev.ecolor || ''};
+  evCur = {nuevo: false, day: el.dataset.gday, gid: el.dataset.gid, gcal: el.dataset.gcal, orig: el.dataset.gorig, desc0: plainDesc(ev.desc), title0: ev.title || '', color0: ev.ecolor || '', color: ev.ecolor || '', rec: !!ev.rec, scope: ev.rec ? 'following' : ''};
   evForm.innerHTML = `<h2>${esc(ev.title || 'Evento')}</h2>
     <label>Título<input name="title" value="${esc(ev.title || '')}" autocomplete="off"></label>
     <div class="row"><label>Día<input type="date" name="day" value="${el.dataset.gday}"></label><label>Empieza<input type="time" name="s" step="900" value="${toHM(+el.dataset.gs)}"></label><label>Acaba<input type="time" name="e" step="900" value="${toHM(+el.dataset.ge)}"></label></div>
     <label>Notas<textarea name="desc" rows="6" placeholder="Apunta aquí lo que necesites…">${esc(plainDesc(ev.desc))}</textarea></label>
     <label>Color</label>${swatches(ev.ecolor || '', 'data-gcol', GCOL)}
-    <p class="iahint">Los cambios se guardan en tu Google Calendar.${ev.rec ? ' Este evento se repite: los cambios de hora y color son solo para este día.' : ''}</p>
+    ${ev.rec ? `<label>Este evento se repite. Cambiar…</label><div class="modes ev-scope"><button type="button" class="chip" data-evscope="one" aria-pressed="false">Solo este</button><button type="button" class="chip" data-evscope="following" aria-pressed="true">Este y los siguientes</button></div>` : ''}
+    <p class="iahint">Los cambios se guardan en tu Google Calendar.</p>
     <div class="actions">${ev.rec ? '<button type="button" class="btn danger" data-evdel>Borrar solo este</button><button type="button" class="btn danger" data-evdel="all">Borrar todos</button>' : '<button type="button" class="btn danger" data-evdel>Borrar</button>'}<span class="sp"></span><button type="button" class="btn" data-evcancel>Cancelar</button><button class="btn primary" value="ok">Guardar</button></div>`;
   evDlg.showModal();
 }
@@ -993,6 +994,8 @@ evForm.addEventListener('click', async e => {
       const r = {id: Math.random().toString(36).slice(2, 8), name: (evForm.querySelector('[name=title]').value || '').trim() || 'Nuevo', icon: '⏱️', start: toHM(c.s), end: toHM(c.e), days: [O.fromIso(c.day).getDay()], on: true};
       P().routines.push(r); rutNueva = r.id; O.render(); openRutina('r:' + r.id, c.day); }
     return; }
+  const sc = e.target.closest('[data-evscope]');
+  if (sc && evCur){ evCur.scope = sc.dataset.evscope; evForm.querySelectorAll('[data-evscope]').forEach(b => b.setAttribute('aria-pressed', b === sc)); return; }
   const sw = e.target.closest('[data-gcol]');
   if (sw && evCur){ evCur.color = sw.dataset.gcol; evForm.querySelectorAll('[data-gcol]').forEach(b => b.classList.toggle('on', b === sw)); return; }
   const del = e.target.closest('[data-evdel]');
@@ -1030,6 +1033,12 @@ async function evDone(rv){
       if (val('title') !== c.title0) q.title = val('title');
       if (val('desc') !== c.desc0) q.desc = val('desc');
       if (c.color && c.color !== c.color0) q.color = c.color;
+      if (c.rec && c.scope === 'following'){
+        q.scope = 'following'; if (day !== c.day){ delete q.start; delete q.end; }   // una serie no se cambia de día desde aquí
+        await bridge(q);
+        for (const k in weekEv) delete weekEv[k];
+        O.toast('Guardado en este y en los siguientes ✓'); wkReload(c.day, day); return;
+      }
       await bridge(q);
       O.toast('Guardado en tu Google Calendar ✓'); wkReload(c.day, day);
     }
