@@ -482,11 +482,10 @@ function wkSide(){
     <div class="list">${(k === 'hoy' ? porUrg(ts) : ts.sort(rank).map(t => O.card(t)).join('')) || `<div class="empty">${empty}</div>`}</div></div>`;
   // «Para hoy» en subgrupos por urgencia
   const porUrg = ts => Object.entries(O.URG).map(([u, x]) => { const g = ts.filter(t => (O.URG[t.priority] ? t.priority : 'normal') === u).sort(O.byOrder);
-    return g.length ? `<div class="ugrp u-${u}"><div class="uh">${x.icon} ${x.label} <span>${g.length}</span></div>${g.map(t => O.card(t)).join('')}</div>` : ''; }).join('');
-  return `<aside class="col side wk-side"><header><h3>Tareas para colocar</h3></header>
-    ${sec('atr', '⏪ Atrasadas', atr, 'Nada atrasado 👌')}
-    ${sec('hoy', '📌 Para hoy', hoyTs, 'Marca tareas con «Hoy» en Clientes')}
-    ${sec('sin', '🗂️ Sin fecha', sin, 'No hay tareas sin fecha')}</aside>`;
+    return g.length ? `<div class="ugrp u-${u}"><div class="uh">${x.icon} ${x.label} <span>${g.length}</span></div>${g.map(t => O.card(t, {urg: true, group: true, status: true})).join('')}</div>` : ''; }).join('');
+  // solo las de hoy, en dos columnas (para no agobiarse)
+  return `<aside class="col side wk-side"><header><h3>📌 Para hoy <span class="wk-n2">${hoyTs.length} por colocar</span></h3></header>
+    ${sec('hoy', '', hoyTs, 'Nada por colocar hoy 👌 · marca tareas con «Hoy» en Clientes')}</aside>`;
 }
 let wkScale = {H0: 480, H1: 1440, cum: [0]};
 const wkY = m => { const {H0, cum} = wkScale; return cum[Math.max(0, Math.min(cum.length - 1, Math.round(m) - H0))]; };
