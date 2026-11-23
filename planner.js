@@ -43,7 +43,7 @@ const APPCOL = ['#FF6B3D','#F59E0B','#16A34A','#0D9488','#06B6D4','#2563EB','#4F
 const swatches = (cur, attr, cols) => `<div class="swatches">${Object.entries(cols).map(([k, c]) => `<button type="button" class="sw${String(cur) === String(k) ? ' on' : ''}" ${attr}="${k}" style="background:${c}" title="${GCOLN[k] || ''}"></button>`).join('')}</div>`;
 async function bridge(params){
   const url = P().bridge; if (!url) throw new Error('sin puente');
-  const r = await fetch(url + (url.includes('?') ? '&' : '?') + new URLSearchParams(params), {redirect: 'follow'});
+  const r = await fetch(url + (url.includes('?') ? '&' : '?') + new URLSearchParams({...params, _t: Date.now()}), {redirect: 'follow', cache: 'no-store'});
   if (!r.ok) throw new Error('puente ' + r.status);
   const j = await r.json(); if (j.error) throw new Error(j.error); return j;
 }
@@ -463,11 +463,14 @@ const weekEv = {};            // día -> eventos (de Google, por el puente o la 
 let weekLoading = false;
 const monday = day => { const d = O.fromIso(day); return O.addDays(d, -((d.getDay() + 6) % 7)); };
 const weekDays = () => { const m = monday(planDay); return [...Array(7)].map((_, i) => O.iso(O.addDays(m, i))); };
+let weekGen = 0;
 async function loadWeek(force){
   const days = weekDays().filter(d => force || !weekEv[d]);
-  if (!days.length || weekLoading) return;
+  if (!days.length || (weekLoading && !force)) return;
+  const gen = ++weekGen;   // si se pide otra carga (p. ej. «Actualizar»), lo que llegue de la anterior se descarta
   weekLoading = true;
-  try { await Promise.all(days.map(async d => { weekEv[d] = await fetchEvents(d); })); } catch(e){ calError = 'Calendario: ' + e.message; }
+  try { await Promise.all(days.map(async d => { const ev = await fetchEvents(d); if (gen === weekGen) weekEv[d] = ev; })); } catch(e){ if (gen === weekGen) calError = 'Calendario: ' + e.message; }
+  if (gen !== weekGen) return;
   weekLoading = false;
   if (S.view === 'dia' && S.diaMode === 'semana') O.render();
 }
