@@ -528,6 +528,10 @@ function weekView(){
       const tb = wkTasks(d, b, its), n = tb.length, aviso = (d < hoy || (d === hoy && b.end <= nowMin)) && tb.some(t => t.status !== 'done') ? 28 : 0, need = 48 + aviso + n * ROWH, have = (b.end - b.start) * PXM;
       if (n && need > have){ const extra = (need - have) / (b.end - b.start); for (let m = Math.max(H0, b.start); m < Math.min(H1, b.end); m++) w[m - H0] = Math.max(w[m - H0], PXM + extra); }
     } }
+  // los eventos cortos (15–20 min) también tienen sitio para leerse sin taparse con el siguiente
+  const MINH = 24;
+  for (const {its} of per) for (const e of its){ const len = Math.min(H1, e.end) - Math.max(H0, e.start);
+    if (len > 0 && len * PXM < MINH) for (let m = Math.max(H0, e.start); m < Math.min(H1, e.end); m++) w[m - H0] = Math.max(w[m - H0], MINH / len); }
   const cum = [0]; for (let k = 0; k < w.length; k++) cum.push(cum[k] + w[k]);
   const Y = m => cum[Math.max(0, Math.min(cum.length - 1, Math.round(m) - H0))];
   wkScale = {H0, H1, cum};
