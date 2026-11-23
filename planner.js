@@ -479,7 +479,10 @@ function wkSide(){
   const sin = libres.filter(t => !atr.includes(t) && !hoyTs.includes(t) && !t.day && !t.today);
   const rank = (a, b) => O.urgRank(a) - O.urgRank(b) || O.byOrder(a, b);
   const sec = (k, title, ts, empty) => `<div class="urg wk-l" data-field="unslot" data-wk="${k}"><h4>${title}<span>${ts.length}</span></h4>
-    <div class="list">${ts.sort(rank).map(t => O.card(t)).join('') || `<div class="empty">${empty}</div>`}</div></div>`;
+    <div class="list">${(k === 'hoy' ? porUrg(ts) : ts.sort(rank).map(t => O.card(t)).join('')) || `<div class="empty">${empty}</div>`}</div></div>`;
+  // «Para hoy» en subgrupos por urgencia
+  const porUrg = ts => Object.entries(O.URG).map(([u, x]) => { const g = ts.filter(t => (O.URG[t.priority] ? t.priority : 'normal') === u).sort(O.byOrder);
+    return g.length ? `<div class="ugrp u-${u}"><div class="uh">${x.icon} ${x.label} <span>${g.length}</span></div>${g.map(t => O.card(t)).join('')}</div>` : ''; }).join('');
   return `<aside class="col side wk-side"><header><h3>Tareas para colocar</h3></header>
     ${sec('atr', '⏪ Atrasadas', atr, 'Nada atrasado 👌')}
     ${sec('hoy', '📌 Para hoy', hoyTs, 'Marca tareas con «Hoy» en Clientes')}
