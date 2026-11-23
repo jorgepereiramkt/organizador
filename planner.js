@@ -734,8 +734,18 @@ function focoDatos(){
 // 🎯 En Foco, la primera tarea del primer bloque de trabajo del día es siempre el Arranque
 function arranqueFoco(d){
   const mi = P().morning || [], md = new Set((P().morningDone || {})[d] || []); if (!mi.length) return '';
-  return `<div class="fo-arr${md.size >= mi.length ? ' done' : ''}" data-wmorn="${d}" role="button" tabindex="0"><span class="tt">☀️ Arranque del día · ${md.size}/${mi.length}</span></div>`;
+  return `<div class="fo-arr${md.size >= mi.length ? ' done' : ''}"><div class="fo-arr-h"><span class="tt">☀️ Arranque del día</span><span class="fo-arr-n">${md.size}/${mi.length}</span></div>
+    <div class="fo-arr-l">${mi.map((x, i) => `<button type="button" class="fo-msub${md.has(i) ? ' on' : ''}" data-msub="${d}|${i}"><i></i><span>${esc(x)}</span></button>`).join('')}</div></div>`;
 }
+// tachar cada paso del Arranque desde Foco
+document.addEventListener('click', e => {
+  const b = e.target.closest('[data-msub]'); if (!b) return;
+  e.preventDefault(); e.stopPropagation();
+  const [d, i] = b.dataset.msub.split('|'), p = P(), m = p.morningDone = p.morningDone || {}, set = new Set(m[d] || []);
+  set.has(+i) ? set.delete(+i) : set.add(+i); m[d] = [...set];
+  O.save(); O.render();
+  if (set.size >= (p.morning || []).length) O.toast('☀️ Arranque completado. ¡A por el bloque!');
+}, true);
 function focoView(){
   const d = new Date();
   O.setToolbar('🎯 Foco', `${O.DIAS_L[d.getDay()]} ${d.getDate()} de ${O.MESES[d.getMonth()]}`,

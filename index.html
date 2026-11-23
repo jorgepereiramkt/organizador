@@ -6,7 +6,7 @@
 <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' https://www.gstatic.com https://apis.google.com https://accounts.google.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://accounts.google.com; font-src https://fonts.gstatic.com; connect-src 'self' https://api.clickup.com https://script.google.com https://script.googleusercontent.com https://accounts.google.com https://firestore.googleapis.com https://identitytoolkit.googleapis.com https://securetoken.googleapis.com https://www.googleapis.com https://apis.google.com; frame-src 'self' https://organizador-jp.firebaseapp.com https://accounts.google.com; img-src 'self' data: https://lh3.googleusercontent.com https://www.google.com; manifest-src 'self'; base-uri 'none'; form-action 'self'; object-src 'none'">
 <meta name="referrer" content="no-referrer">
 <meta name="robots" content="noindex, nofollow">
-<link rel="manifest" href="manifest.json?v=20261124003216">
+<link rel="manifest" href="manifest.json?v=20261124003424">
 <link rel="icon" href="icon-192.png">
 <link rel="apple-touch-icon" href="icon-180.png">
 <meta name="theme-color" content="#0a0a0b">
@@ -1423,8 +1423,17 @@ body.is-dragging .col:not(.wk-side) .ugrp.vacia{display:flex}
 .wk-ev .wk-arr .tt{font-weight:600;font-size:11px;line-height:13px}
 .wk-ev .wk-arr.done{opacity:.55}
 .wk-ev .wk-arr.done .tt{text-decoration:line-through}
-.fo-arr{cursor:pointer;padding:16px 18px;border-radius:14px;background:color-mix(in srgb,#FFC93D 22%,var(--surface));border-left:4px solid #FFC93D;font-size:17px;font-weight:600}
-.fo-arr.done{opacity:.5}
+.fo-arr{padding:14px 18px;border-radius:14px;background:color-mix(in srgb,#FFC93D 18%,var(--surface));border-left:4px solid #FFC93D}
+.fo-arr-h{display:flex;align-items:baseline;gap:10px;font-size:17px;font-weight:700;margin-bottom:8px}
+.fo-arr-n{margin-left:auto;font-size:14px;color:var(--muted);font-variant-numeric:tabular-nums}
+.fo-arr-l{display:flex;flex-direction:column;gap:4px}
+.fo-msub{display:flex;align-items:center;gap:12px;width:100%;text-align:left;background:none;border:0;padding:8px 4px;border-radius:10px;font:500 16px var(--body);color:var(--text);cursor:pointer}
+.fo-msub:hover{background:color-mix(in srgb,#FFC93D 16%,transparent)}
+.fo-msub i{flex:none;width:22px;height:22px;border-radius:50%;border:2px solid var(--faint);display:grid;place-items:center}
+.fo-msub.on i{background:var(--ok,#34c759);border-color:var(--ok,#34c759)}
+.fo-msub.on i::after{content:'✓';color:#fff;font:800 13px/1 var(--body);font-style:normal}
+.fo-msub.on span{text-decoration:line-through;color:var(--faint)}
+.fo-arr.done{opacity:.6}
 </style>
 </head>
 <body>
@@ -1508,16 +1517,16 @@ body.is-dragging .col:not(.wk-side) .ugrp.vacia{display:flex}
 
 <div class="toast" id="toast"></div>
 
-<script src="app.js?v=20261124003216"></script>
-<script src="planner.js?v=20261124003216"></script>
-<script src="clients.js?v=20261124003216"></script>
-<script src="quick.js?v=20261124003216"></script>
-<script src="ia.js?v=20261124003216"></script>
-<script src="hours.js?v=20261124003216"></script>
-<script src="cliente.js?v=20261124003216"></script>
-<script src="diario.js?v=20261124003216"></script>
-<script src="imagenes.js?v=20261124003216"></script>
-<script src="archivos.js?v=20261124003216"></script>
-<script type="module" src="cloud.js?v=20261124003216"></script>
+<script src="app.js?v=20261124003424"></script>
+<script src="planner.js?v=20261124003424"></script>
+<script src="clients.js?v=20261124003424"></script>
+<script src="quick.js?v=20261124003424"></script>
+<script src="ia.js?v=20261124003424"></script>
+<script src="hours.js?v=20261124003424"></script>
+<script src="cliente.js?v=20261124003424"></script>
+<script src="diario.js?v=20261124003424"></script>
+<script src="imagenes.js?v=20261124003424"></script>
+<script src="archivos.js?v=20261124003424"></script>
+<script type="module" src="cloud.js?v=20261124003424"></script>
 </body>
 </html>
