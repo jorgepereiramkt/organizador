@@ -10,7 +10,7 @@
   let grab = null, grabAt = 0;
   async function cargarGrabadas(){
     const br = S.plan && S.plan.bridge; if (!br) return [];
-    if (grab && Date.now() - grabAt < 5 * 60e3) return grab;
+    if (grab && grab.length && Date.now() - grabAt < 60e3) return grab;   // una lista vacía no se guarda: se vuelve a mirar
     const r = await fetch(br + '?a=reuniones'); const j = await r.json(); if (j.error) throw new Error(j.error);
     grab = (j.reuniones || []).map(f => { const n = f.name.replace(/^📞\s*/, '').split(' · ');
       const [fecha, hora] = (n[0] || '').split(' ');
@@ -124,7 +124,7 @@
   O.openCliente = async id => {
     cur = id; reus = null; pinta(); if (!dlg.open) dlg.showModal();
     const c = O.client(id); if (cargando) return; cargando = true;
-    cargarGrabadas().then(() => { if (cur === id) pinta(); }).catch(() => { grab = grab || []; });
+    cargarGrabadas().then(() => { if (cur === id) pinta(); }).catch(() => { grab = grab || []; if (cur === id) pinta(); });
     try { const r = await cargarReuniones(c); if (cur === id){ reus = r; pinta(); } } finally { cargando = false; }
   };
   // las tarjetas de tareas funcionan igual que en el tablero (completar, abrir, para hoy…)
