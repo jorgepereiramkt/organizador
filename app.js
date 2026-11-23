@@ -345,6 +345,15 @@ const snap = t => ({title:t.title, day:t.day, status:t.status, priority:t.priori
 const cliEf = t => ((S.plan && S.plan.tproy) || {})[t.id] || t.client;
 // interno de la agencia: tus proyectos y la carpeta personal de ClickUp (Jorge Personal)
 const esInterno = c => !!c && c.group === 'agency' && (c.proyecto || c.interno || /^jorge\b/i.test(c.name || ''));
+// Orden por facturación. Prop Hero, Artic Clients y Artic Agency van juntos (en ese orden), con lo que facturan entre los tres
+const ARTIC = [/prop ?hero/i, /artic clients?/i, /artic agen/i];
+function ordenFact(c){
+  const fac = x => { const f = (window.__org || {}).factura; return f ? +f(x) || 0 : 0; };
+  const i = c.group === 'mine' ? ARTIC.findIndex(r => r.test(c.name)) : -1;
+  if (i < 0) return {v: fac(c), k: 0};
+  const v = S.clients.filter(x => x.group === 'mine' && ARTIC.some(r => r.test(x.name))).reduce((s, x) => s + fac(x), 0);
+  return {v, k: i};
+}
 const isAgency = id => { const c = client(id); return !!(c && c.group === 'agency' && !c.proyecto); };   // los proyectos son de la agencia pero solo viven en la app
 
 // Regla de oro: solo se sube a ClickUp lo que es de un cliente marcado como «Agencia». Lo tuyo nunca sale de la app.
@@ -636,8 +645,8 @@ const views = {
         const ts = T.filter(x => cliEf(x) === c.id);
         const pend = ts.filter(x => x.status !== 'done').sort((a,b) => urgRank(a) - urgRank(b) || byOrder(a,b));
         return {c, i, pend, hechas: ts.length - pend.length};
-      }).sort((a, b) => { const fa = window.__org.factura ? window.__org.factura(a.c) || 0 : 0, fb = window.__org.factura ? window.__org.factura(b.c) || 0 : 0;   // orden fijo: de más a menos facturación
-        return fb - fa || a.c.name.localeCompare(b.c.name, 'es'); });
+      }).sort((a, b) => { const ka = ordenFact(a.c), kb = ordenFact(b.c);   // orden fijo: de más a menos facturación
+        return kb.v - ka.v || ka.k - kb.k || a.c.name.localeCompare(b.c.name, 'es'); });
       const conT = cols.filter(x => x.pend.length).length, gc = g === 'mine' ? 'mine' : 'ag', sel = S.cliSel && client(S.cliSel) ? S.cliSel : null;
       if (sel){ for (const {c, pend, hechas} of cols) if (c.id === sel) html += column({title:c.name, sub: hechas ? `${hechas} hecha${hechas>1?'s':''}` : '', field:'client', value:c.id, tasks:pend, hide:{client:true, urg:true, group:true, pick:true}, dot:clientColor(c), add: c.id, cls: `cg-${gc} solo`, byUrg:true}); continue; }
       html += `<div class="sep sep-${gc}"><b>${g === 'mine' ? '🔒 Mis clientes' : '🏢 Agencia'}</b><span>${conT} con tareas · ${cols.length - conT} sin pendientes${apartados ? ` · ${apartados} pausado${apartados > 1 ? 's' : ''} o antiguo${apartados > 1 ? 's' : ''} (en Fichas)` : ''}</span></div>`;
