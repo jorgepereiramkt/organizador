@@ -597,11 +597,13 @@ function render(){
   const vw = S.view;
   if (!views[vw]) return;   // la vista Día la añade planner.js, que se carga después
   // Si estás escribiendo una tarea nueva, lo escrito y el cursor sobreviven al redibujado (sincronización en segundo plano)
-  const ae = document.activeElement, qf = ae && main.contains(ae) && ae.matches('input,textarea') ? ae.closest('[data-qclient]') : null;
-  const keep = qf && ae.value ? {k: qf.dataset.qclient, v: ae.value, a: ae.selectionStart, b: ae.selectionEnd} : null;
+  const ae = document.activeElement, enMain = ae && main.contains(ae) && ae.matches('input,textarea');
+  const qf = enMain ? ae.closest('[data-qclient]') : null, ATTR = ['data-dnote', 'data-dval', 'data-dcnew'];
+  const at = enMain && !qf ? ATTR.find(a => ae.hasAttribute(a)) : null;
+  const keep = enMain && (qf || at) ? {sel: qf ? `[data-qclient="${CSS.escape(qf.dataset.qclient)}"] input` : `[${at}="${CSS.escape(ae.getAttribute(at))}"]`, v: ae.value, a: ae.selectionStart, b: ae.selectionEnd} : null;
   main.innerHTML = views[vw]();
   if (views[vw].after) views[vw].after();
-  if (keep){ const f = [...main.querySelectorAll('[data-qclient]')].find(x => x.dataset.qclient === keep.k), i = f && f.querySelector('input,textarea');
+  if (keep){ const i = main.querySelector(keep.sel);
     if (i){ i.value = keep.v; i.focus({preventScroll: true}); try { i.setSelectionRange(keep.a, keep.b); } catch(e){} } }
   if (S.view === 'semana' && S._keepScroll) main.querySelector('.board').scrollLeft = sx;
   S._keepScroll = false;

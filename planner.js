@@ -292,7 +292,7 @@ O.views.dia = function(){
     `<button class="icon" data-pday="-1" aria-label="Día anterior"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m15 18-6-6 6-6"/></svg></button>
      <button class="chip" data-pday="0">Hoy</button>
      <button class="icon" data-pday="1" aria-label="Día siguiente"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m9 18 6-6-6-6"/></svg></button>
-     <div class="modes"><button class="chip" data-dmode="dia" aria-pressed="true">Día</button><button class="chip" data-dmode="semana" aria-pressed="false">Semana</button></div>
+     <div class="modes"><button class="chip" data-dmode="dia" aria-pressed="true">Día</button><button class="chip" data-dmode="semana" aria-pressed="false">Semana</button><button class="chip" data-dmode="diario" aria-pressed="false">📒 Clientes</button></div>
      <button class="chip build-btn" data-buildday>🧱 Montar bloques</button>
      <span class="cal-st">${calStatus()}</span>`, 'Arrastra tareas a los bloques de trabajo');
 
@@ -496,7 +496,7 @@ function weekView(){
     `<button class="icon" data-pweek="-1" aria-label="Semana anterior"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m15 18-6-6 6-6"/></svg></button>
      <button class="chip" data-pweek="0">Hoy</button>
      <button class="icon" data-pweek="1" aria-label="Semana siguiente"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m9 18 6-6-6-6"/></svg></button>
-     <div class="modes"><button class="chip" data-dmode="dia" aria-pressed="false">Día</button><button class="chip" data-dmode="semana" aria-pressed="true">Semana</button></div>
+     <div class="modes"><button class="chip" data-dmode="dia" aria-pressed="false">Día</button><button class="chip" data-dmode="semana" aria-pressed="true">Semana</button><button class="chip" data-dmode="diario" aria-pressed="false">📒 Clientes</button></div>
      <span class="cal-st">${calStatus()}</span>`, 'Toca un día para abrirlo · toca un bloque para montarlo');
   const ROUTC = {comida:'#FFC93D', cena:'#C77DFF', deporte:'#3DDC97'};
   const per = days.map(d => {
@@ -575,8 +575,8 @@ O.statsBar = function(){
   return `<div class="stats"><div class="st-done"><span><b>${hoyN}</b><small>hechas hoy</small></span><span><b>${sem}</b><small>esta semana</small></span><span><b>${mesN}</b><small>este mes</small></span></div>
     <div class="st-pend"><small>Pendientes</small>${Object.entries(O.URG).map(([k, u]) => `<span class="u-${k}" title="${u.label}">${u.icon} <b>${byU(k)}</b></span>`).join('')}<span class="st-tot">${pend.length} en total</span></div></div>`;
 };
-O.views.dia = function(){ return S.diaMode === 'semana' ? weekView() : diaView(); };
-O.views.dia.after = diaAfter;
+O.views.dia = function(){ return S.diaMode === 'diario' && O.diarioView ? O.diarioView() : S.diaMode === 'semana' ? weekView() : diaView(); };
+O.views.dia.after = () => { if (S.diaMode === 'diario' && O.diarioView) return O.diarioAfter && O.diarioAfter(); diaAfter(); };
 document.addEventListener('click', e => {
   const m = e.target.closest('[data-dmode]');
   if (m){ S.diaMode = m.dataset.dmode; try { localStorage.setItem('jp-diamode', S.diaMode); } catch(err){} O.render(); return; }
