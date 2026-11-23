@@ -31,11 +31,12 @@
 
   // ¿Es una línea recta (con o sin punta de flecha dibujada en el mismo trazo)?
   function lineOf(s, medH){
-    if (s.len < Math.max(60, 2.5 * medH)) return null;
     const p = s.pts, st = p[0];
+    const horiz = Math.abs(p[p.length - 1][0] - st[0]) >= Math.abs(p[p.length - 1][1] - st[1]);
+    if (s.len < Math.max(50, (horiz ? 1.4 : 2.2) * medH)) return null;
     let tipI = 0, best = 0; p.forEach((q, i) => { const d = dist(st, q); if (d > best){ best = d; tipI = i; } });
     const tramo = pathLen(p, 0, tipI), cola = pathLen(p, tipI);
-    if (tramo < 50 || best / tramo < 0.86) return null;
+    if (tramo < 45 || best / tramo < 0.88) return null;
     const punta = cola > 8 && cola < 0.45 * tramo;          // volvió hacia atrás al final: punta dibujada de un tirón
     if (!punta && cola > 8) return null;
     return { a: st, b: p[tipI], headEnd: punta, headStart: false };
@@ -94,7 +95,7 @@
     for (const f of flechas){
       for (const s of trazos){
         if (usados.has(s) || Math.max(s.w, s.h) > Math.max(60, 0.45 * dist(f.a, f.b))) continue;
-        const c = [s.cx, s.cy], r = Math.max(30, Math.max(s.w, s.h));
+        const c = [s.cx, s.cy], r = Math.max(40, 1.3 * Math.max(s.w, s.h));
         if (dist(c, f.b) < r){ f.headEnd = true; usados.add(s); }
         else if (dist(c, f.a) < r){ f.headStart = true; usados.add(s); }
       }
@@ -120,10 +121,20 @@
       sk.push({ id: f.id, type: f.type, x: f.s.x0, y: f.s.y0, width: f.s.w, height: f.s.h, strokeColor: f.s.e.strokeColor, strokeWidth: 2, roughness: 0,
         ...(lab ? { label: { text: lab, fontSize: Math.min(36, Math.max(16, Math.round(H * 0.6))), fontFamily: 2 } } : {}) });
     }
-    const pega = p => formas.find(f => p[0] > f.s.x0 - 30 && p[0] < f.s.x1 + 30 && p[1] > f.s.y0 - 30 && p[1] < f.s.y1 + 30);
+    const enF = (p, f, m) => p[0] > f.s.x0 - m && p[0] < f.s.x1 + m && p[1] > f.s.y0 - m && p[1] < f.s.y1 + m;
+    const pega = p => formas.find(f => enF(p, f, 30));
+    // sigue la dirección de la flecha desde su extremo (hasta 300 px) por si apunta a un cuadro sin llegar a tocarlo
+    const apunta = (desde, hacia) => {
+      const d = dist(desde, hacia) || 1, ux = (hacia[0] - desde[0]) / d, uy = (hacia[1] - desde[1]) / d;
+      for (let t = 0; t <= Math.max(300, d); t += 8){ const q = [hacia[0] + ux * t, hacia[1] + uy * t], f = formas.find(f => enF(q, f, 2)); if (f) return { f, q }; }
+      return null;
+    };
     let nFlechas = 0, nLineas = 0;
     for (const f of flechas){
-      const sf = pega(f.a), ef = pega(f.b), esFlecha = f.headEnd || f.headStart || (sf && ef && sf !== ef);
+      let sf = pega(f.a), ef = pega(f.b);
+      if (!ef && (f.headEnd || !f.headStart)){ const h = apunta(f.a, f.b); if (h && h.f !== sf){ ef = h.f; f.b = h.q; } }
+      if (!sf && f.headStart){ const h = apunta(f.b, f.a); if (h && h.f !== ef){ sf = h.f; f.a = h.q; } }
+      const esFlecha = f.headEnd || f.headStart || (sf && ef && sf !== ef);
       esFlecha ? nFlechas++ : nLineas++;
       sk.push({ type: 'arrow', x: f.a[0], y: f.a[1], points: [[0, 0], [f.b[0] - f.a[0], f.b[1] - f.a[1]]], strokeColor: f.s.e.strokeColor, strokeWidth: 2, roughness: 0,
         endArrowhead: esFlecha && (f.headEnd || !f.headStart) ? 'arrow' : null, startArrowhead: f.headStart ? 'arrow' : null,
