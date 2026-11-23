@@ -67,10 +67,16 @@ function scheduleCloud(){
   if (!window.__cloud) return;
   clearTimeout(cloudTimer);
   cloudTimer = setTimeout(() => {
+    if (!window.__cloud || !window.__cloud.ready || applyPending) return scheduleCloud();
     const data = cloudData(), js = JSON.stringify(data);
-    if (js === lastSent || !window.__cloud) return;
+    if (js === lastSent) return;
     lastSent = js;
-    window.__cloud.save(data).catch(e => { lastSent = ''; toast('No se pudo guardar en tu cuenta: ' + (e.code || e.message)); });
+    window.__cloud.save(data).catch(e => {
+      lastSent = '';
+      if (e.code === 'wait') return scheduleCloud();
+      if (e.code === 'stale') return toast('Había cambios más nuevos en otro dispositivo: los he cargado (repite lo último si no aparece)');
+      toast('No se pudo guardar en tu cuenta: ' + (e.code || e.message));
+    });
   }, 700);
 }
 async function adoptToken(token){
@@ -79,8 +85,21 @@ async function adoptToken(token){
   try { const {user} = await cu('/user'); S.cu.me = user.id; S.cu.meName = user.username || user.email || ''; await loadLists(); saveLocal(); await sync(); }
   catch(e){ toast('ClickUp: ' + e.message); modeIdle(); }
 }
+let applyPending = false;
+// Copias de seguridad en este dispositivo: una por día de lo que llega de la nube (se guardan 10 días)
+function backupLocal(d){
+  try {
+    const k = 'jp-copias', all = JSON.parse(localStorage.getItem(k) || '{}'), day = today();
+    if ((d.clients || []).length < 3) return;
+    all[day] = JSON.stringify({clients: d.clients, tasks: d.tasks, plan: d.plan, slots: d.slots, hours: d.hours, ai: d.ai, hidden: d.hidden});
+    Object.keys(all).sort().slice(0, -10).forEach(x => delete all[x]);
+    localStorage.setItem(k, JSON.stringify(all));
+  } catch(e){}
+}
 function applyCloud(d){
-  if (D || (typeof ed !== 'undefined' && ed.open)) return setTimeout(() => applyCloud(d), 800);
+  if (D || (typeof ed !== 'undefined' && ed.open)){ applyPending = true; return setTimeout(() => applyCloud(d), 800); }
+  applyPending = false;
+  backupLocal(d);
   S.clients = d.clients || [];
   S.tasks = [...S.tasks.filter(t => t.cu), ...(d.tasks || [])];
   S.cu.hidden = d.hidden || [];

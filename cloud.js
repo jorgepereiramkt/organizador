@@ -3,7 +3,7 @@
 import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.14.1/firebase-app.js';
 import { getAuth, onAuthStateChanged, GoogleAuthProvider, signInWithPopup, signInWithRedirect, getRedirectResult, signOut }
   from 'https://www.gstatic.com/firebasejs/10.14.1/firebase-auth.js';
-import { initializeFirestore, persistentLocalCache, doc, onSnapshot, setDoc, serverTimestamp }
+import { initializeFirestore, persistentLocalCache, doc, onSnapshot, runTransaction, serverTimestamp }
   from 'https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore.js';
 
 const ALLOWED = 'jorgepereiramktdigital@gmail.com';
@@ -50,17 +50,32 @@ onAuthStateChanged(auth, user => {
   gate.hidden = true; gate.classList.remove('loading');
   try { localStorage.setItem('jp-session', '1'); } catch(e){}
   const ref = doc(db, 'users', user.uid);
+  let baseRev = 0;
   window.__cloud = {
     email: user.email,
-    save: data => setDoc(ref, { ...data, by: DEVICE, at: serverTimestamp() }),
+    ready: false,                                         // no se sube nada hasta tener la versión del servidor
+    save: async data => {
+      if (!window.__cloud || !window.__cloud.ready) throw Object.assign(new Error('aún no tengo la versión de la nube'), { code: 'wait' });
+      let rev = 0;
+      await runTransaction(db, async tx => {
+        const s = await tx.get(ref), cur = s.exists() ? (s.data().rev || 0) : 0;
+        // Si otro dispositivo guardó algo más nuevo, NO se pisa: se carga lo suyo
+        if (s.exists() && cur !== baseRev) throw Object.assign(new Error('había cambios más nuevos en otro dispositivo'), { code: 'stale' });
+        rev = cur + 1;
+        tx.set(ref, { ...data, rev, by: DEVICE, at: serverTimestamp() });
+      });
+      baseRev = rev;
+    },
     logout: async () => { await signOut(auth); window.__org.wipeLocal(); location.reload(); }
   };
-  unsub = onSnapshot(ref, snap => {
+  unsub = onSnapshot(ref, { includeMetadataChanges: true }, snap => {
     if (snap.metadata.hasPendingWrites) return;          // es un cambio nuestro que aún se está enviando
-    const d = snap.data();
-    if (!d) return window.__org.cloudEmpty();             // primera vez: subir lo que haya en este dispositivo
-    if (d.by === DEVICE) return;                          // lo escribimos nosotros
-    window.__org.applyCloud(d);
+    if (snap.metadata.fromCache) return;                 // copia guardada en este dispositivo: puede ser vieja
+    const d = snap.data(), first = !window.__cloud.ready;
+    if (!d) { window.__cloud.ready = true; window.__org.cloudEmpty(); return window.__org.cloudReady(); }
+    if (d.rev != null && d.rev === baseRev && !first) return;   // ya la tenemos
+    baseRev = d.rev || 0;
+    if (first || d.by !== DEVICE) window.__org.applyCloud(d);
+    if (first) { window.__cloud.ready = true; window.__org.cloudReady(); }
   }, e => window.__org.toast('Sincronización: ' + (e.code || e.message)));
-  window.__org.cloudReady();
 });
