@@ -522,10 +522,10 @@ function weekView(){
   const H0 = Math.floor(G0 / 60) * 60, H1 = Math.min(24 * 60, Math.ceil(G1 / 60) * 60), PXM = 0.9;
   const now = new Date(), nowMin = now.getHours() * 60 + now.getMinutes(), hoy = O.today();
   // píxeles por minuto (se estiran donde un bloque de trabajo de hoy o de días futuros tiene más tareas de las que caben)
-  const ROWH = 33, w = new Array(H1 - H0).fill(PXM);
+  const ROWH = 38, w = new Array(H1 - H0).fill(PXM);
   for (const {d, its} of per){ if (d < hoy) continue;
     for (const b of its.filter(x => x.kind === 'work')){
-      const n = wkTasks(d, b, its).length, need = 34 + n * ROWH, have = (b.end - b.start) * PXM;
+      const tb = wkTasks(d, b, its), n = tb.length, aviso = (d < hoy || (d === hoy && b.end <= nowMin)) && tb.some(t => t.status !== 'done') ? 28 : 0, need = 48 + aviso + n * ROWH, have = (b.end - b.start) * PXM;
       if (n && need > have){ const extra = (need - have) / (b.end - b.start); for (let m = Math.max(H0, b.start); m < Math.min(H1, b.end); m++) w[m - H0] = Math.max(w[m - H0], PXM + extra); }
     } }
   const cum = [0]; for (let k = 0; k < w.length; k++) cum.push(cum[k] + w[k]);
