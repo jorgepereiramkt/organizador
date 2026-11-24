@@ -793,6 +793,7 @@ function focoView(){
     <h2 class="fo-t">${esc(actual.bname || 'Trabajo')}</h2>
     <div class="fo-reloj" id="foReloj" data-fin="${actual.end}" data-ini="${actual.start}">--:--</div>
     <div class="fo-barra"><i id="foBarra"></i></div>
+    <button type="button" class="fo-mini" id="foMini" aria-label="Ver el temporizador"><b id="foMiniT">--:--</b><span class="fo-mini-b"><i id="foMiniB"></i></span></button>
     <div class="fo-prog">${ts.length ? `${hechas} de ${ts.length} tareas hechas${hechas === ts.length ? ' · ¡bloque completado! 🎉' : ''}` : 'Este bloque no tiene tareas: arrástralas desde «Para hoy» en la Semana'}</div>
     <div class="fo-lista" data-field="slot" data-value="${actual.at}" data-day="${hoy}">${cards}</div>
     ${frase}
@@ -814,16 +815,29 @@ function focoAfter(){
       const fin = +r.dataset.fin, ini = +r.dataset.ini, seg = Math.max(0, Math.round((fin - now) * 60));
       if (seg <= 0) return pideRender();
       const h = Math.floor(seg / 3600), m = Math.floor(seg % 3600 / 60), s = seg % 60;
-      r.textContent = (h ? h + ':' + String(m).padStart(2, '0') : m) + ':' + String(s).padStart(2, '0');
-      r.classList.toggle('poco', seg < 600);
-      if (b) b.style.width = Math.min(100, (now - ini) / (fin - ini) * 100) + '%';
+      const txt = (h ? h + ':' + String(m).padStart(2, '0') : m) + ':' + String(s).padStart(2, '0'), pc = Math.min(100, (now - ini) / (fin - ini) * 100) + '%';
+      r.textContent = txt; r.classList.toggle('poco', seg < 600);
+      if (b) b.style.width = pc;
+      const mt = document.getElementById('foMiniT'), mb = document.getElementById('foMiniB');
+      if (mt){ mt.textContent = txt; mt.classList.toggle('poco', seg < 600); } if (mb) mb.style.width = pc;
+      focoMini();
     } else if (Math.floor(Date.now() / 1000) % 30 === 0) pideRender();   // sin bloque: mira cada 30 s si empieza uno
     if (new Date().getSeconds() === 0) pideRender();   // cada minuto: «Siguiente… en X min»
     if (Math.floor(Date.now() / 1000) % 90 === 0){ focoFrase++; const f = document.getElementById('foFrase'); if (f){ f.classList.remove('in'); void f.offsetWidth; f.textContent = FRASES_FOCO[focoFrase % FRASES_FOCO.length]; f.classList.add('in'); } }
   };
   tick(); focoTimer = setInterval(tick, 1000);
 }
+// Temporizador siempre a la vista: si bajas y el reloj grande sale de la pantalla, aparece una píldora fija arriba
+function focoMini(){
+  const r = document.getElementById('foReloj'), m = document.getElementById('foMini'); if (!r || !m) return;
+  const top = document.querySelector('.top'), fs = document.fullscreenElement || document.webkitFullscreenElement;
+  const alto = !fs && top ? Math.max(0, top.getBoundingClientRect().bottom) : 0;
+  m.style.top = (alto + 10) + 'px';
+  m.classList.toggle('ver', r.getBoundingClientRect().bottom < alto + 4);
+}
+window.addEventListener('scroll', focoMini, {passive: true, capture: true});
 document.addEventListener('click', e => {
+  if (e.target.closest('#foMini')){ const r = document.getElementById('foReloj'); if (r) r.scrollIntoView({behavior: 'smooth', block: 'center'}); return; }
   const n = e.target.closest('[data-fnav]'); if (n){ focoSel = n.dataset.fnav === 'ahora' ? null : +n.dataset.fnav; return O.render(); }
   if (e.target.closest('[data-dmode]')) focoSel = null;
   if (!e.target.closest('[data-fsc]')) return;
