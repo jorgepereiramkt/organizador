@@ -1,4 +1,4 @@
-// 🎵 Música para el modo Foco: un reproductor de Spotify (el reproductor insertable oficial, gratis, sin claves).
+// 🎵 Música para el modo Foco: el reproductor insertable oficial de Spotify (gratis, sin claves).
 // Vive fuera de la vista para que la música no se corte cuando el Foco se redibuja cada minuto.
 // En Foco se ve entero; fuera de Foco, si suena algo, queda una pastilla pequeña abajo.
 // Al acabar el bloque de trabajo, la pausa sola (se puede desactivar).
@@ -21,9 +21,9 @@
     let m = s.match(/^spotify:(playlist|album|artist|track|show|episode):([A-Za-z0-9]+)$/); if (m) return `spotify:${m[1]}:${m[2]}`;
     m = s.match(/open\.spotify\.com\/(?:intl-[a-z-]+\/)?(?:embed\/)?(playlist|album|artist|track|show|episode)\/([A-Za-z0-9]+)/); return m ? `spotify:${m[1]}:${m[2]}` : ''; };
 
-  let ctrl = null, apiCargando = false, cargado = '', sonando = false, abierto = true, anadiendo = false, finBloque = null;
+  let cargado = '', sonando = false, abierto = true, anadiendo = false, finBloque = null;
   const dock = document.createElement('div'); dock.id = 'musica'; dock.hidden = true;
-  dock.innerHTML = '<div class="mu-cab"></div><div class="mu-player"><div id="muFrame"></div></div><div class="mu-pie"></div>';
+  dock.innerHTML = '<div class="mu-cab"></div><div class="mu-player"></div><div class="mu-pie"></div>';
   document.body.appendChild(dock);
 
   function pinta(){
@@ -40,30 +40,26 @@
       ${cargado && sel ? `<a class="mu-op" href="${webDe(sel.uri)}" target="_blank" rel="noopener">Abrir en la app de Spotify ↗</a>` : ''}`;
   }
 
-  function api(cb){
-    if (window.__spotifyApi) return cb(window.__spotifyApi);
-    window.__spotifyEspera = (window.__spotifyEspera || []).concat(cb);
-    if (apiCargando) return; apiCargando = true;
-    window.onSpotifyIframeApiReady = A => { window.__spotifyApi = A; (window.__spotifyEspera || []).forEach(f => f(A)); window.__spotifyEspera = []; };
-    const s = document.createElement('script'); s.src = 'https://open.spotify.com/embed/iframe-api/v1'; s.async = true;
-    s.onerror = () => { apiCargando = false; O.toast('No he podido cargar Spotify. ¿Hay conexión?'); };
-    document.head.appendChild(s);
-  }
+  // reproductor insertable normal de Spotify (sin su script: pedía «eval», que la app no permite) y control por mensajes
+  const manda = cmd => { const f = dock.querySelector('.mu-player iframe'); if (f && f.contentWindow) f.contentWindow.postMessage({ command: cmd }, 'https://open.spotify.com'); };
+  const ctrl = { pause: () => manda('pause'), play: () => manda('resume'), togglePlay: () => manda('toggle') };
+  let listo = false;
+  window.addEventListener('message', ev => {
+    if (ev.origin !== 'https://open.spotify.com') return;
+    const d = ev.data || {};
+    if (d.type === 'ready'){ listo = true; if (porSonar){ porSonar = false; manda('toggle'); } }
+    if (d.type === 'playback_update' && d.payload){ const s = !d.payload.isPaused; if (s !== sonando){ sonando = s; pinta(); } }
+  });
+  let porSonar = false;
   function pon(e){
-    const m = M(); m.sel = e.k; O.save(); abierto = true;
-    if (ctrl){ ctrl.loadUri(e.uri); ctrl.play(); cargado = e.uri; return pinta(); }
-    cargado = e.uri; pinta();
-    api(A => A.createController(document.getElementById('muFrame'), { uri: e.uri, width: '100%', height: 152, theme: 'dark' }, c => {
-      ctrl = c;
-      c.addListener('ready', () => c.play());
-      c.addListener('playback_update', ev => { const s = !ev.data.isPaused; if (s !== sonando){ sonando = s; pinta(); } });
-      if (cargado !== e.uri) c.loadUri(cargado);
-    }));
+    const m = M(); m.sel = e.k; O.save(); abierto = true; cargado = e.uri; sonando = false; listo = false; porSonar = true;
+    const p = dock.querySelector('.mu-player');
+    p.innerHTML = `<iframe src="https://open.spotify.com/embed/${e.uri.split(':').slice(1).join('/')}?utm_source=oembed&theme=0" width="100%" height="152" allow="autoplay; clipboard-write; encrypted-media; fullscreen; picture-in-picture" loading="eager" title="Spotify"></iframe>`;
+    pinta();
   }
   function quita(){
-    if (ctrl){ try { ctrl.destroy(); } catch (e) {} ctrl = null; }
-    cargado = ''; sonando = false;
-    const p = dock.querySelector('.mu-player'); p.innerHTML = '<div id="muFrame"></div>';
+    cargado = ''; sonando = false; porSonar = false;
+    dock.querySelector('.mu-player').innerHTML = '';
     pinta();
   }
 
@@ -75,7 +71,7 @@
     const b = ev.target.closest('[data-mu]'); if (!b) return;
     const a = b.dataset.mu;
     if (a === 'abre'){ if (!enFoco()){ S.view = 'dia'; S.diaMode = 'foco'; O.render(); } else abierto = !abierto; }
-    if (a === 'pp' && ctrl) ctrl.togglePlay();
+    if (a === 'pp') ctrl.togglePlay();
     if (a === 'quita') quita();
     if (a === 'mas') anadiendo = !anadiendo;
     pinta();
@@ -100,7 +96,7 @@
     const d = new Date(), now = d.getHours() * 60 + d.getMinutes() + d.getSeconds() / 60;
     if (now < finBloque) return;
     finBloque = null;
-    if (sonando && ctrl && M().parar){ ctrl.pause(); O.toast('⏹ Bloque terminado: música en pausa. ¡Buen trabajo!'); }
+    if (sonando && M().parar){ ctrl.pause(); O.toast('⏹ Bloque terminado: música en pausa. ¡Buen trabajo!'); }
   }, 1000);
   pinta();
 })();
