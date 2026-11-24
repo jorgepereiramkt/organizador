@@ -410,7 +410,7 @@ O.views.dia = function(){
   const timer = !isToday || (!curC && !nextC) ? '' : `<div class="cdbox${curC ? ' in' : ''}">${curC
       ? `<small>En reunión · termina en</small><b data-cdto="${base + curC.end * 60e3}"></b><span>${esc(curC.title)}</span>`
       : `<small>Siguiente reunión en</small><b data-cdto="${base + nextC.start * 60e3}" data-mtg="${esc(nextC.title)}"></b><span>${toHM(nextC.start)} · ${esc(nextC.title)}</span>`}
-      <button type="button" class="cdbell${bellOn() ? ' on' : ''}" data-bell title="${bellOn() ? 'Aviso con sonido 5 min y 1 min antes: activado' : 'Activar aviso con sonido 5 min y 1 min antes'}">${bellOn() ? '🔔' : '🔕'}</button></div>`;
+      <button type="button" class="cdbell${bellOn() ? ' on' : ''}" data-bell title="${bellOn() ? 'Alarma al terminar cada bloque: activada' : 'Activar alarma al terminar cada bloque'}">${bellOn() ? '🔔' : '🔕'}</button></div>`;
   // Reuniones del día en una fila
   const mtgRow = `<div class="mtgs">${calls.length ? calls.map(c => {
       const s = !isToday ? '' : nowMin >= c.end ? 'past' : nowMin >= c.start ? 'now' : '';
@@ -757,7 +757,7 @@ function focoView(){
   const d = new Date();
   O.setToolbar('🎯 Foco', `${O.DIAS_L[d.getDay()]} ${d.getDate()} de ${O.MESES[d.getMonth()]}`,
     `<div class="modes"><button class="chip" data-dmode="foco" aria-pressed="true">🎯 Foco</button><button class="chip" data-dmode="dia" aria-pressed="false">Día</button><button class="chip" data-dmode="semana" aria-pressed="false">Semana</button><button class="chip" data-dmode="diario" aria-pressed="false">📒 Clientes</button></div>
-     <button class="chip" data-bell aria-pressed="${bellOn()}" title="Sonido 5 y 1 min antes de cada reunión y al terminar cada bloque">${bellOn() ? '🔔 Avisos' : '🔕 Avisos'}</button>
+     <button class="chip" data-bell aria-pressed="${bellOn()}" title="Alarma con sonido al terminar cada bloque de trabajo">${bellOn() ? '🔔 Avisos' : '🔕 Avisos'}</button>
      <button class="chip" data-fsc title="Pantalla completa">⛶ Pantalla completa</button>`, 'Un bloque, sus tareas y nada más');
   const {hoy, now, its, works, actual, sig, ev, cargando} = focoDatos();
   const frase = `<p class="fo-frase" id="foFrase">${esc(FRASES_FOCO[focoFrase % FRASES_FOCO.length])}</p>`;
@@ -1635,13 +1635,13 @@ function avisar(key, title, min = 5){
     try { if ('Notification' in window && Notification.permission === 'granted') new Notification('⏰ Fin del bloque', {body: title, icon: 'logo-claro.png', tag: 'fin-' + key}); } catch(e){}
     return;
   }
-  chime(min === 1 ? 'urgent' : 'soft'); O.toast(min === 1 ? `📞 ¡En 1 minuto!: ${title}` : `📞 En 5 min: ${title}`);
+  O.toast(min === 1 ? `📞 ¡En 1 minuto!: ${title}` : `📞 En 5 min: ${title}`);
   try { if ('Notification' in window && Notification.permission === 'granted') new Notification(min === 1 ? 'Reunión en 1 minuto' : 'Reunión en 5 minutos', {body: title, icon: 'logo-claro.png', tag: 'reu-' + key}); } catch(e){}
 }
 document.addEventListener('click', e => {
   if (!e.target.closest('[data-bell]')) return;
   const on = !bellOn(); try { localStorage.setItem('jp-bell', on ? 'on' : 'off'); } catch(err){}
-  if (on){ chime(); O.toast('🔔 Te avisaré con un sonido 5 min y 1 min antes de cada reunión y al terminar cada bloque'); try { if ('Notification' in window && Notification.permission === 'default') Notification.requestPermission(); } catch(err){} }
+  if (on){ chime(); O.toast('🔔 Sonará una alarma al terminar cada bloque de trabajo'); try { if ('Notification' in window && Notification.permission === 'default') Notification.requestPermission(); } catch(err){} }
   else O.toast('🔕 Avisos con sonido desactivados en este dispositivo');
   O.render();
 });
@@ -1652,15 +1652,21 @@ function tickCd(){ for (const el of document.querySelectorAll('[data-cdto]')){ c
 setInterval(tickCd, 1000);
 // Vigilante de avisos: funciona en cualquier vista (Foco, Semana, Clientes…), no solo en el Día.
 // Reuniones: 5 min y 1 min antes. Bloques de trabajo: alarma al terminar.
-let avisoLista = [], avisoHecha = 0;
+let avisoLista = [], avisoHecha = 0, base = 0;
+const ANIMO = {
+  30: ['💪 30 minutos concentrado. Vas muy bien, sigue así.', '🔥 Media hora dentro. Lo difícil ya está hecho: arrancar.', '🚀 30 min seguidos. Este ritmo es el que marca la diferencia.'],
+  60: ['🏆 ¡Una hora de foco! Pocos aguantan tanto. Tú sí.', '⚡ 60 minutos a tope. Bebe agua y sigue, que estás en racha.', '🎯 Una hora entera. Esto es trabajo profundo de verdad.'],
+  90: ['👑 ¡90 minutos! Nivel bestia. Remata y date un respiro al acabar.', '🌟 Hora y media de foco. Lo que estás haciendo hoy cuenta.', '🔥 90 min sin soltar. Ya casi: termina fuerte.']
+};
+const enFoco = () => S.view === 'dia' && S.diaMode === 'foco';
 function vigilaAvisos(){
   try {
     if (Date.now() - avisoHecha > 30e3){
       avisoHecha = Date.now();
-      const {hoy, its} = focoDatos(), base = O.fromIso(hoy).getTime();
+      const {hoy, its} = focoDatos(); base = O.fromIso(hoy).getTime();
       avisoLista = [
         ...its.filter(i => i.kind === 'event' && i.isCall && !i.allDay).map(c => ({t: 'reu', at: base + c.start * 60e3, title: c.title || 'Reunión'})),
-        ...its.filter(i => i.kind === 'work').map(w => ({t: 'fin', at: base + w.end * 60e3, title: `${w.bname || 'Trabajo'} · ${toHM(w.start)} – ${toHM(w.end)}`}))
+        ...its.filter(i => i.kind === 'work').map(w => ({t: 'fin', at: base + w.end * 60e3, ini: base + w.start * 60e3, title: `${w.bname || 'Trabajo'} · ${toHM(w.start)} – ${toHM(w.end)}`}))
       ];
     }
     const ahora = Date.now();
@@ -1671,6 +1677,11 @@ function vigilaAvisos(){
         else if (s > 60 && s <= 300 && !avisadas[a.at]) avisar(a.at, a.title, 5);
       }
       if (a.t === 'fin' && s <= 0 && s > -90 && !avisadas[a.at + ':fin']) avisar(a.at + ':fin', a.title, 'fin');
+      if (a.t !== 'fin' || !enFoco()) continue;
+      // En el Foco (sin sonido): aviso cuando quedan 10 min y ánimo a los 30, 60 y 90 min del bloque
+      if (s > 60 && s <= 600 && !avisadas[a.at + ':10']){ avisadas[a.at + ':10'] = 1; O.toast('⏳ Quedan 10 minutos de bloque: cierra lo que tengas entre manos.'); }
+      const lleva = (ahora - a.ini) / 60e3;
+      for (const m of [30, 60, 90]) if (s > 0 && lleva >= m && lleva < m + 1.5 && !avisadas[a.ini + ':a' + m]){ avisadas[a.ini + ':a' + m] = 1; const f = ANIMO[m]; O.toast(f[Math.floor(Math.random() * f.length)]); }
     }
   } catch(e){}
 }
