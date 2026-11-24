@@ -722,7 +722,7 @@ let focoSel = null;   // bloque que estás mirando (null = el de ahora)
 let focoTimer = null, focoFrase = Math.floor(Math.random() * FRASES_FOCO.length), focoPidiendo = false;
 function focoDatos(){
   const hoy = O.today(), nowD = new Date(), now = nowD.getHours() * 60 + nowD.getMinutes() + nowD.getSeconds() / 60;
-  const evs = weekEv[hoy] || (planDay === hoy ? lastEvents : null);
+  const evs = weekEv[hoy] || (planDay === hoy && lastEvents && lastEvents.length ? lastEvents : null);
   if (!evs && !focoPidiendo){ focoPidiendo = true; fetchEvents(hoy).then(e => { weekEv[hoy] = e; }).catch(() => {}).finally(() => { focoPidiendo = false; if (S.view === 'dia' && S.diaMode === 'foco') O.render(); }); }
   const its = buildDay(hoy, evs || []).filter(i => i.end > i.start);
   const works = its.filter(i => i.kind === 'work').sort((a, b) => a.start - b.start);
