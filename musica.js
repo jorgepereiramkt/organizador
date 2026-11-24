@@ -12,7 +12,7 @@
     { k: 'night', i: '🌃', n: 'Drive Night', uri: 'spotify:playlist:37i9dQZF1DX6GJXiuZRisr' },      // Night Rider
     { k: 'retro', i: '🌆', n: 'Retrowave', uri: 'spotify:playlist:37i9dQZF1DXdLEN7aqioXM' }         // Retrowave // Outrun
   ];
-  const M = () => { S.plan = S.plan || {}; const m = S.plan.musica = S.plan.musica || {}; m.custom = m.custom || []; if (m.parar == null) m.parar = true; return m; };
+  const M = () => { S.plan = S.plan || {}; const m = S.plan.musica = S.plan.musica || {}; m.custom = m.custom || []; if (m.parar == null) m.parar = true; if (!m.modo) m.modo = 'app'; return m; };
   const todos = () => ESTILOS.concat(M().custom.map(c => ({ ...c, i: '⭐', mia: true })));
   const enFoco = () => S.view === 'dia' && S.diaMode === 'foco';
   const webDe = uri => 'https://open.spotify.com/' + uri.split(':').slice(1).join('/');
@@ -21,24 +21,27 @@
     let m = s.match(/^spotify:(playlist|album|artist|track|show|episode):([A-Za-z0-9]+)$/); if (m) return `spotify:${m[1]}:${m[2]}`;
     m = s.match(/open\.spotify\.com\/(?:intl-[a-z-]+\/)?(?:embed\/)?(playlist|album|artist|track|show|episode)\/([A-Za-z0-9]+)/); return m ? `spotify:${m[1]}:${m[2]}` : ''; };
 
-  let muestras = false, cargado = '', sonando = false, abierto = true, anadiendo = false, finBloque = null;
+  let enApp = '', muestras = false, cargado = '', sonando = false, abierto = true, anadiendo = false, finBloque = null;
   const dock = document.createElement('div'); dock.id = 'musica'; dock.hidden = true;
   dock.innerHTML = '<div class="mu-cab"></div><div class="mu-player"></div><div class="mu-pie"></div>';
   document.body.appendChild(dock);
 
   function pinta(){
     const m = M(), foco = enFoco();
-    dock.hidden = !foco && !cargado;
+    dock.hidden = !foco && !cargado && !enApp;
     dock.classList.toggle('mini', !foco || !abierto);
     const sel = todos().find(e => e.k === m.sel);
-    dock.querySelector('.mu-cab').innerHTML = `<button type="button" class="mu-tit" data-mu="abre" title="${abierto ? 'Plegar' : 'Desplegar'}">🎵 ${cargado && sel ? `${sel.i} ${esc(sel.n)}${sonando ? ' <i class="mu-eq"><b></b><b></b><b></b></i>' : ' · en pausa'}` : 'Música para el foco'}</button>
+    if (enApp) dock.querySelector('.mu-cab').innerHTML = `<button type="button" class="mu-tit" data-mu="abre">🎵 ${sel ? `${sel.i} ${esc(sel.n)}` : 'Música'} · en tu app de Spotify</button><button type="button" class="mu-x" data-mu="quita" title="Dejar de vigilar">✕</button>`;
+    else dock.querySelector('.mu-cab').innerHTML = `<button type="button" class="mu-tit" data-mu="abre" title="${abierto ? 'Plegar' : 'Desplegar'}">🎵 ${cargado && sel ? `${sel.i} ${esc(sel.n)}${sonando ? ' <i class="mu-eq"><b></b><b></b><b></b></i>' : ' · en pausa'}` : 'Música para el foco'}</button>
       ${cargado ? `<button type="button" class="mu-x" data-mu="pp" title="${sonando ? 'Pausar' : 'Reproducir'}">${sonando ? '⏸' : '▶'}</button><button type="button" class="mu-x" data-mu="quita" title="Quitar la música">✕</button>` : ''}`;
-    dock.querySelector('.mu-pie').innerHTML = `<div class="mu-estilos">${todos().map(e => `<button type="button" class="chip${e.k === m.sel && cargado ? ' on' : ''}" data-mu-est="${esc(e.k)}">${e.i} ${esc(e.n)}${e.mia ? ` <span class="mu-del" data-mu-del="${esc(e.k)}" title="Quitar de la lista">×</span>` : ''}</button>`).join('')}
+    const app = m.modo === 'app';
+    dock.querySelector('.mu-pie').innerHTML = `<div class="mu-modo"><span>Suena en:</span><button type="button" class="chip${app ? ' on' : ''}" data-mu-modo="app">🟢 App de Spotify</button><button type="button" class="chip${app ? '' : ' on'}" data-mu-modo="web">🌐 Aquí</button></div>
+      <div class="mu-estilos">${todos().map(e => `<button type="button" class="chip${e.k === m.sel && (cargado || enApp) ? ' on' : ''}" data-mu-est="${esc(e.k)}">${e.i} ${esc(e.n)}${e.mia ? ` <span class="mu-del" data-mu-del="${esc(e.k)}" title="Quitar de la lista">×</span>` : ''}</button>`).join('')}
       <button type="button" class="chip mu-mas" data-mu="mas">＋ Tu playlist</button></div>
       ${anadiendo ? `<form class="mu-form" data-mu-form><input name="url" placeholder="Pega el enlace de Spotify (Compartir → Copiar enlace)" required><input name="n" placeholder="Nombre (p. ej. Mi Drive Night)" maxlength="30"><button class="btn">Guardar</button></form>` : ''}
       ${cargado && muestras ? `<div class="mu-aviso">Estás oyendo <b>muestras de 30 s</b>. Para tu Premium: <a href="https://accounts.spotify.com/login?continue=https%3A%2F%2Fopen.spotify.com%2F" target="_blank" rel="noopener">inicia sesión en Spotify</a> en este navegador y vuelve a darle al estilo.</div>` : ''}
-      <label class="mu-op"><input type="checkbox" data-mu-parar ${m.parar ? 'checked' : ''}> Pausar al acabar el bloque</label>
-      ${cargado && sel ? `<a class="mu-op" href="${webDe(sel.uri)}" target="_blank" rel="noopener">Abrir en la app de Spotify ↗</a>` : ''}`;
+      ${app ? `<div class="mu-op">Se abre la playlist en tu app de Spotify (con tu Premium): dale a ▶ allí. Al acabar el bloque te aviso para pausarla.</div>` : `<label class="mu-op"><input type="checkbox" data-mu-parar ${m.parar ? 'checked' : ''}> Pausar al acabar el bloque</label>`}
+      ${!app && cargado && sel ? `<a class="mu-op" href="${webDe(sel.uri)}" target="_blank" rel="noopener">Abrir en la app de Spotify ↗</a>` : ''}`;
   }
 
   // reproductor insertable normal de Spotify (sin su script: pedía «eval», que la app no permite) y control por mensajes
@@ -61,7 +64,14 @@
     p.innerHTML = `<iframe src="https://open.spotify.com/embed/${e.uri.split(':').slice(1).join('/')}?utm_source=iframe-api&theme=0" width="100%" height="152" allow="autoplay; clipboard-write; encrypted-media; fullscreen; picture-in-picture" loading="eager" title="Spotify"></iframe>`;
     pinta();
   }
+  function abreApp(e){
+    if (cargado) quita();
+    M().sel = e.k; O.save(); enApp = e.uri;
+    const a = document.createElement('a'); a.href = e.uri; document.body.appendChild(a); a.click(); a.remove();   // spotify:playlist:… abre la app del ordenador / iPad
+    pinta();
+  }
   function quita(){
+    enApp = '';
     cargado = ''; sonando = false; porSonar = false; muestras = false;
     dock.querySelector('.mu-player').innerHTML = '';
     pinta();
@@ -71,7 +81,9 @@
     const del = ev.target.closest('[data-mu-del]');
     if (del){ ev.stopPropagation(); const m = M(), k = del.dataset.muDel; m.custom = m.custom.filter(c => c.k !== k); if (m.sel === k){ m.sel = ''; quita(); } O.save(); return pinta(); }
     const est = ev.target.closest('[data-mu-est]');
-    if (est){ const e = todos().find(x => x.k === est.dataset.muEst); if (e) pon(e); return; }
+    if (est){ const e = todos().find(x => x.k === est.dataset.muEst); if (e) (M().modo === 'app' ? abreApp : pon)(e); return; }
+    const mo = ev.target.closest('[data-mu-modo]');
+    if (mo){ M().modo = mo.dataset.muModo; O.save(); if (mo.dataset.muModo === 'app' && cargado) quita(); else if (mo.dataset.muModo === 'web') enApp = ''; return pinta(); }
     const b = ev.target.closest('[data-mu]'); if (!b) return;
     const a = b.dataset.mu;
     if (a === 'abre'){ if (!enFoco()){ S.view = 'dia'; S.diaMode = 'foco'; O.render(); } else abierto = !abierto; }
@@ -92,7 +104,7 @@
   // cada segundo: mostrar/ocultar según la vista y pausar cuando acaba el bloque del Foco
   let antes = '';
   setInterval(() => {
-    const est = enFoco() + '|' + !!cargado;
+    const est = enFoco() + '|' + !!cargado + '|' + !!enApp;
     if (est !== antes){ antes = est; pinta(); }
     const r = document.getElementById('foReloj');
     if (enFoco()) finBloque = r ? +r.dataset.fin : null;   // solo cuenta el bloque que tienes en marcha
@@ -100,7 +112,8 @@
     const d = new Date(), now = d.getHours() * 60 + d.getMinutes() + d.getSeconds() / 60;
     if (now < finBloque) return;
     finBloque = null;
-    if (sonando && M().parar){ ctrl.pause(); O.toast('⏹ Bloque terminado: música en pausa. ¡Buen trabajo!'); }
+    if (enApp) O.toast('⏹ Bloque terminado: pausa Spotify. ¡Buen trabajo!');
+    else if (sonando && M().parar){ ctrl.pause(); O.toast('⏹ Bloque terminado: música en pausa. ¡Buen trabajo!'); }
   }, 1000);
   pinta();
 })();
