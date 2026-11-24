@@ -1130,7 +1130,7 @@ if (online()) sync(true);
 // Mantener PC y móvil al día: cada 60 s con la app abierta y al volver a ella
 setInterval(() => { if (document.visibilityState === 'visible') sync(true); }, 60000);
 document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') sync(true); });
-window.__org = {cliEf, syncCU: s => sync(s), mergeCloud, cloudSaved, editingId: () => editing, setNote, noteLinks, S, isApartado, byClientOrder, GROUP, clientColor, URG, urgRank, parse, pushCreate, uid, maxOrder, clientLists, online, PALETA, cu, listInfo, norm, isRegTask, applyCloud, cloudEmpty, cloudReady, wipeLocal, toast, views, render, save, card, setToolbar, visibleTasks, client, task, esc, iso, fromIso, addDays, today, dayLabel, DIAS_L, MESES, pad, byOrder};
+window.__org = {esInterno, cliEf, syncCU: s => sync(s), mergeCloud, cloudSaved, editingId: () => editing, setNote, noteLinks, S, isApartado, byClientOrder, GROUP, clientColor, URG, urgRank, parse, pushCreate, uid, maxOrder, clientLists, online, PALETA, cu, listInfo, norm, isRegTask, applyCloud, cloudEmpty, cloudReady, wipeLocal, toast, views, render, save, card, setToolbar, visibleTasks, client, task, esc, iso, fromIso, addDays, today, dayLabel, DIAS_L, MESES, pad, byOrder};
 })();
 
 /* ---------- Versión nueva: se actualiza sola en todos los dispositivos ---------- */

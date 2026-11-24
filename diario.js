@@ -20,7 +20,7 @@
   const poda = () => { const lim = O.iso(O.addDays(new Date(), -450)); for (const d in D().log) if (d < lim) delete D().log[d]; };
   let saveT = null; const guarda = () => { clearTimeout(saveT); saveT = setTimeout(() => { poda(); O.save(); }, 400); };
 
-  const clientes = () => O.byClientOrder(S.clients.filter(c => (S.group === 'all' || c.group === S.group) && !O.isApartado(c) && c.estado !== 'interno'));
+  const clientes = () => O.byClientOrder(S.clients.filter(c => (S.group === 'all' || c.group === S.group) && !O.isApartado(c) && c.estado !== 'interno' && !(O.esInterno && O.esInterno(c))));   // los proyectos internos no son clientes
   const ayer = () => O.iso(O.addDays(new Date(), -1));
   const dia = () => S.diarioDay || ayer();
   const revisado = (day, c) => { const e = entrada(day, c.id); return !!(e && e.m && Object.keys(e.m).length); };

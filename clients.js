@@ -20,7 +20,7 @@ O.views.clientes = function(){
   const grupos = [['mine', 'Mis clientes', '🔒 Solo en la app'], ['agency', 'Agencia', 'ClickUp']];
   let html = '', resto = [];
   for (const [g, titulo, sub] of grupos){
-    let cs = O.byClientOrder(S.clients.filter(c => (g === 'mine') === (c.group === 'mine'))
+    let cs = O.byClientOrder(S.clients.filter(c => (g === 'mine') === (c.group === 'mine') && !c.proyecto)   // los proyectos no son clientes: no salen en Fichas
       .filter(c => S.group === 'all' || S.group === g));
     if (!cs.length && S.group !== 'all' && S.group !== g) continue;
     resto.push(...cs.filter(c => estadoDe(c) !== 'actual'));
