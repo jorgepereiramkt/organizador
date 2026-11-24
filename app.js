@@ -134,7 +134,7 @@ function applyCloud(d){
   if (D || (typeof ed !== 'undefined' && ed.open)){ applyPending = true; return setTimeout(() => applyCloud(d), 800); }
   applyPending = false;
   backupLocal(d);
-  S.clients = d.clients || [];
+  S.clients = d.clients || []; marcaProyectos();
   S.tasks = [...S.tasks.filter(t => t.cu), ...(d.tasks || [])];
   S.cu.hidden = d.hidden || [];
   if (d.plan) S.plan = d.plan;
@@ -215,7 +215,7 @@ async function connect(token){
   S.tasks = S.tasks.filter(t => !t.demo && !t.cu);
   save(); await sync();
 }
-function disconnect(){ S.cu = CU_DEFAULT(); S.tasks = S.tasks.filter(t => !t.cu); S.clients = S.clients.filter(c => !c.auto); save(); render(); modeIdle(); }
+function disconnect(){ S.cu = CU_DEFAULT(); S.tasks = S.tasks.filter(t => !t.cu); S.clients = S.clients.filter(c => !c.auto); save(); marcaProyectos(); render(); modeIdle(); }
 
 /* Clientes de la agencia = carpetas de ClickUp (o listas sueltas sin carpeta). Se crean solos con tus tareas. */
 const rawKey = (folderId, listId) => folderId ? 'f:' + folderId : 'l:' + listId;
@@ -344,6 +344,8 @@ const snap = t => ({title:t.title, day:t.day, status:t.status, priority:t.priori
 // Una tarea de ClickUp puede «verse» dentro de un proyecto sin salir de ClickUp (solo en esta app)
 const cliEf = t => ((S.plan && S.plan.tproy) || {})[t.id] || t.client;
 // interno de la agencia: tus proyectos y la carpeta personal de ClickUp (Jorge Personal)
+// Los proyectos se reconocen también por su id (los de ClickUp empiezan por «f:» o «l:»): así no se pierden si un dispositivo con una versión vieja guarda sin la marca
+const marcaProyectos = () => { for (const c of S.clients) if (c.group === 'agency' && !c.proyecto && !/^[fl]:/.test(String(c.id)) && !c.auto) c.proyecto = true; };
 const esInterno = c => !!c && c.group === 'agency' && (c.proyecto || c.interno || /^jorge\b/i.test(c.name || ''));
 // Orden por facturación. Prop Hero, Artic Clients y Artic Agency van juntos (en ese orden), con lo que facturan entre los tres
 const ARTIC = [/prop ?hero/i, /artic clients?/i, /artic agen/i];
