@@ -20,7 +20,8 @@
   const poda = () => { const lim = O.iso(O.addDays(new Date(), -450)); for (const d in D().log) if (d < lim) delete D().log[d]; };
   let saveT = null; const guarda = () => { clearTimeout(saveT); saveT = setTimeout(() => { poda(); O.save(); }, 400); };
 
-  const clientes = () => O.byClientOrder(S.clients.filter(c => (S.group === 'all' || c.group === S.group) && !O.isApartado(c) && c.estado !== 'interno' && !(O.esInterno && O.esInterno(c))));   // los proyectos internos no son clientes
+  const clientes = () => O.byClientOrder(S.clients.filter(c => (S.group === 'all' || c.group === S.group) && !O.isApartado(c) && c.estado !== 'interno' && !(O.esInterno && O.esInterno(c)) && !ocultos()[c.id]));   // los proyectos internos no son clientes; los ocultos van abajo
+  const ocultos = () => (D().ocultos = D().ocultos || {});
   const ayer = () => O.iso(O.addDays(new Date(), -1));
   const dia = () => S.diarioDay || ayer();
   const revisado = (day, c) => { const e = entrada(day, c.id); return !!(e && e.m && Object.keys(e.m).length); };
@@ -43,7 +44,8 @@
     return `<div class="dcfg"><p>Qué revisas de <b>${esc(c.name)}</b>:</p>
       <div class="dcfg-l">${Object.entries(CAT).map(([k, t]) => `<label><input type="checkbox" data-dck="${k}" ${ks.includes(k) ? 'checked' : ''}> ${t}</label>`).join('')}
       ${extras.map(k => `<label><input type="checkbox" data-dck="${esc(k)}" checked> ${esc(nombre(k))}</label>`).join('')}</div>
-      <div class="dcfg-add"><input data-dcnew placeholder="Otro apartado (ej.: Stock, Reseñas, Email)…" autocomplete="off"><button type="button" class="btn" data-dcadd>Añadir</button><span class="sp"></span><button type="button" class="btn primary" data-dcok>Listo</button></div></div>`;
+      <div class="dcfg-add"><input data-dcnew placeholder="Otro apartado (ej.: Stock, Reseñas, Email)…" autocomplete="off"><button type="button" class="btn" data-dcadd>Añadir</button><span class="sp"></span><button type="button" class="btn primary" data-dcok>Listo</button></div>
+      <div class="dcfg-ocul"><button type="button" class="btn" data-docul="${c.id}">🙈 Ocultar este cliente del diario</button><small>Lo verás abajo del todo para volver a mostrarlo</small></div></div>`;
   }
 
   /* ---------- Resumen del mes / año ---------- */
@@ -90,7 +92,9 @@
        <div class="modes"><button class="chip" data-dmode="foco" aria-pressed="false">🎯 Foco</button><button class="chip" data-dmode="dia" aria-pressed="false">Día</button><button class="chip" data-dmode="semana" aria-pressed="false">Semana</button><button class="chip" data-dmode="diario" aria-pressed="true">📒 Clientes</button></div>
        <span class="dprog${hechos === cs.length && cs.length ? ' full' : ''}">Revisados ${hechos}/${cs.length}</span>`,
       'Cada mañana: revisa cómo fue ayer cada cliente');
-    return `<div class="dgrid">${cs.map(c => tarjeta(c, day)).join('') || '<p class="empty">No hay clientes activos con este filtro.</p>'}</div>${resumen(cs, day)}`;
+    const ocs = S.clients.filter(c => ocultos()[c.id] && (S.group === 'all' || c.group === S.group));
+    return `<div class="dgrid">${cs.map(c => tarjeta(c, day)).join('') || '<p class="empty">No hay clientes activos con este filtro.</p>'}</div>${resumen(cs, day)}
+      ${ocs.length ? `<div class="docultos"><b>🙈 Ocultos del diario (${ocs.length})</b>${ocs.map(c => `<span class="doc-c" style="--c:${O.clientColor(c)}"><i></i>${esc(c.name)}<button type="button" class="btn" data-dmostrar="${c.id}">Mostrar</button></span>`).join('')}</div>` : ''}`;
   };
   O.diarioAfter = () => {};
 
@@ -115,6 +119,8 @@
       if (en.m[k] === n) delete en.m[k]; else en.m[k] = n;
       limpia(dia(), cid); guarda(); return pintaTarjeta(cid);
     }
+    const oc = e.target.closest('[data-docul]'); if (oc){ ocultos()[oc.dataset.docul] = true; S.diarioCfg = null; O.save(); O.render(); return O.toast('Oculto del diario · lo tienes abajo para volver a mostrarlo'); }
+    const mo = e.target.closest('[data-dmostrar]'); if (mo){ delete ocultos()[mo.dataset.dmostrar]; O.save(); O.render(); return O.toast('Vuelve a salir en el diario ✓'); }
     const cf = e.target.closest('[data-dcfg]'); if (cf){ S.diarioCfg = S.diarioCfg === cf.dataset.dcfg ? null : cf.dataset.dcfg; return pintaTarjeta(cf.dataset.dcfg); }
     const card = e.target.closest('.dcard'); if (!card) return;
     const cid = card.dataset.dcid, c = O.client(cid);
