@@ -41,20 +41,21 @@
   }
 
   // reproductor insertable normal de Spotify (sin su script: pedía «eval», que la app no permite) y control por mensajes
-  const manda = cmd => { const f = dock.querySelector('.mu-player iframe'); if (f && f.contentWindow) f.contentWindow.postMessage({ command: cmd }, 'https://open.spotify.com'); };
+  const manda = cmd => { const f = dock.querySelector('.mu-player iframe'); if (f && f.contentWindow) f.contentWindow.postMessage({ command: cmd }, '*'); };
   const ctrl = { pause: () => manda('pause'), play: () => manda('resume'), togglePlay: () => manda('toggle') };
   let listo = false;
   window.addEventListener('message', ev => {
-    if (ev.origin !== 'https://open.spotify.com') return;
+    const f = dock.querySelector('.mu-player iframe');
+    if (ev.origin !== 'https://open.spotify.com' || !f || ev.source !== f.contentWindow) return;
     const d = ev.data || {};
-    if (d.type === 'ready'){ listo = true; if (porSonar){ porSonar = false; manda('toggle'); } }
+    if (d.type === 'ready'){ listo = true; if (porSonar){ porSonar = false; manda('play'); } }
     if (d.type === 'playback_update' && d.payload){ const s = !d.payload.isPaused; if (s !== sonando){ sonando = s; pinta(); } }
   });
   let porSonar = false;
   function pon(e){
     const m = M(); m.sel = e.k; O.save(); abierto = true; cargado = e.uri; sonando = false; listo = false; porSonar = true;
     const p = dock.querySelector('.mu-player');
-    p.innerHTML = `<iframe src="https://open.spotify.com/embed/${e.uri.split(':').slice(1).join('/')}?utm_source=oembed&theme=0" width="100%" height="152" allow="autoplay; clipboard-write; encrypted-media; fullscreen; picture-in-picture" loading="eager" title="Spotify"></iframe>`;
+    p.innerHTML = `<iframe src="https://open.spotify.com/embed/${e.uri.split(':').slice(1).join('/')}?utm_source=iframe-api&theme=0" width="100%" height="152" allow="autoplay; clipboard-write; encrypted-media; fullscreen; picture-in-picture" loading="eager" title="Spotify"></iframe>`;
     pinta();
   }
   function quita(){
