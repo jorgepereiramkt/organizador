@@ -757,6 +757,7 @@ function focoView(){
   const d = new Date();
   O.setToolbar('🎯 Foco', `${O.DIAS_L[d.getDay()]} ${d.getDate()} de ${O.MESES[d.getMonth()]}`,
     `<div class="modes"><button class="chip" data-dmode="foco" aria-pressed="true">🎯 Foco</button><button class="chip" data-dmode="dia" aria-pressed="false">Día</button><button class="chip" data-dmode="semana" aria-pressed="false">Semana</button><button class="chip" data-dmode="diario" aria-pressed="false">📒 Clientes</button></div>
+     <button class="chip" data-bell aria-pressed="${bellOn()}" title="Sonido 5 y 1 min antes de cada reunión y al terminar cada bloque">${bellOn() ? '🔔 Avisos' : '🔕 Avisos'}</button>
      <button class="chip" data-fsc title="Pantalla completa">⛶ Pantalla completa</button>`, 'Un bloque, sus tareas y nada más');
   const {hoy, now, its, works, actual, sig, ev, cargando} = focoDatos();
   const frase = `<p class="fo-frase" id="foFrase">${esc(FRASES_FOCO[focoFrase % FRASES_FOCO.length])}</p>`;
@@ -1603,41 +1604,77 @@ function chime(kind = 'soft'){
   try {
     actx = actx || new (window.AudioContext || window.webkitAudioContext)(); actx.resume();
     const t0 = actx.currentTime;
-    const notes = kind === 'urgent'
+    const notes = kind === 'fin'
+      ? [0, .5, 1, 1.5, 2, 2.5].flatMap(d => [[988, d, .22, 'square'], [1319, d + .22, .22, 'square']])
+      : kind === 'urgent'
       ? [0, .14, .5, .64, 1, 1.14].map(d => [1320, d, .1, 'triangle'])
       : [[880, 0, .9, 'sine'], [1175, .18, .9, 'sine'], [1568, .36, .9, 'sine']];
     notes.forEach(([f, d, len, type]) => {
       const o = actx.createOscillator(), g = actx.createGain(); o.type = type; o.frequency.value = f;
-      g.gain.setValueAtTime(0, t0 + d); g.gain.linearRampToValueAtTime(kind === 'urgent' ? .3 : .25, t0 + d + .01); g.gain.exponentialRampToValueAtTime(.001, t0 + d + len);
+      g.gain.setValueAtTime(0, t0 + d); g.gain.linearRampToValueAtTime(kind === 'fin' ? .18 : kind === 'urgent' ? .3 : .25, t0 + d + .01); g.gain.exponentialRampToValueAtTime(.001, t0 + d + len);
       o.connect(g).connect(actx.destination); o.start(t0 + d); o.stop(t0 + d + len + .05);
     });
   } catch(e){}
 }
 // el navegador solo deja sonar después de un toque: se «desbloquea» con el primer clic
-document.addEventListener('pointerdown', () => { if (!actx && bellOn()) try { actx = new (window.AudioContext || window.webkitAudioContext)(); actx.resume(); } catch(e){} }, {once: true});
+// En iPad/iPhone el audio se «duerme» al bloquear la pantalla o cambiar de app: cada toque lo vuelve a despertar
+const despiertaAudio = () => {
+  if (!bellOn()) return;
+  try {
+    actx = actx || new (window.AudioContext || window.webkitAudioContext)();
+    if (actx.state !== 'running'){ actx.resume(); const b = actx.createBuffer(1, 1, 22050), src = actx.createBufferSource(); src.buffer = b; src.connect(actx.destination); src.start(0); }
+  } catch(e){}
+};
+['pointerdown', 'touchend', 'keydown'].forEach(t => document.addEventListener(t, despiertaAudio, {capture: true, passive: true}));
 const avisadas = (() => { try { return JSON.parse(localStorage.getItem('jp-avisos') || '{}'); } catch(e){ return {}; } })();
 function avisar(key, title, min = 5){
   avisadas[key] = 1; try { localStorage.setItem('jp-avisos', JSON.stringify(Object.fromEntries(Object.entries(avisadas).filter(([k]) => parseInt(k) > Date.now() - 864e5)))); } catch(e){}
   if (!bellOn()) return;
+  if (min === 'fin'){
+    chime('fin'); O.toast(`⏰ Fin del bloque: ${title}`);
+    try { if ('Notification' in window && Notification.permission === 'granted') new Notification('⏰ Fin del bloque', {body: title, icon: 'logo-claro.png', tag: 'fin-' + key}); } catch(e){}
+    return;
+  }
   chime(min === 1 ? 'urgent' : 'soft'); O.toast(min === 1 ? `📞 ¡En 1 minuto!: ${title}` : `📞 En 5 min: ${title}`);
   try { if ('Notification' in window && Notification.permission === 'granted') new Notification(min === 1 ? 'Reunión en 1 minuto' : 'Reunión en 5 minutos', {body: title, icon: 'logo-claro.png', tag: 'reu-' + key}); } catch(e){}
 }
 document.addEventListener('click', e => {
   if (!e.target.closest('[data-bell]')) return;
   const on = !bellOn(); try { localStorage.setItem('jp-bell', on ? 'on' : 'off'); } catch(err){}
-  if (on){ chime(); O.toast('🔔 Te avisaré con un sonido 5 min y 1 min antes de cada reunión'); try { if ('Notification' in window && Notification.permission === 'default') Notification.requestPermission(); } catch(err){} }
-  else O.toast('🔕 Aviso de reuniones desactivado en este dispositivo');
+  if (on){ chime(); O.toast('🔔 Te avisaré con un sonido 5 min y 1 min antes de cada reunión y al terminar cada bloque'); try { if ('Notification' in window && Notification.permission === 'default') Notification.requestPermission(); } catch(err){} }
+  else O.toast('🔕 Avisos con sonido desactivados en este dispositivo');
   O.render();
 });
 // Temporizador de la siguiente reunión: se actualiza cada segundo
 function tickCd(){ for (const el of document.querySelectorAll('[data-cdto]')){ const ms = +el.dataset.cdto - Date.now(), s = Math.max(0, Math.round(ms / 1000));
-  if (el.dataset.mtg !== undefined && s > 0){
-    if (s <= 60 && !avisadas[el.dataset.cdto + ':1']){ avisadas[el.dataset.cdto] = 1; avisar(el.dataset.cdto + ':1', el.dataset.mtg, 1); }
-    else if (s > 60 && s <= 300 && !avisadas[el.dataset.cdto]) avisar(el.dataset.cdto, el.dataset.mtg, 5);
-  }
   const h = Math.floor(s / 3600), m = Math.floor(s % 3600 / 60), ss = s % 60;
   el.textContent = h ? `${h} h ${O.pad(m)} min` : `${O.pad(m)}:${O.pad(ss)}`; el.closest('.cdbox')?.classList.toggle('soon', s < 600); } }
 setInterval(tickCd, 1000);
+// Vigilante de avisos: funciona en cualquier vista (Foco, Semana, Clientes…), no solo en el Día.
+// Reuniones: 5 min y 1 min antes. Bloques de trabajo: alarma al terminar.
+let avisoLista = [], avisoHecha = 0;
+function vigilaAvisos(){
+  try {
+    if (Date.now() - avisoHecha > 30e3){
+      avisoHecha = Date.now();
+      const {hoy, its} = focoDatos(), base = O.fromIso(hoy).getTime();
+      avisoLista = [
+        ...its.filter(i => i.kind === 'event' && i.isCall && !i.allDay).map(c => ({t: 'reu', at: base + c.start * 60e3, title: c.title || 'Reunión'})),
+        ...its.filter(i => i.kind === 'work').map(w => ({t: 'fin', at: base + w.end * 60e3, title: `${w.bname || 'Trabajo'} · ${toHM(w.start)} – ${toHM(w.end)}`}))
+      ];
+    }
+    const ahora = Date.now();
+    for (const a of avisoLista){
+      const s = (a.at - ahora) / 1000;
+      if (a.t === 'reu' && s > 0){
+        if (s <= 60 && !avisadas[a.at + ':1']){ avisadas[a.at] = 1; avisar(a.at + ':1', a.title, 1); }
+        else if (s > 60 && s <= 300 && !avisadas[a.at]) avisar(a.at, a.title, 5);
+      }
+      if (a.t === 'fin' && s <= 0 && s > -90 && !avisadas[a.at + ':fin']) avisar(a.at + ':fin', a.title, 'fin');
+    }
+  } catch(e){}
+}
+setInterval(vigilaAvisos, 1000);
 setInterval(() => { if (S.view === 'dia' && !document.querySelector('.ghost') && !document.querySelector('dialog[open]') && !document.activeElement?.matches('input,textarea')) O.render(); }, 60e3);
 // Refresco suave: la marca de «ahora» y el calendario cada 5 min
 setInterval(() => { if (S.view === 'dia' && !document.querySelector('.ghost')){ clearCache(); refresh(); } }, 5 * 60e3);
