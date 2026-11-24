@@ -3,10 +3,10 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' https://www.gstatic.com https://apis.google.com https://accounts.google.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://accounts.google.com; font-src https://fonts.gstatic.com; connect-src 'self' https://api.clickup.com https://script.google.com https://script.googleusercontent.com https://accounts.google.com https://firestore.googleapis.com https://identitytoolkit.googleapis.com https://securetoken.googleapis.com https://www.googleapis.com https://apis.google.com; frame-src 'self' https://organizador-jp.firebaseapp.com https://accounts.google.com; img-src 'self' data: https://lh3.googleusercontent.com https://www.google.com; manifest-src 'self'; base-uri 'none'; form-action 'self'; object-src 'none'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' https://open.spotify.com https://www.gstatic.com https://apis.google.com https://accounts.google.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://accounts.google.com; font-src https://fonts.gstatic.com; connect-src 'self' https://api.clickup.com https://script.google.com https://script.googleusercontent.com https://accounts.google.com https://firestore.googleapis.com https://identitytoolkit.googleapis.com https://securetoken.googleapis.com https://www.googleapis.com https://apis.google.com; frame-src 'self' https://open.spotify.com https://organizador-jp.firebaseapp.com https://accounts.google.com; img-src 'self' data: https://lh3.googleusercontent.com https://www.google.com; manifest-src 'self'; base-uri 'none'; form-action 'self'; object-src 'none'">
 <meta name="referrer" content="no-referrer">
 <meta name="robots" content="noindex, nofollow">
-<link rel="manifest" href="manifest.json?v=20261124095815">
+<link rel="manifest" href="manifest.json?v=20261124160719">
 <link rel="icon" href="icon-192.png">
 <link rel="apple-touch-icon" href="icon-180.png">
 <meta name="theme-color" content="#0a0a0b">
@@ -1448,6 +1448,33 @@ body.is-dragging .col:not(.wk-side) .ugrp.vacia{display:flex}
 .doc-c{display:inline-flex;align-items:center;gap:8px;padding:4px 4px 4px 10px;border-radius:99px;background:var(--surface);border:1px solid var(--line);font-weight:600;color:var(--text);opacity:.8}
 .doc-c i{width:9px;height:9px;border-radius:50%;background:var(--c)}
 .doc-c .btn{height:26px;padding:0 10px;font-size:12px}
+
+/* 🎵 Música del Foco (Spotify) */
+#musica{position:fixed;left:16px;bottom:16px;z-index:60;width:min(380px,calc(100vw - 32px));background:var(--surface);border:1px solid var(--line);border-radius:18px;box-shadow:0 10px 30px rgba(0,0,0,.18);padding:10px 12px;display:flex;flex-direction:column;gap:8px}
+#musica[hidden]{display:none}
+.mu-cab{display:flex;align-items:center;gap:6px}
+.mu-tit{flex:1;min-width:0;text-align:left;background:none;border:0;padding:2px 0;font:700 14px var(--body);color:var(--text);cursor:pointer;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.mu-x{width:30px;height:30px;border-radius:50%;border:1px solid var(--line);background:var(--bg,transparent);color:var(--text);cursor:pointer;font-size:13px;flex:none}
+.mu-player{border-radius:12px;overflow:hidden}
+.mu-player iframe{display:block;border:0;border-radius:12px}
+.mu-estilos{display:flex;flex-wrap:wrap;gap:6px}
+.mu-estilos .chip.on{background:var(--accent);color:#fff;border-color:var(--accent)}
+.mu-del{margin-left:4px;opacity:.6;font-weight:700}
+.mu-del:hover{opacity:1}
+.mu-form{display:flex;flex-direction:column;gap:6px;margin-top:6px}
+.mu-form input{padding:8px 10px;border-radius:10px;border:1px solid var(--line);background:var(--bg,transparent);color:var(--text);font:14px var(--body)}
+.mu-op{display:flex;align-items:center;gap:6px;margin-top:6px;font-size:12px;color:var(--muted)}
+a.mu-op{color:var(--accent);text-decoration:none}
+.mu-pie{display:flex;flex-direction:column}
+/* plegado (o fuera del Foco): solo la barra de arriba; el reproductor sigue sonando, solo se esconde */
+#musica.mini{width:auto;max-width:min(320px,calc(100vw - 32px));padding:6px 8px 6px 14px;border-radius:999px}
+#musica.mini .mu-pie{display:none}
+#musica.mini .mu-player{position:absolute;width:1px;height:1px;overflow:hidden;opacity:0;pointer-events:none}
+.mu-eq{display:inline-flex;align-items:flex-end;gap:2px;height:11px;margin-left:4px;vertical-align:-1px}
+.mu-eq b{width:3px;background:var(--accent);border-radius:1px;animation:mueq 1s ease-in-out infinite}
+.mu-eq b:nth-child(2){animation-delay:-.4s}.mu-eq b:nth-child(3){animation-delay:-.7s}
+@keyframes mueq{0%,100%{height:3px}50%{height:11px}}
+@media (prefers-reduced-motion:reduce){.mu-eq b{animation:none;height:8px}}
 </style>
 </head>
 <body>
@@ -1531,16 +1558,17 @@ body.is-dragging .col:not(.wk-side) .ugrp.vacia{display:flex}
 
 <div class="toast" id="toast"></div>
 
-<script src="app.js?v=20261124095815"></script>
-<script src="planner.js?v=20261124095815"></script>
-<script src="clients.js?v=20261124095815"></script>
-<script src="quick.js?v=20261124095815"></script>
-<script src="ia.js?v=20261124095815"></script>
-<script src="hours.js?v=20261124095815"></script>
-<script src="cliente.js?v=20261124095815"></script>
-<script src="diario.js?v=20261124095815"></script>
-<script src="imagenes.js?v=20261124095815"></script>
-<script src="archivos.js?v=20261124095815"></script>
-<script type="module" src="cloud.js?v=20261124095815"></script>
+<script src="app.js?v=20261124160719"></script>
+<script src="planner.js?v=20261124160719"></script>
+<script src="clients.js?v=20261124160719"></script>
+<script src="quick.js?v=20261124160719"></script>
+<script src="ia.js?v=20261124160719"></script>
+<script src="hours.js?v=20261124160719"></script>
+<script src="cliente.js?v=20261124160719"></script>
+<script src="diario.js?v=20261124160719"></script>
+<script src="imagenes.js?v=20261124160719"></script>
+<script src="archivos.js?v=20261124160719"></script>
+<script src="musica.js?v=20261124160719"></script>
+<script type="module" src="cloud.js?v=20261124160719"></script>
 </body>
 </html>
