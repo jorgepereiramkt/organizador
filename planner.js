@@ -732,6 +732,13 @@ function focoDatos(){
   return {hoy, now, its, works, actual, sig, ev, cargando: !evs};
 }
 // 🎯 En Foco, la primera tarea del primer bloque de trabajo del día es siempre el Arranque
+// esquina pequeña: la hora exacta y lo siguiente que tienes (reunión, bloque, comida…)
+function focoEsquina(its, now){
+  const sig = its.filter(i => i.start > now && i.kind !== 'morning' && !i.allDay).sort((a, b) => a.start - b.start)[0];
+  const que = !sig ? 'Nada más hoy' : (i => i.kind === 'work' ? '🧱 ' + (i.bname || 'Bloque de trabajo') : i.isCall ? '📞 ' + (i.title || 'Reunión') : (i.title || 'Evento'))(sig);
+  const falta = sig ? Math.round(sig.start - now) : 0;
+  return `<div class="fo-esq"><b id="foHora">${new Date().toTimeString().slice(0, 5)}</b>${sig ? `<span>Siguiente: <em>${esc(que)}</em> a las ${toHM(sig.start)} · en ${falta >= 60 ? Math.floor(falta / 60) + ' h ' : ''}${falta % 60} min</span>` : `<span>${que}</span>`}</div>`;
+}
 function arranqueFoco(d){
   const mi = P().morning || [], md = new Set((P().morningDone || {})[d] || []); if (!mi.length) return '';
   return `<div class="fo-arr${md.size >= mi.length ? ' done' : ''}"><div class="fo-arr-h"><span class="tt">☀️ Arranque del día</span><span class="fo-arr-n">${md.size}/${mi.length}</span></div>
@@ -763,7 +770,7 @@ function focoView(){
     <button type="button" class="chip" data-fnav="${next}" ${next >= works.length ? 'disabled' : ''}>Bloque siguiente ›</button></div>` : '';
   if (iVer != null && works[iVer] !== actual){
     const b = works[iVer], ts = wkTasks(hoy, b, its), pend = ts.filter(t => t.status !== 'done').length, pasado = b.end <= now;
-    return `<div class="foco"><div class="fo-in">${nav}
+    return `<div class="foco">${focoEsquina(its, now)}<div class="fo-in">${nav}
       <div class="fo-k">${pasado ? 'Bloque anterior' : 'Bloque siguiente'} · ${toHM(b.start)} – ${toHM(b.end)}${lugarEn(hoy, b.start) ? ' · ' + LUGARES[lugarEn(hoy, b.start)] : ''}</div>
       <h2 class="fo-t">${esc(b.bname || 'Trabajo')}</h2>
       <div class="fo-prog${pasado && pend ? ' fo-quedan' : ''}">${!ts.length ? 'Este bloque no tiene tareas' : pasado ? (pend ? `⚠️ Te quedaron ${pend} sin hacer: márcalas o arrástralas al bloque de ahora` : '✓ Todo hecho en este bloque 🎉') : `${ts.length} tarea${ts.length > 1 ? 's' : ''} preparada${ts.length > 1 ? 's' : ''}`}</div>
@@ -772,7 +779,7 @@ function focoView(){
   }
   if (!actual){
     const queda = sig ? Math.round(sig.start - now) : 0;
-    return `<div class="foco vacio"><div class="fo-in">${nav}
+    return `<div class="foco vacio">${focoEsquina(its, now)}<div class="fo-in">${nav}
       <div class="fo-k">${cargando ? 'Mirando tu calendario…' : ev ? 'Ahora mismo' : 'Ahora no tienes un bloque de trabajo'}</div>
       ${ev ? `<h2 class="fo-t">${esc(ev.title || '')}</h2><div class="fo-sub">${toHM(ev.start)} – ${toHM(ev.end)}</div>` : ''}
       ${sig ? `<div class="fo-next">Siguiente bloque: <b>${esc(sig.bname || 'Trabajo')}</b> a las ${toHM(sig.start)} · en ${queda >= 60 ? Math.floor(queda / 60) + ' h ' : ''}${queda % 60} min</div>` : '<div class="fo-next">No te quedan bloques de trabajo hoy. Descansa: también es parte del proceso 🌙</div>'}
@@ -781,7 +788,7 @@ function focoView(){
   const ts = wkTasks(hoy, actual, its), hechas = ts.filter(t => t.status === 'done').length;
   const arr = works[0] === actual ? arranqueFoco(hoy) : '';
   const cards = arr + ts.map((t, k) => O.card(t, {group: true, status: true}).replace('class="card ', `class="card fo-t${k} `)).join('');
-  return `<div class="foco"><div class="fo-in">${nav}
+  return `<div class="foco">${focoEsquina(its, now)}<div class="fo-in">${nav}
     <div class="fo-k">Bloque de ahora · ${toHM(actual.start)} – ${toHM(actual.end)}${lugarEn(hoy, now) ? ' · ' + LUGARES[lugarEn(hoy, now)] : ''}</div>
     <h2 class="fo-t">${esc(actual.bname || 'Trabajo')}</h2>
     <div class="fo-reloj" id="foReloj" data-fin="${actual.end}" data-ini="${actual.start}">--:--</div>
@@ -800,6 +807,7 @@ function focoAfter(){
   clearInterval(focoTimer);
   const tick = () => {
     if (S.view !== 'dia' || S.diaMode !== 'foco'){ clearInterval(focoTimer); return; }
+    const hh = document.getElementById('foHora'); if (hh) hh.textContent = new Date().toTimeString().slice(0, 5);
     const r = document.getElementById('foReloj'), b = document.getElementById('foBarra');
     const nowD = new Date(), now = nowD.getHours() * 60 + nowD.getMinutes() + nowD.getSeconds() / 60;
     if (r){
@@ -810,6 +818,7 @@ function focoAfter(){
       r.classList.toggle('poco', seg < 600);
       if (b) b.style.width = Math.min(100, (now - ini) / (fin - ini) * 100) + '%';
     } else if (Math.floor(Date.now() / 1000) % 30 === 0) pideRender();   // sin bloque: mira cada 30 s si empieza uno
+    if (new Date().getSeconds() === 0) pideRender();   // cada minuto: «Siguiente… en X min»
     if (Math.floor(Date.now() / 1000) % 90 === 0){ focoFrase++; const f = document.getElementById('foFrase'); if (f){ f.classList.remove('in'); void f.offsetWidth; f.textContent = FRASES_FOCO[focoFrase % FRASES_FOCO.length]; f.classList.add('in'); } }
   };
   tick(); focoTimer = setInterval(tick, 1000);
