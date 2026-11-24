@@ -47,7 +47,7 @@
       ${cargado && muestras ? `<div class="mu-aviso">Estás oyendo <b>muestras de 30 s</b>. Para tu Premium: <a href="https://accounts.spotify.com/login?continue=https%3A%2F%2Fopen.spotify.com%2F" target="_blank" rel="noopener">inicia sesión en Spotify</a> en este navegador y vuelve a darle al estilo.</div>` : ''}
       ${app ? (SP.ok() ? `<div class="mu-op">✅ Conectado a tu Spotify: suena en tu app con tu Premium. <button type="button" class="mu-lnk" data-mu="desco">Desconectar</button></div>`
         : `<div class="mu-op">Se abre la playlist en tu app de Spotify: dale a ▶ allí. Al acabar el bloque te aviso para pausarla.</div>
-        <div class="mu-aviso">⚡ Para que el play y la pausa vayan solos: <button type="button" class="mu-lnk" data-mu="conecta">Conectar con Spotify</button>
+        <div class="mu-aviso">⚡ Para que el play y la pausa vayan solos: <button type="button" class="mu-lnk" data-mu="conecta">Conectar con Spotify</button>${m.clientId && !pideId ? ` · <button type="button" class="mu-lnk" data-mu="cambiaid">cambiar Client ID</button>` : ''}
         ${pideId ? `<ol class="mu-pasos"><li>Entra en <a href="https://developer.spotify.com/dashboard" target="_blank" rel="noopener">developer.spotify.com/dashboard</a> con tu cuenta de Spotify y pulsa <b>Create app</b>.</li>
           <li>Nombre: <b>Organizador JP</b> (descripción, la que quieras). En <b>Redirect URIs</b> pega <code>${esc(REDIR)}</code> y pulsa Add. Marca <b>Web API</b>, acepta y guarda.</li>
           <li>Copia el <b>Client ID</b> y pégalo aquí:</li></ol>
@@ -180,6 +180,7 @@
     const a = b.dataset.mu;
     if (a === 'abre'){ if (!enFoco()){ S.view = 'dia'; S.diaMode = 'foco'; O.render(); } else abierto = !abierto; }
     if (a === 'pp'){ if (enApp && SP.ok()){ (sonando ? SP.pausa() : SP.sigue()).then(() => setTimeout(() => SP.estado(), 800)); sonando = !sonando; } else ctrl.togglePlay(); }
+    if (a === 'cambiaid') pideId = true;
     if (a === 'conecta'){ if (M().clientId) return SP.conecta(M().clientId); pideId = !pideId; }
     if (a === 'desco'){ SP.guarda(null); enApp = ''; sonando = false; O.toast('Spotify desconectado en este dispositivo'); }
     if (a === 'quita') quita();
