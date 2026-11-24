@@ -830,6 +830,13 @@ document.addEventListener('click', e => {
   const el = document.documentElement;
   if (document.fullscreenElement) document.exitFullscreen(); else if (el.requestFullscreen) el.requestFullscreen().catch(() => {}); else O.toast('Tu navegador no deja ponerla a pantalla completa');
 });
+// En el iPad, Safari no deja escribir (no sale el teclado) mientras la página está a pantalla completa:
+// al tocar un campo para escribir, o al salir del Foco, se quita la pantalla completa.
+const salFs = () => { if (document.fullscreenElement && document.exitFullscreen) document.exitFullscreen().catch(() => {}); else if (document.webkitFullscreenElement && document.webkitExitFullscreen) document.webkitExitFullscreen(); };
+const enFs = () => !!(document.fullscreenElement || document.webkitFullscreenElement);
+document.addEventListener('focusin', e => { if (enFs() && e.target.matches && e.target.matches('input:not([type=checkbox]):not([type=radio]):not([type=range]),textarea,[contenteditable]')){ salFs(); setTimeout(() => { try { e.target.focus(); } catch (er) {} }, 350); } });
+document.addEventListener('pointerdown', e => { if (enFs() && e.target.closest && e.target.closest('input,textarea,[contenteditable],dialog')) salFs(); }, true);
+setInterval(() => { if (enFs() && !(S.view === 'dia' && S.diaMode === 'foco')) salFs(); }, 1000);
 // Al entrar en la Semana, la hora actual queda en el centro de la pantalla (se reajusta mientras carga, salvo que ya te hayas movido)
 let porCentrar = true, centroDesde = 0;
 function centra(){
