@@ -21,7 +21,7 @@
     let m = s.match(/^spotify:(playlist|album|artist|track|show|episode):([A-Za-z0-9]+)$/); if (m) return `spotify:${m[1]}:${m[2]}`;
     m = s.match(/open\.spotify\.com\/(?:intl-[a-z-]+\/)?(?:embed\/)?(playlist|album|artist|track|show|episode)\/([A-Za-z0-9]+)/); return m ? `spotify:${m[1]}:${m[2]}` : ''; };
 
-  let cargado = '', sonando = false, abierto = true, anadiendo = false, finBloque = null;
+  let muestras = false, cargado = '', sonando = false, abierto = true, anadiendo = false, finBloque = null;
   const dock = document.createElement('div'); dock.id = 'musica'; dock.hidden = true;
   dock.innerHTML = '<div class="mu-cab"></div><div class="mu-player"></div><div class="mu-pie"></div>';
   document.body.appendChild(dock);
@@ -36,6 +36,7 @@
     dock.querySelector('.mu-pie').innerHTML = `<div class="mu-estilos">${todos().map(e => `<button type="button" class="chip${e.k === m.sel && cargado ? ' on' : ''}" data-mu-est="${esc(e.k)}">${e.i} ${esc(e.n)}${e.mia ? ` <span class="mu-del" data-mu-del="${esc(e.k)}" title="Quitar de la lista">×</span>` : ''}</button>`).join('')}
       <button type="button" class="chip mu-mas" data-mu="mas">＋ Tu playlist</button></div>
       ${anadiendo ? `<form class="mu-form" data-mu-form><input name="url" placeholder="Pega el enlace de Spotify (Compartir → Copiar enlace)" required><input name="n" placeholder="Nombre (p. ej. Mi Drive Night)" maxlength="30"><button class="btn">Guardar</button></form>` : ''}
+      ${cargado && muestras ? `<div class="mu-aviso">Estás oyendo <b>muestras de 30 s</b>. Para tu Premium: <a href="https://accounts.spotify.com/login?continue=https%3A%2F%2Fopen.spotify.com%2F" target="_blank" rel="noopener">inicia sesión en Spotify</a> en este navegador y vuelve a darle al estilo.</div>` : ''}
       <label class="mu-op"><input type="checkbox" data-mu-parar ${m.parar ? 'checked' : ''}> Pausar al acabar el bloque</label>
       ${cargado && sel ? `<a class="mu-op" href="${webDe(sel.uri)}" target="_blank" rel="noopener">Abrir en la app de Spotify ↗</a>` : ''}`;
   }
@@ -49,7 +50,9 @@
     if (ev.origin !== 'https://open.spotify.com' || !f || ev.source !== f.contentWindow) return;
     const d = ev.data || {};
     if (d.type === 'ready'){ listo = true; if (porSonar){ porSonar = false; manda('play'); } }
-    if (d.type === 'playback_update' && d.payload){ const s = !d.payload.isPaused; if (s !== sonando){ sonando = s; pinta(); } }
+    if (d.type === 'playback_update' && d.payload){
+      const s = !d.payload.isPaused, mu = d.payload.duration > 0 && d.payload.duration <= 31000;   // sin sesión, Spotify solo da 30 s
+      if (s !== sonando || mu !== muestras){ sonando = s; muestras = mu; pinta(); } }
   });
   let porSonar = false;
   function pon(e){
@@ -59,7 +62,7 @@
     pinta();
   }
   function quita(){
-    cargado = ''; sonando = false; porSonar = false;
+    cargado = ''; sonando = false; porSonar = false; muestras = false;
     dock.querySelector('.mu-player').innerHTML = '';
     pinta();
   }
