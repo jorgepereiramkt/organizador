@@ -44,7 +44,7 @@
   #proTog { width: 48px; height: 48px; border-radius: 16px; border: 1px solid rgba(0,0,0,.08); background: rgba(255,255,255,.94); box-shadow: 0 8px 28px rgba(0,0,0,.16); font-size: 22px; cursor: pointer; display: grid; place-items: center; }
   #proTog .sw { position: absolute; right: 6px; bottom: 6px; width: 12px; height: 12px; border-radius: 50%; border: 2px solid #fff; box-shadow: 0 0 0 1px rgba(0,0,0,.15); }
   #proTog { position: relative; }
-  #proPanel { width: 264px; max-height: min(78vh, 640px); overflow: auto; background: rgba(255,255,255,.96); -webkit-backdrop-filter: blur(16px); backdrop-filter: blur(16px);
+  #proPanel { box-sizing: border-box; width: 264px; max-height: min(78vh, 640px); overflow: auto; background: rgba(255,255,255,.96); -webkit-backdrop-filter: blur(16px); backdrop-filter: blur(16px);
     border: 1px solid rgba(0,0,0,.08); border-radius: 20px; box-shadow: 0 16px 48px rgba(0,0,0,.18); padding: 14px; color: #1e1e24;
     transform-origin: right center; transition: opacity .18s ease, transform .18s ease; }
   #pro:not(.abierto) #proPanel { opacity: 0; transform: scale(.96) translateX(8px); pointer-events: none; }
