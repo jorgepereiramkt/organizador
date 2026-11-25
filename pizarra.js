@@ -28,7 +28,7 @@
     const r = await fetch(BRIDGE, { method: 'POST', headers: { 'Content-Type': 'text/plain' }, body: JSON.stringify(body) });
     const j = await r.json(); if (j.error) throw new Error(j.error); return j;
   };
-  const parse = s => { try { const d = JSON.parse(s || '{}'); return { elements: d.elements || [], files: d.files || {}, bg: d.bg }; } catch (e) { return { elements: [], files: {} }; } };
+  const parse = s => { try { const d = JSON.parse(s || '{}'); return { elements: d.elements || [], files: d.files || {}, bg: d.bg, fondo: d.fondo }; } catch (e) { return { elements: [], files: {} }; } };
 
   // Une dos versiones: de cada elemento se queda la más reciente (así no se pisa lo dibujado en otro dispositivo)
   function merge(a, b){
@@ -44,9 +44,11 @@
       .map(e => e.type === 'freedraw' ? { ...e, points: e.points.map(p => [r1(p[0]), r1(p[1])]), pressures: (e.pressures || []).map(r1) } : e);
     const used = new Set(els.filter(e => e.type === 'image' && !e.isDeleted).map(e => e.fileId)), all = api.getFiles(), files = {};
     used.forEach(id => { if (all[id]) files[id] = all[id]; });
-    return { v: 1, elements: els, files, bg: api.getAppState().viewBackgroundColor };
+    return { v: 1, elements: els, files, bg: api.getAppState().viewBackgroundColor, fondo: window.__pizFondo || '' };
   }
-  const sig = els => els.reduce((a, e) => a + e.version * 31 + (e.isDeleted ? 7 : 0), els.length);
+  const sig0 = els => els.reduce((a, e) => a + e.version * 31 + (e.isDeleted ? 7 : 0), els.length);
+  const sig = els => sig0(els) + (window.__pizFondo || '') + (api ? api.getAppState().viewBackgroundColor : '');
+  window.__pizGuardar = () => schedule(600);
 
   async function save(){
     if (!api) return;
@@ -102,7 +104,11 @@
     }
     let view = {};
     try { view = JSON.parse(localStorage.getItem(VKEY) || '{}'); } catch (e) {}
-    const dark = matchMedia('(prefers-color-scheme: dark)').matches;
+    // Tema elegido en el panel 🎨 (por defecto claro: fondo blanco aunque el iPad esté en modo oscuro)
+    let tema = 'light'; try { tema = localStorage.getItem('jp-board-theme') || 'light'; } catch (e) {}
+    const dark = tema === 'dark';
+    document.body.classList.toggle('oscuro', dark);
+    window.__pizFondoIni = data.fondo || '';
     const { Excalidraw } = window.ExcalidrawLib;
     const el = React.createElement(Excalidraw, {
       excalidrawAPI: a => { api = a; window.__pizApi = a; },
@@ -110,7 +116,7 @@
       theme: dark ? 'dark' : 'light',
       initialData: {
         elements: data.elements, files: data.files, scrollToContent: !view.zoom,
-        appState: { viewBackgroundColor: (!data.bg || data.bg === '#121214') ? '#ffffff' : data.bg,   // en modo oscuro Excalidraw invierte los colores: el fondo se guarda blanco
+        appState: { viewBackgroundColor: (!data.bg || data.bg === '#121214') ? '#ffffff' : data.bg, theme: dark ? 'dark' : 'light',   // en modo oscuro Excalidraw invierte los colores: el fondo se guarda blanco
           currentItemFontFamily: 1,
           ...(view.zoom ? { scrollX: view.scrollX, scrollY: view.scrollY, zoom: { value: view.zoom } } : {}) }
       },

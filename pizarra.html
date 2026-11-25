@@ -25,22 +25,22 @@
   #bar button:disabled { opacity: .6; }
   @media (max-width: 520px) { #nm { display: none; } }
   #msg { position: fixed; inset: 0; display: grid; place-items: center; color: #6b6b76; font-size: 15px; text-align: center; padding: 24px; }
-  @media (prefers-color-scheme: dark) {
-    html, body { background: #121214; }
-    #bar { background: rgba(30,30,34,.92); border-color: rgba(255,255,255,.08); color: #eee; }
-    #st, #msg { color: #a0a0aa; }
-  }
+  body.oscuro { background: #121214; }
+  body.oscuro #bar { background: rgba(30,30,34,.92); border-color: rgba(255,255,255,.08); color: #eee; }
+  body.oscuro #st, body.oscuro #msg { color: #a0a0aa; }
+  #app { background-color: #fff; }
 </style>
 </head>
 <body>
 <div id="msg">Cargando la pizarra…</div>
 <div id="app"></div>
 <div id="bar" hidden><span class="dot" id="dot"></span><b id="nm"></b><span id="st">…</span><button id="limpio" type="button" class="sec" title="Convierte la letra a mano en texto y los dibujos en cuadros y flechas (si seleccionas algo, solo eso)">✨ Pasar a limpio</button><button id="close" type="button">Cerrar</button></div>
-<script src="pizarra-cfg.js?v=20261125130752"></script>
+<script src="pizarra-cfg.js?v=20261125133145"></script>
 <script src="https://unpkg.com/react@18.2.0/umd/react.production.min.js"></script>
 <script src="https://unpkg.com/react-dom@18.2.0/umd/react-dom.production.min.js"></script>
 <script src="https://unpkg.com/@excalidraw/excalidraw@0.17.6/dist/excalidraw.production.min.js"></script>
-<script src="pizarra-limpio.js?v=20261125130752"></script>
-<script src="pizarra.js?v=20261125130752"></script>
+<script src="pizarra-limpio.js?v=20261125133145"></script>
+<script src="pizarra-pro.js?v=20261125133145"></script>
+<script src="pizarra.js?v=20261125133145"></script>
 </body>
 </html>
