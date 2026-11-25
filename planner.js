@@ -1368,7 +1368,7 @@ async function importClickupReuniones(){
         k++;
         if (!O.norm(m[1]).includes(yo)) continue;
         const texto = m[2].replace(/\\~/g, '~').replace(/\s+/g, ' ').trim(); if (!texto) continue;
-        const titulo = texto.split(/[;.]\s/)[0].replace(/[.;]\s*$/, '').slice(0, 140);
+        const titulo = texto.split(/;\s/)[0].replace(/[.;]\s*$/, '').slice(0, 160);
         const tid = 'cu' + String(d.id).replace(/[^\w]/g, '').slice(-12) + '_' + k;
         const urg = /\bhoy\b|\bya\b|urgente|cr[ií]tic/i.test(texto) ? 'urgente' : 'media';
         const t = parseInbox(titulo, `cliente: ${cliente}\nurgencia: ${urg}\nnota: ${texto}\norigen: clickup\nreunion: ${reunion}`); t.id = tid;
