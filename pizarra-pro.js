@@ -28,6 +28,11 @@
   ];
   let ajustes = LS.get('jp-board-pinceles', {});   // {id: {c, w, o}} lo que has cambiado de cada pincel
   let activo = LS.get('jp-board-pincel', 'rotu');
+  // ⭐ Favoritos: pinceles guardados (pincel base + color, grosor y opacidad) en la barra de la derecha
+  const FAV0 = [
+    { b: 'boli', c: '#1e1e1e', w: 0.5, o: 100 }, { b: 'rotu', c: '#1971c2', w: 1.5, o: 100 }, { b: 'rotu', c: '#e03131', w: 1.5, o: 100 },
+    { b: 'pincel', c: '#e8590c', w: 3, o: 100 }, { b: 'subra', c: '#fab005', w: 5, o: 30 }, { b: 'lapiz', c: '#495057', w: 0.7, o: 60 }];
+  let favs = LS.get('jp-board-favs', FAV0), favOn = LS.get('jp-board-fav', -1);
   const pincel = id => { const p = PINCELES.find(x => x.id === id) || PINCELES[2]; return { ...p, ...(ajustes[p.id] || {}) }; };
 
   /* ---------- Estilos ---------- */
@@ -71,6 +76,23 @@
   body.oscuro .pz-pin button.on { background: #3a2218; color: #ffb08a; }
   body.oscuro .pz-prev { background: #2a2a31; }
   body.oscuro .pz-rng b { color: #eee; }
+  #proCol { display: flex; flex-direction: column; align-items: center; gap: 8px; }
+  #favs { display: flex; flex-direction: column; gap: 6px; padding: 6px; background: rgba(255,255,255,.94); border: 1px solid rgba(0,0,0,.08); border-radius: 18px; box-shadow: 0 8px 28px rgba(0,0,0,.14); max-height: 58vh; overflow-y: auto; }
+  #favs:empty { display: none; }
+  #favs button { width: 40px; height: 40px; border-radius: 12px; border: 0; background: transparent; cursor: pointer; display: grid; place-items: center; padding: 0; position: relative; }
+  #favs button:hover { background: #f1f1f4; }
+  #favs button.on { background: #fff1ea; box-shadow: inset 0 0 0 2px #ff5a1f; }
+  #favs button i { display: block; border-radius: 50%; }
+  #favs button small { position: absolute; right: 1px; bottom: 0; font-size: 11px; line-height: 1; }
+  body.oscuro #favs { background: rgba(30,30,34,.95); border-color: rgba(255,255,255,.08); }
+  body.oscuro #favs button:hover { background: #2a2a31; }
+  .pz-favs { display: flex; flex-wrap: wrap; gap: 6px; }
+  .pz-favs span { display: inline-flex; align-items: center; gap: 6px; background: #f4f4f7; border-radius: 99px; padding: 4px 6px 4px 8px; font-size: 11px; }
+  .pz-favs span i { width: 12px; height: 12px; border-radius: 50%; display: block; }
+  .pz-favs button { border: 0; background: none; cursor: pointer; color: #8a8a96; font-size: 13px; padding: 0 2px; }
+  .pz-save { width: 100%; margin-top: 8px; border: 0; border-radius: 12px; padding: 9px; background: #1e1e24; color: #fff; font: 600 12px -apple-system, system-ui, sans-serif; cursor: pointer; }
+  body.oscuro .pz-favs span { background: #2a2a31; }
+  @media (max-width: 730px) { #favs { max-height: 40vh; } }
   @media (max-width: 730px) { #pro { top: auto; bottom: calc(env(safe-area-inset-bottom) + 84px); transform: none; right: 10px; align-items: flex-end; } #proPanel { width: min(264px, calc(100vw - 80px)); max-height: 60vh; } }
   @media (prefers-reduced-motion: reduce) { #proPanel { transition: none; } }`;
   document.head.appendChild(css);
@@ -86,7 +108,7 @@
   /* ---------- Panel ---------- */
   const box = document.createElement('div');
   box.id = 'pro';
-  box.innerHTML = `<div id="proPanel" role="dialog" aria-label="Pinceles y fondo"></div><button id="proTog" type="button" title="Pinceles, colores y fondo" aria-label="Pinceles, colores y fondo">🎨<span class="sw"></span></button>`;
+  box.innerHTML = `<div id="proPanel" role="dialog" aria-label="Pinceles y fondo"></div><div id="proCol"><div id="favs" role="toolbar" aria-label="Pinceles favoritos"></div><button id="proTog" type="button" title="Pinceles, colores y fondo" aria-label="Pinceles, colores y fondo">🎨<span class="sw"></span></button></div>`;
   document.body.appendChild(box);
   const panel = box.querySelector('#proPanel');
 
@@ -103,17 +125,34 @@
       <div class="pz-rng"><input type="range" data-w min="0.3" max="12" step="0.1" value="${p.w}"><b>${(+p.w).toFixed(1)}</b></div>
       <h4>Opacidad</h4>
       <div class="pz-rng"><input type="range" data-o min="10" max="100" step="5" value="${p.o}"><b>${p.o}%</b></div>
-      <div class="pz-prev">${muestra(p, 220, 40)}</div>` : `<p class="pz-tip">${p.tool === 'laser' ? 'El láser dibuja un trazo rojo que se borra solo: ideal para señalar en una llamada.' : 'Pasa la goma por encima de lo que quieras borrar.'}</p>`}
+      <div class="pz-prev">${muestra(p, 220, 40)}</div>
+      <button type="button" class="pz-save" data-guardar>⭐ Guardar este pincel en la barra</button>` : `<p class="pz-tip">${p.tool === 'laser' ? 'El láser dibuja un trazo rojo que se borra solo: ideal para señalar en una llamada.' : 'Pasa la goma por encima de lo que quieras borrar.'}</p>`}
+      ${favs.length ? `<h4>Favoritos de la barra</h4><div class="pz-favs">${favs.map((f, i) => `<span><i style="background:${f.c};opacity:${Math.max(.35, f.o / 100)}"></i>${pincel(f.b).n} ${(+f.w).toFixed(1)}<button type="button" data-quitar="${i}" title="Quitar de la barra">✕</button></span>`).join('')}</div>` : ''}
       <h4>Fondo</h4>
       <div class="pz-fon">${FONDOS.map(f => `<button type="button" data-f="${f.id || 'blanco'}" class="${(f.tema ? tema === 'oscuro' : tema !== 'oscuro' && f.id === fondo) ? 'on' : ''}">${f.n}</button>`).join('')}</div>
       <p class="pz-tip">Con el Apple Pencil el trazo sigue la presión. Atajos: <b>P</b> pincel · <b>E</b> goma · <b>K</b> láser.</p>`;
+    pintaFavs();
     box.querySelector('.sw').style.background = p.tool ? (p.tool === 'laser' ? '#ff3b30' : '#ffc9c9') : p.c;
   }
 
+  function pintaFavs(){
+    const el = box.querySelector('#favs');
+    el.innerHTML = favs.map((f, i) => { const base = pincel(f.b), d = Math.max(6, Math.min(26, f.w * 4.2 + 4));
+      return `<button type="button" data-fav="${i}" class="${i === favOn ? 'on' : ''}" title="${base.n} · grosor ${(+f.w).toFixed(1)}${f.o < 100 ? ' · ' + f.o + '%' : ''}"><i style="width:${d}px;height:${d}px;background:${f.c};opacity:${Math.max(.35, f.o / 100)}"></i><small>${base.e}</small></button>`; }).join('');
+  }
+  function usaFav(i){
+    const f = favs[i], a = api(); if (!f || !a) return;
+    favOn = i; LS.set('jp-board-fav', i);
+    activo = f.b; LS.set('jp-board-pincel', f.b);
+    ajustes[f.b] = { ...(ajustes[f.b] || {}), c: f.c, w: f.w, o: f.o }; LS.set('jp-board-pinceles', ajustes);
+    a.updateScene({ appState: { currentItemStrokeWidth: f.w, currentItemOpacity: f.o, currentItemStrokeColor: f.c, currentItemRoughness: 0 } });
+    a.setActiveTool({ type: 'freedraw' });
+    pinta();
+  }
   // Aplica el pincel a Excalidraw (lo siguiente que dibujes sale con este trazo)
   function usa(id, abrirHerramienta = true){
     const a = api(); if (!a) return;
-    activo = id; LS.set('jp-board-pincel', id);
+    activo = id; LS.set('jp-board-pincel', id); if (abrirHerramienta){ favOn = -1; LS.set('jp-board-fav', -1); }
     const p = pincel(id);
     if (p.tool) a.setActiveTool({ type: p.tool });
     else {
@@ -124,7 +163,7 @@
   }
   function ajusta(cambio){
     const p = pincel(activo); if (p.tool) return;
-    ajustes[activo] = { ...(ajustes[activo] || {}), ...cambio }; LS.set('jp-board-pinceles', ajustes);
+    ajustes[activo] = { ...(ajustes[activo] || {}), ...cambio }; LS.set('jp-board-pinceles', ajustes); favOn = -1; LS.set('jp-board-fav', -1);
     usa(activo);
   }
 
@@ -172,7 +211,11 @@
     if (b.dataset.p) return usa(b.dataset.p);
     if (b.dataset.c) return ajusta({ c: b.dataset.c });
     if (b.dataset.f) return fondo(b.dataset.f);
+    if (b.dataset.guardar !== undefined){ const p = pincel(activo); if (p.tool) return;
+      favs.push({ b: activo, c: p.c, w: p.w, o: p.o }); LS.set('jp-board-favs', favs); favOn = favs.length - 1; LS.set('jp-board-fav', favOn); pinta(); return; }
+    if (b.dataset.quitar !== undefined){ const i = +b.dataset.quitar; favs.splice(i, 1); LS.set('jp-board-favs', favs); if (favOn === i) favOn = -1; else if (favOn > i) favOn--; LS.set('jp-board-fav', favOn); pinta(); }
   });
+  box.querySelector('#favs').addEventListener('click', e => { const b = e.target.closest('[data-fav]'); if (b){ usaFav(+b.dataset.fav); box.classList.remove('abierto'); } });
   panel.addEventListener('input', e => {
     const t = e.target;
     if (t.dataset.cc !== undefined) return ajusta({ c: t.value });

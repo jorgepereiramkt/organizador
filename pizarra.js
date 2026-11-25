@@ -130,24 +130,47 @@
       }
     });
     ReactDOM.createRoot($('#app')).render(el);
-    // Pellizcar con dos dedos (iPad): acerca/aleja y mueve el lienzo; Safari no se lo pasa bien a Excalidraw
+    // Pellizcar con dos dedos (iPad): acerca/aleja y mueve el lienzo. Se hace con «pointer events» en captura,
+    // antes que Excalidraw: el 2.º dedo no le llega (así no pinta ni se pelea con el zoom) y, si el 1.er dedo
+    // ya había empezado una raya, se quita. El Apple Pencil (pen) sigue dibujando normal.
     (() => {
-      let p0 = null;
-      const dos = t => { const a = t[0], b = t[1]; return { d: Math.hypot(a.clientX - b.clientX, a.clientY - b.clientY), x: (a.clientX + b.clientX) / 2, y: (a.clientY + b.clientY) / 2 }; };
+      const dedos = new Map(); let p0 = null, antes = null;
       const stop = e => { if (e.cancelable) e.preventDefault(); };
       ['gesturestart', 'gesturechange', 'gestureend'].forEach(n => document.addEventListener(n, stop, { passive: false }));
-      document.addEventListener('touchstart', e => {
-        if (e.touches.length !== 2 || !api) { p0 = null; return; }
-        const st = api.getAppState(), g = dos(e.touches);
-        p0 = { ...g, z: st.zoom.value, sx: g.x / st.zoom.value - st.scrollX, sy: g.y / st.zoom.value - st.scrollY };
-      }, { passive: true, capture: true });
-      document.addEventListener('touchmove', e => {
-        if (!p0 || e.touches.length !== 2 || !api) return;
-        stop(e);
-        const g = dos(e.touches), z = Math.min(30, Math.max(0.1, p0.z * g.d / (p0.d || 1)));
+      const centro = () => { const [a, b] = [...dedos.values()]; return { d: Math.hypot(a.x - b.x, a.y - b.y), x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 }; };
+      const enLienzo = e => e.target && e.target.closest && e.target.closest('canvas, .excalidraw__canvas, #app') && !e.target.closest('#pro, #bar, .App-menu, .Island');
+      window.addEventListener('pointerdown', e => {
+        if (e.pointerType !== 'touch' || !api) return;
+        if (dedos.size === 0){ antes = new Set(api.getSceneElementsIncludingDeleted().map(x => x.id)); }
+        dedos.set(e.pointerId, { x: e.clientX, y: e.clientY });
+        if (dedos.size === 2 && enLienzo(e)){
+          e.stopImmediatePropagation(); stop(e);
+          const st = api.getAppState(), g = centro();
+          p0 = { ...g, z: st.zoom.value, sx: g.x / st.zoom.value - st.scrollX, sy: g.y / st.zoom.value - st.scrollY };
+        } else if (dedos.size > 2 && p0){ e.stopImmediatePropagation(); stop(e); }
+      }, { capture: true, passive: false });
+      window.addEventListener('pointermove', e => {
+        if (e.pointerType !== 'touch' || !dedos.has(e.pointerId)) return;
+        dedos.set(e.pointerId, { x: e.clientX, y: e.clientY });
+        if (!p0) return;
+        e.stopImmediatePropagation(); stop(e);   // mientras dure el pellizco, ningún dedo pinta
+        if (dedos.size < 2) return;
+        const g = centro(), z = Math.min(30, Math.max(0.1, p0.z * g.d / (p0.d || 1)));
         api.updateScene({ appState: { zoom: { value: z }, scrollX: g.x / z - p0.sx, scrollY: g.y / z - p0.sy } });
-      }, { passive: false, capture: true });
-      document.addEventListener('touchend', e => { if (e.touches.length < 2) p0 = null; }, { passive: true, capture: true });
+      }, { capture: true, passive: false });
+      const fin = e => {
+        if (e.pointerType !== 'touch' || !dedos.has(e.pointerId)) return;
+        dedos.delete(e.pointerId);
+        if (!p0) return;
+        if (dedos.size < 2){
+          // quita la raya que hubiera empezado el primer dedo antes de poner el segundo
+          const nuevos = api.getSceneElementsIncludingDeleted().filter(x => !x.isDeleted && antes && !antes.has(x.id) && x.type === 'freedraw');
+          if (nuevos.length) setTimeout(() => api.updateScene({ elements: api.getSceneElementsIncludingDeleted().map(x => nuevos.some(n => n.id === x.id) ? { ...x, isDeleted: true, version: x.version + 1, versionNonce: Math.floor(Math.random() * 1e9) } : x) }), 0);
+          if (dedos.size === 0) p0 = null;
+        }
+      };
+      window.addEventListener('pointerup', fin, { capture: true });
+      window.addEventListener('pointercancel', fin, { capture: true });
     })();
     msg('');
     $('#bar').hidden = false;
