@@ -1665,7 +1665,7 @@ function vigilaAvisos(){
       avisoHecha = Date.now();
       const {hoy, its} = focoDatos(); base = O.fromIso(hoy).getTime();
       avisoLista = [
-        ...its.filter(i => i.kind === 'event' && i.isCall && !i.allDay).map(c => ({t: 'reu', at: base + c.start * 60e3, title: c.title || 'Reunión'})),
+        ...its.filter(i => i.kind === 'event' && i.isCall && !i.allDay).map(c => ({t: 'reu', at: base + c.start * 60e3, fin: base + c.end * 60e3, title: c.title || 'Reunión'})),
         ...its.filter(i => i.kind === 'work').map(w => ({t: 'fin', at: base + w.end * 60e3, ini: base + w.start * 60e3, title: `${w.bname || 'Trabajo'} · ${toHM(w.start)} – ${toHM(w.end)}`}))
       ];
     }
@@ -1676,6 +1676,8 @@ function vigilaAvisos(){
         if (s <= 60 && !avisadas[a.at + ':1']){ avisadas[a.at] = 1; avisar(a.at + ':1', a.title, 1); }
         else if (s > 60 && s <= 300 && !avisadas[a.at]) avisar(a.at, a.title, 5);
       }
+      // 6 min después de acabar una reunión: busca sus tareas (Fathom, ClickUp y buzón) sin esperar a la rutina de las 14:00/20:00
+      if (a.t === 'reu' && a.fin){ const tras = (ahora - a.fin) / 60e3; if (tras >= 6 && tras < 30 && !avisadas[a.fin + ':fathom']){ avisadas[a.fin + ':fathom'] = 1; buscaNuevas(false, a.title); } }
       if (a.t === 'fin' && s <= 0 && s > -90 && !avisadas[a.at + ':fin']) avisar(a.at + ':fin', a.title, 'fin');
       if (a.t !== 'fin' || !enFoco()) continue;
       // En el Foco (sin sonido): aviso cuando quedan 10 min y ánimo a los 30, 60 y 90 min del bloque
@@ -1686,6 +1688,27 @@ function vigilaAvisos(){
   } catch(e){}
 }
 setInterval(vigilaAvisos, 1000);
+// 📞 Buscar reuniones y tareas nuevas: calendario + ClickUp + buzón al momento, y pide a la rutina de Fathom que lea
+// las videollamadas ya (por el puente). Después mira el buzón cada 40 s durante 10 min hasta que lleguen las tareas.
+let buscando = 0;
+async function buscaNuevas(manual, reunion){
+  if (buscando && Date.now() - buscando < 60e3) return manual && O.toast('Ya lo estoy buscando…');
+  buscando = Date.now();
+  const btn = document.getElementById('fathomBtn'); if (btn) btn.classList.add('girando');
+  if (manual) O.toast('📞 Buscando reuniones y tareas nuevas…');
+  for (const k in weekEv) delete weekEv[k]; clearCache(); lastEvents = [];
+  await Promise.allSettled([refresh(), O.syncCU ? O.syncCU(true) : null, importInbox()]);
+  let r = null, err = ''; try { r = P().bridge ? await bridge({a: 'fathomrun'}) : null; } catch(e){ err = String(e.message || e); if (/desconocid/i.test(err)) r = {notoken: true}; }
+  if (btn) btn.classList.remove('girando');
+  O.render();
+  if (r && r.ok) O.toast(`📞 ${reunion ? `«${reunion}» terminó: ` : ''}leyendo tus videollamadas de Fathom. Las tareas te saldrán aquí en unos minutos.`);
+  else if (r && r.espera) { if (manual) O.toast(`📞 Ya se lanzó hace poco: las tareas llegan en unos minutos (puedes volver a lanzarlo en ${r.espera} min).`); }
+  else if (manual && err && !/unknown|desconocid|puente \d/i.test(err)) O.toast('⚠️ No se pudo lanzar Fathom: ' + err.slice(0, 120));
+  else if (manual) O.toast(r && r.notoken ? '✓ Calendario, ClickUp y buzón al día. Para lanzar Fathom al momento falta la clave de la rutina en el puente.' : '✓ Calendario, ClickUp y buzón al día.');
+  if (r && (r.ok || r.espera)){ let n = 0; const iv = setInterval(() => { if (++n > 15) return clearInterval(iv); importInbox(); }, 40e3); }
+}
+O.buscaNuevas = buscaNuevas;
+document.getElementById('fathomBtn')?.addEventListener('click', () => buscaNuevas(true));
 setInterval(() => { if (S.view === 'dia' && !document.querySelector('.ghost') && !document.querySelector('dialog[open]') && !document.activeElement?.matches('input,textarea')) O.render(); }, 60e3);
 // Refresco suave: la marca de «ahora» y el calendario cada 5 min
 setInterval(() => { if (S.view === 'dia' && !document.querySelector('.ghost')){ clearCache(); refresh(); } }, 5 * 60e3);
