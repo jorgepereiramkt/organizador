@@ -32,13 +32,15 @@
   const FAV0 = [
     { b: 'boli', c: '#1e1e1e', w: 0.5, o: 100 }, { b: 'rotu', c: '#1971c2', w: 1.5, o: 100 }, { b: 'rotu', c: '#e03131', w: 1.5, o: 100 },
     { b: 'pincel', c: '#e8590c', w: 3, o: 100 }, { b: 'subra', c: '#fab005', w: 5, o: 30 }, { b: 'lapiz', c: '#495057', w: 0.7, o: 60 }];
-  let favs = LS.get('jp-board-favs', FAV0), favOn = LS.get('jp-board-fav', -1);
+  let favs = LS.get('jp-board-favs', FAV0), favOn = LS.get('jp-board-fav', -1), editFav = -1;
   const pincel = id => { const p = PINCELES.find(x => x.id === id) || PINCELES[2]; return { ...p, ...(ajustes[p.id] || {}) }; };
 
   /* ---------- Estilos ---------- */
   const css = document.createElement('style');
   css.textContent = `
-  #pro { position: fixed; z-index: 11; right: 14px; top: 50%; transform: translateY(-50%); display: flex; align-items: center; gap: 10px; font-family: -apple-system, system-ui, sans-serif; }
+  #pro { position: fixed; z-index: 11; right: 14px; top: 50%; transform: translateY(-50%); display: flex; align-items: center; gap: 10px; font-family: -apple-system, system-ui, sans-serif; pointer-events: none; }
+  #proCol, #pro.abierto #proPanel { pointer-events: auto; }
+  #pro:not(.abierto) #proPanel { visibility: hidden; transition: opacity .18s ease, transform .18s ease, visibility 0s .18s; }
   #proTog { width: 48px; height: 48px; border-radius: 16px; border: 1px solid rgba(0,0,0,.08); background: rgba(255,255,255,.94); box-shadow: 0 8px 28px rgba(0,0,0,.16); font-size: 22px; cursor: pointer; display: grid; place-items: center; }
   #proTog .sw { position: absolute; right: 6px; bottom: 6px; width: 12px; height: 12px; border-radius: 50%; border: 2px solid #fff; box-shadow: 0 0 0 1px rgba(0,0,0,.15); }
   #proTog { position: relative; }
@@ -79,6 +81,15 @@
   #proCol { display: flex; flex-direction: column; align-items: center; gap: 8px; }
   #favs { display: flex; flex-direction: column; gap: 6px; padding: 6px; background: rgba(255,255,255,.94); border: 1px solid rgba(0,0,0,.08); border-radius: 18px; box-shadow: 0 8px 28px rgba(0,0,0,.14); max-height: 58vh; overflow-y: auto; }
   #favs:empty { display: none; }
+  #favs button { -webkit-touch-callout: none; -webkit-user-select: none; user-select: none; touch-action: manipulation; }
+  #favs button.edit { background: #fff1ea; box-shadow: inset 0 0 0 2px #ff5a1f; animation: pzlatir 1s ease-in-out infinite; }
+  @keyframes pzlatir { 50% { transform: scale(.92); } }
+  .pz-edit { display: flex; align-items: center; gap: 8px; background: #fff1ea; color: #c2410c; border-radius: 12px; padding: 8px 10px; font-size: 12px; font-weight: 600; margin-bottom: 10px; }
+  .pz-edit span { flex: 1; }
+  .pz-edit button { border: 0; border-radius: 8px; padding: 5px 9px; font: 600 11px -apple-system, system-ui, sans-serif; cursor: pointer; background: #ff5a1f; color: #fff; }
+  .pz-edit button.sec { background: #fff; color: #c2410c; }
+  body.oscuro .pz-edit { background: #3a2218; color: #ffb08a; }
+  @media (prefers-reduced-motion: reduce) { #favs button.edit { animation: none; } }
   #favs button { width: 40px; height: 40px; border-radius: 12px; border: 0; background: transparent; cursor: pointer; display: grid; place-items: center; padding: 0; position: relative; }
   #favs button:hover { background: #f1f1f4; }
   #favs button.on { background: #fff1ea; box-shadow: inset 0 0 0 2px #ff5a1f; }
@@ -115,7 +126,9 @@
   function pinta(){
     const p = pincel(activo), trazo = !p.tool;
     const fondo = window.__pizFondo || '', tema = document.body.classList.contains('oscuro') ? 'oscuro' : '';
+    if (editFav >= favs.length) editFav = -1;
     panel.innerHTML = `
+      ${editFav >= 0 ? `<div class="pz-edit"><span>✏️ Editando el favorito ${editFav + 1}: los cambios se guardan solos</span><button type="button" class="sec" data-favdel>Quitar</button><button type="button" data-favok>Listo</button></div>` : ''}
       <h4>Pinceles</h4>
       <div class="pz-pin">${PINCELES.map(x => { const q = pincel(x.id); return `<button type="button" data-p="${x.id}" class="${x.id === activo ? 'on' : ''}" title="${q.n}">${muestra(q)}<span>${q.e} ${q.n}</span></button>`; }).join('')}</div>
       ${trazo ? `
@@ -135,10 +148,17 @@
     box.querySelector('.sw').style.background = p.tool ? (p.tool === 'laser' ? '#ff3b30' : '#ffc9c9') : p.c;
   }
 
+  // Si estás editando un favorito, cada cambio del panel se copia a ese favorito
+  function syncFav(){
+    if (editFav < 0 || !favs[editFav]) return;
+    const p = pincel(activo); if (p.tool) return;
+    favs[editFav] = { b: activo, c: p.c, w: p.w, o: p.o }; LS.set('jp-board-favs', favs); favOn = editFav; LS.set('jp-board-fav', favOn);
+  }
+  function editaFav(i){ usaFav(i); editFav = i; box.classList.add('abierto'); pinta(); }
   function pintaFavs(){
     const el = box.querySelector('#favs');
     el.innerHTML = favs.map((f, i) => { const base = pincel(f.b), d = Math.max(6, Math.min(26, f.w * 4.2 + 4));
-      return `<button type="button" data-fav="${i}" class="${i === favOn ? 'on' : ''}" title="${base.n} · grosor ${(+f.w).toFixed(1)}${f.o < 100 ? ' · ' + f.o + '%' : ''}"><i style="width:${d}px;height:${d}px;background:${f.c};opacity:${Math.max(.35, f.o / 100)}"></i><small>${base.e}</small></button>`; }).join('');
+      return `<button type="button" data-fav="${i}" class="${i === editFav ? 'edit' : i === favOn ? 'on' : ''}" title="Mantén pulsado para editar · "${base.n} · grosor ${(+f.w).toFixed(1)}${f.o < 100 ? ' · ' + f.o + '%' : ''}"><i style="width:${d}px;height:${d}px;background:${f.c};opacity:${Math.max(.35, f.o / 100)}"></i><small>${base.e}</small></button>`; }).join('');
   }
   function usaFav(i){
     const f = favs[i], a = api(); if (!f || !a) return;
@@ -152,10 +172,11 @@
   // Aplica el pincel a Excalidraw (lo siguiente que dibujes sale con este trazo)
   function usa(id, abrirHerramienta = true){
     const a = api(); if (!a) return;
-    activo = id; LS.set('jp-board-pincel', id); if (abrirHerramienta){ favOn = -1; LS.set('jp-board-fav', -1); }
+    activo = id; LS.set('jp-board-pincel', id); if (abrirHerramienta && editFav < 0){ favOn = -1; LS.set('jp-board-fav', -1); }
     const p = pincel(id);
     if (p.tool) a.setActiveTool({ type: p.tool });
     else {
+      if (abrirHerramienta) syncFav();
       a.updateScene({ appState: { currentItemStrokeWidth: p.w, currentItemOpacity: p.o, currentItemStrokeColor: p.c, currentItemRoughness: 0 } });
       if (abrirHerramienta) a.setActiveTool({ type: 'freedraw' });
     }
@@ -163,7 +184,7 @@
   }
   function ajusta(cambio){
     const p = pincel(activo); if (p.tool) return;
-    ajustes[activo] = { ...(ajustes[activo] || {}), ...cambio }; LS.set('jp-board-pinceles', ajustes); favOn = -1; LS.set('jp-board-fav', -1);
+    ajustes[activo] = { ...(ajustes[activo] || {}), ...cambio }; LS.set('jp-board-pinceles', ajustes); if (editFav < 0){ favOn = -1; LS.set('jp-board-fav', -1); }
     usa(activo);
   }
 
@@ -205,7 +226,7 @@
   }
 
   /* ---------- Eventos ---------- */
-  box.querySelector('#proTog').addEventListener('click', () => { box.classList.toggle('abierto'); pinta(); });
+  box.querySelector('#proTog').addEventListener('click', () => { box.classList.toggle('abierto'); if (!box.classList.contains('abierto')) editFav = -1; pinta(); });
   panel.addEventListener('click', e => {
     const b = e.target.closest('button'); if (!b) return;
     if (b.dataset.p) return usa(b.dataset.p);
@@ -213,15 +234,28 @@
     if (b.dataset.f) return fondo(b.dataset.f);
     if (b.dataset.guardar !== undefined){ const p = pincel(activo); if (p.tool) return;
       favs.push({ b: activo, c: p.c, w: p.w, o: p.o }); LS.set('jp-board-favs', favs); favOn = favs.length - 1; LS.set('jp-board-fav', favOn); pinta(); return; }
+    if (b.dataset.favok !== undefined){ editFav = -1; box.classList.remove('abierto'); pinta(); return; }
+    if (b.dataset.favdel !== undefined){ const i = editFav; editFav = -1; favs.splice(i, 1); LS.set('jp-board-favs', favs); favOn = -1; LS.set('jp-board-fav', -1); pinta(); return; }
     if (b.dataset.quitar !== undefined){ const i = +b.dataset.quitar; favs.splice(i, 1); LS.set('jp-board-favs', favs); if (favOn === i) favOn = -1; else if (favOn > i) favOn--; LS.set('jp-board-fav', favOn); pinta(); }
   });
-  box.querySelector('#favs').addEventListener('click', e => { const b = e.target.closest('[data-fav]'); if (b){ usaFav(+b.dataset.fav); box.classList.remove('abierto'); } });
+  // Toque: usa el favorito. Mantener pulsado (medio segundo): lo abre para editarlo (pincel, color, grosor, opacidad)
+  let larga = null, fueLarga = false;
+  const favsEl = box.querySelector('#favs');
+  favsEl.addEventListener('pointerdown', e => { const b = e.target.closest('[data-fav]'); if (!b) return; fueLarga = false; clearTimeout(larga);
+    larga = setTimeout(() => { fueLarga = true; try { navigator.vibrate && navigator.vibrate(15); } catch (er) {} editaFav(+b.dataset.fav); }, 480); });
+  ['pointerup', 'pointerleave', 'pointercancel'].forEach(n => favsEl.addEventListener(n, () => clearTimeout(larga)));
+  favsEl.addEventListener('contextmenu', e => e.preventDefault());
+  favsEl.addEventListener('click', e => { const b = e.target.closest('[data-fav]'); if (!b) return;
+    if (fueLarga){ fueLarga = false; return; }
+    if (editFav >= 0){ editaFav(+b.dataset.fav); return; }
+    usaFav(+b.dataset.fav); box.classList.remove('abierto'); });
   panel.addEventListener('input', e => {
     const t = e.target;
     if (t.dataset.cc !== undefined) return ajusta({ c: t.value });
     if (t.dataset.w !== undefined){ t.nextElementSibling.textContent = (+t.value).toFixed(1); ajustes[activo] = { ...(ajustes[activo] || {}), w: +t.value }; }
     if (t.dataset.o !== undefined){ t.nextElementSibling.textContent = t.value + '%'; ajustes[activo] = { ...(ajustes[activo] || {}), o: +t.value }; }
-    LS.set('jp-board-pinceles', ajustes);
+    LS.set('jp-board-pinceles', ajustes); syncFav();
+    if (editFav >= 0) pintaFavs();
     const a = api(), p = pincel(activo);
     if (a && !p.tool) a.updateScene({ appState: { currentItemStrokeWidth: p.w, currentItemOpacity: p.o } });
     const pv = panel.querySelector('.pz-prev'); if (pv) pv.innerHTML = muestra(p, 220, 40);
@@ -229,7 +263,7 @@
   });
   panel.addEventListener('change', e => { if (e.target.dataset.w !== undefined || e.target.dataset.o !== undefined) pinta(); });
   // Toca fuera del panel para cerrarlo (sin estorbar al dibujar)
-  document.addEventListener('pointerdown', e => { if (box.classList.contains('abierto') && !box.contains(e.target)) box.classList.remove('abierto'); }, true);
+  document.addEventListener('pointerdown', e => { if (box.classList.contains('abierto') && !box.contains(e.target)){ box.classList.remove('abierto'); if (editFav >= 0){ editFav = -1; pintaFavs(); } } }, true);
   // Si eliges el lápiz de Excalidraw, se usa tu pincel activo
   let ultTool = '';
   function vigila(){
