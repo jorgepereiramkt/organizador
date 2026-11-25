@@ -246,6 +246,49 @@
     requestAnimationFrame(vigila);
   }
 
+  /* ---------- Imágenes editables con el dedo (iPad con Apple Pencil) ----------
+     Con el Pencil, Excalidraw entra en «modo lápiz» y los dedos no hacen nada si hay un pincel activo.
+     Aquí: si tocas con el dedo una imagen (o lo que ya tienes seleccionado), pasa a «seleccionar» para moverla,
+     ampliarla/reducirla o borrarla. En cuanto vuelves a escribir con el Pencil, recupera tu pincel. */
+  let toolAntes = null, reenviando = false;
+  const DIBUJO = new Set(['freedraw', 'eraser', 'laser', 'rectangle', 'diamond', 'ellipse', 'arrow', 'line', 'text', 'hand']);
+  function aEscena(e){
+    const a = api(), st = a.getAppState(), r = document.getElementById('app').getBoundingClientRect(), z = st.zoom.value;
+    return { x: (e.clientX - r.left - (st.offsetLeft || 0)) / z - st.scrollX, y: (e.clientY - r.top - (st.offsetTop || 0)) / z - st.scrollY, z };
+  }
+  function tocaEditable(e){
+    const a = api(), p = aEscena(e), m = 18 / p.z, sel = a.getAppState().selectedElementIds || {};
+    return a.getSceneElements().some(el => {
+      if (el.isDeleted || el.locked) return false;
+      const x1 = Math.min(el.x, el.x + el.width), x2 = Math.max(el.x, el.x + el.width), y1 = Math.min(el.y, el.y + el.height), y2 = Math.max(el.y, el.y + el.height);
+      const extra = sel[el.id] ? m : 0;   // lo seleccionado: también sus tiradores para ampliar/reducir
+      return (el.type === 'image' || sel[el.id]) && p.x >= x1 - extra && p.x <= x2 + extra && p.y >= y1 - extra && p.y <= y2 + extra;
+    });
+  }
+  // Reenvía el mismo toque cuando Excalidraw ya ha cambiado de herramienta
+  function reenvia(e){
+    const c = new PointerEvent('pointerdown', { pointerId: e.pointerId, pointerType: e.pointerType, clientX: e.clientX, clientY: e.clientY, screenX: e.screenX, screenY: e.screenY,
+      pressure: e.pressure, width: e.width, height: e.height, isPrimary: e.isPrimary, button: 0, buttons: 1, bubbles: true, cancelable: true, composed: true });
+    const t = e.target;
+    setTimeout(() => { reenviando = true; try { t.dispatchEvent(c); } finally { reenviando = false; } }, 0);
+  }
+  window.addEventListener('pointerdown', e => {
+    const a = api(); if (!a || reenviando) return;
+    if (!e.target.closest || !e.target.closest('canvas')) return;
+    const st = a.getAppState(), t = st.activeTool.type;
+    if (e.pointerType === 'touch' && e.isPrimary && DIBUJO.has(t) && tocaEditable(e)){
+      e.stopImmediatePropagation(); e.preventDefault();
+      toolAntes = t; a.setActiveTool({ type: 'selection' }); reenvia(e);
+    } else if (e.pointerType === 'pen' && toolAntes && t === 'selection' && !tocaEditable(e)){
+      e.stopImmediatePropagation(); e.preventDefault();
+      const vuelve = toolAntes; toolAntes = null;
+      a.updateScene({ appState: { selectedElementIds: {} } });
+      a.setActiveTool({ type: vuelve }); reenvia(e);
+    } else if (e.pointerType === 'touch' && toolAntes && t === 'selection' && !tocaEditable(e)){
+      a.updateScene({ appState: { selectedElementIds: {} } });   // tocar fuera con el dedo: deselecciona
+    }
+  }, { capture: true, passive: false });
+
   // Arranque: espera a que Excalidraw esté listo y aplica el fondo guardado de esta pizarra
   const espera = setInterval(() => {
     const a = api(); if (!a) return;
