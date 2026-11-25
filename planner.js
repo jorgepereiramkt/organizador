@@ -1333,6 +1333,56 @@ async function importDrive(ib){
   importing = false;
 }
 O.importInbox = importInbox;
+// 📞 Reuniones grabadas en ClickUp (AI Notetaker de la agencia): cada una es un Doc «… - MM/DD/AAAA» con la sección
+// «Próximos Pasos» («- [ ] **Jorge Pereira**: tarea»). Se leen directamente (sin IA) y las tuyas salen como propuestas.
+// Solo se LEE de ClickUp: nada de tus clientes propios va hacia allí.
+let leyendoCU = false;
+async function importClickupReuniones(){
+  const tk = S.cu && S.cu.token, team = S.cu && (S.cu.teams || []).map(t => t.id || t)[0];
+  if (!tk || !team || leyendoCU) return 0;
+  leyendoCU = true; let n = 0;
+  try {
+    const h = {Authorization: tk}, desde = Date.now() - 3 * 864e5, seen = (P().inboxSeen = P().inboxSeen || {});
+    let cur = '', docs = [];
+    for (let i = 0; i < 10; i++){
+      const r = await fetch(`https://api.clickup.com/api/v3/workspaces/${team}/docs?limit=100${cur ? '&next_cursor=' + encodeURIComponent(cur) : ''}`, {headers: h});
+      if (!r.ok) break; const j = await r.json(); docs.push(...(j.docs || [])); cur = j.next_cursor; if (!cur) break;
+    }
+    docs = docs.filter(d => !d.deleted && +d.date_created > desde && /\d{1,2}\/\d{1,2}\/\d{4}\s*$/.test(d.name || '') && (!S.cu.me || String(d.creator) === String(S.cu.me)) && !seen['cud:' + d.id]);
+    for (const d of docs){
+      const r = await fetch(`https://api.clickup.com/api/v3/workspaces/${team}/docs/${d.id}/pages?content_format=text/md&max_page_depth=-1`, {headers: h});
+      if (!r.ok) continue; const j = await r.json();
+      const md = (Array.isArray(j) ? j : j.pages || []).map(p => p.content || '').join('\n');
+      const ini = md.search(/^#{2,4}\s*(Pr[oó]ximos pasos|Next steps|Action items|Acciones|Tareas)/im);
+      if (ini < 0) continue;   // las notas aún no están listas: se vuelve a mirar en la próxima búsqueda
+      seen['cud:' + d.id] = Date.now();
+      const sec = md.slice(ini).split(/\n#{2,4}\s/)[0];
+      const nombre = (d.name || '').replace(/^[^\p{L}\p{N}]+/u, '').trim();
+      const fecha = (nombre.match(/(\d{1,2})\/(\d{1,2})\/\d{4}\s*$/) || []).slice(1);
+      const reunion = nombre.replace(/\s*-\s*\d{1,2}\/\d{1,2}\/\d{4}\s*$/, '') + (fecha.length ? ` (${fecha[1].padStart(2, '0')}/${fecha[0].padStart(2, '0')})` : '');
+      const cliente = nombre.split(/<>|\|/)[0].replace(/reuni[oó]n.*$/i, '').trim();
+      const yo = O.norm(S.cu.meName || 'Jorge Pereira').split(' ')[0] || 'jorge';
+      let k = 0;
+      for (const l of sec.split('\n')){
+        const m = l.match(/^\s*[-*]\s*(?:\[[ xX]?\]\s*)?\*\*([^*]+)\*\*\s*:?\s*(.+)$/); if (!m) continue;
+        k++;
+        if (!O.norm(m[1]).includes(yo)) continue;
+        const texto = m[2].replace(/\\~/g, '~').replace(/\s+/g, ' ').trim(); if (!texto) continue;
+        const titulo = texto.split(/[;.]\s/)[0].replace(/[.;]\s*$/, '').slice(0, 140);
+        const tid = 'cu' + String(d.id).replace(/[^\w]/g, '').slice(-12) + '_' + k;
+        const urg = /\bhoy\b|\bya\b|urgente|cr[ií]tic/i.test(texto) ? 'urgente' : 'media';
+        const t = parseInbox(titulo, `cliente: ${cliente}\nurgencia: ${urg}\nnota: ${texto}\norigen: clickup\nreunion: ${reunion}`); t.id = tid;
+        if (iaRepetida(t, tid)) continue;
+        S.tasks.push(t); n++;
+      }
+    }
+    O.save(); if (n){ O.render(); O.toast(`📞 ${n} tarea${n > 1 ? 's' : ''} nueva${n > 1 ? 's' : ''} de tus reuniones de ClickUp por revisar`); }
+  } catch(e){}
+  leyendoCU = false; return n;
+}
+O.importClickupReuniones = importClickupReuniones;
+setTimeout(importClickupReuniones, 6000);
+setInterval(() => { if (document.visibilityState === 'visible') importClickupReuniones(); }, 10 * 60e3);
 // ↻ Actualizar todo: vuelve a pedir el calendario (y la lista de calendarios), ClickUp, el buzón y la nube
 document.getElementById('refreshAll').addEventListener('click', async () => {
   const b = document.getElementById('refreshAll'); if (b.classList.contains('girando')) return;
@@ -1697,7 +1747,7 @@ async function buscaNuevas(manual, reunion){
   const btn = document.getElementById('fathomBtn'); if (btn) btn.classList.add('girando');
   if (manual) O.toast('📞 Buscando reuniones y tareas nuevas…');
   for (const k in weekEv) delete weekEv[k]; clearCache(); lastEvents = [];
-  await Promise.allSettled([refresh(), O.syncCU ? O.syncCU(true) : null, importInbox()]);
+  await Promise.allSettled([refresh(), O.syncCU ? O.syncCU(true) : null, importInbox(), importClickupReuniones()]);
   let r = null, err = ''; try { r = P().bridge ? await bridge({a: 'fathomrun'}) : null; } catch(e){ err = String(e.message || e); if (/desconocid/i.test(err)) r = {notoken: true}; }
   if (btn) btn.classList.remove('girando');
   O.render();
@@ -1705,7 +1755,8 @@ async function buscaNuevas(manual, reunion){
   else if (r && r.espera) { if (manual) O.toast(`📞 Ya se lanzó hace poco: las tareas llegan en unos minutos (puedes volver a lanzarlo en ${r.espera} min).`); }
   else if (manual && err && !/unknown|desconocid|puente \d/i.test(err)) O.toast('⚠️ No se pudo lanzar Fathom: ' + err.slice(0, 120));
   else if (manual) O.toast(r && r.notoken ? '✓ Calendario, ClickUp y buzón al día. Para lanzar Fathom al momento falta la clave de la rutina en el puente.' : '✓ Calendario, ClickUp y buzón al día.');
-  if (r && (r.ok || r.espera)){ let n = 0; const iv = setInterval(() => { if (++n > 15) return clearInterval(iv); importInbox(); }, 40e3); }
+  if (r && (r.ok || r.espera)){ let n = 0; const iv = setInterval(() => { if (++n > 15) return clearInterval(iv); importInbox(); if (n % 3 === 0) importClickupReuniones(); }, 40e3); }
+  else { let n = 0; const iv = setInterval(() => { if (++n > 5) return clearInterval(iv); importClickupReuniones(); }, 2 * 60e3); }
 }
 O.buscaNuevas = buscaNuevas;
 document.getElementById('fathomBtn')?.addEventListener('click', () => buscaNuevas(true));
