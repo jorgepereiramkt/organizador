@@ -121,7 +121,8 @@ const mejor = e => seriesBuenas(e).reduce((m, s) => e1rm(s.kg, s.r) > e1rm(m?.kg
 function sugerida() {
   if (!F.rutinas.length) return null;
   const ult = r => (F.entrenos.find(w => w.rut === r.id) || {}).ini || 0;
-  return [...F.rutinas].sort((a, b) => ult(a) - ult(b))[0];
+  const activas = F.rutinas.filter(r => Date.now() - ult(r) < 45 * DIA);   // solo las que estás usando
+  return [...(activas.length ? activas : F.rutinas)].sort((a, b) => ult(a) - ult(b))[0];
 }
 function semanaActual() {
   const l = lunes(Date.now());
@@ -604,15 +605,21 @@ function deCSV(txt) {
     if (!e || e.n !== n) { e = { n, eid: null, notas: f[c('exercise_notes')] || '', s: [] }; w.ej.push(e); }
     e.s.push({ kg: num(f[c('weight_kg')]), r: num(f[c('reps')]), tipo: TIPO[f[c('set_type')]] || 'n', ...(num(f[c('duration_seconds')]) ? { seg: num(f[c('duration_seconds')]) } : {}) });
   }
-  return { entrenos: [...porW.values()], rutinas: [] };
+  // Une cada ejercicio con el que ya tienes (mismo nombre) para que el progreso no salga duplicado
+  const porNombre = new Map(); for (const x of catalogo().values()) if (x.eid) porNombre.set(norm(x.n), x.eid);
+  for (const w of F.entrenos) for (const e of w.ej || []) if (e.eid) porNombre.set(norm(e.n), e.eid);
+  const ws = [...porW.values()]; for (const w of ws) for (const e of w.ej) e.eid = porNombre.get(norm(e.n)) || null;
+  // Si coincide con un entreno de una rutina tuya (mismos ejercicios), lo enlaza a esa rutina
+  for (const w of ws) { const ks = w.ej.map(keyOf).join('|'); const r = F.rutinas.find(r => F.entrenos.some(x => x.rut === r.id && x.ej.map(keyOf).join('|') === ks)); if (r) w.rut = r.id; }
+  return { entrenos: ws, rutinas: [] };
 }
 $('#fileIn').addEventListener('change', async ev => {
   const f = ev.target.files[0]; ev.target.value = ''; if (!f) return;
   let d; try { const txt = await f.text(); d = /\.csv$/i.test(f.name) || !txt.trim().startsWith('{') ? deCSV(txt) : deJSON(JSON.parse(txt)); }
   catch (e) { return toast('No pude leer el archivo: ' + e.message, 5000); }
   // Evita duplicados: mismo inicio (al minuto) = mismo entreno
-  const ya = new Set(F.entrenos.map(w => Math.round(w.ini / 60000)));
-  const nuevos = d.entrenos.filter(w => w.ini && !ya.has(Math.round(w.ini / 60000)));
+  const ya = new Set(F.entrenos.map(w => Math.floor(w.ini / 60000)));
+  const nuevos = d.entrenos.filter(w => w.ini && !ya.has(Math.floor(w.ini / 60000)));
   if (!confirm(`Voy a importar ${nuevos.length} entrenos nuevos${d.entrenos.length - nuevos.length ? ` (${d.entrenos.length - nuevos.length} ya estaban)` : ''} y ${d.rutinas.length} rutinas. ¿Sigo?`)) return;
   toast('Importando…', 20000);
   const porMes = {}; for (const w of nuevos) ((porMes[ym(w.ini)] ||= {})[w.id] = w);
@@ -623,8 +630,8 @@ $('#fileIn').addEventListener('change', async ev => {
   } catch (e) { return toast('Error al importar: ' + (e.code || e.message), 6000); }
   reconstruye(); cierraHoja(); pinta(); toast(`Importados ${nuevos.length} entrenos y ${d.rutinas.length} rutinas ✓`, 4000);
 });
-window.__fit = { F, deJSON, importa: async d => { const x = deJSON(d); const ya = new Set(F.entrenos.map(w => Math.round(w.ini / 60000)));
-  const nuevos = x.entrenos.filter(w => w.ini && !ya.has(Math.round(w.ini / 60000))); const porMes = {}; for (const w of nuevos) ((porMes[ym(w.ini)] ||= {})[w.id] = w);
+window.__fit = { F, deJSON, importa: async d => { const x = deJSON(d); const ya = new Set(F.entrenos.map(w => Math.floor(w.ini / 60000)));
+  const nuevos = x.entrenos.filter(w => w.ini && !ya.has(Math.floor(w.ini / 60000))); const porMes = {}; for (const w of nuevos) ((porMes[ym(w.ini)] ||= {})[w.id] = w);
   for (const [k, e] of Object.entries(porMes)) { Object.assign(F.meses[k] ||= {}, e); await setDoc(mesRef(k), { e }, { merge: true }); }
   for (const r of x.rutinas) { const i = F.rutinas.findIndex(y => y.id === r.id); if (i >= 0) F.rutinas[i] = r; else F.rutinas.push(r); }
   guardaPerfil(0); reconstruye(); pinta(); return { entrenos: nuevos.length, rutinas: x.rutinas.length }; } };
