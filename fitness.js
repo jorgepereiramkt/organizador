@@ -51,6 +51,7 @@ function ponTema(t) {   // modo claro / oscuro propio de Fitness (por defecto os
   const mc = document.querySelector('meta[name=theme-color]'); if (mc) mc.content = t === 'dark' ? '#000000' : '#f3f6f4';
   const b = document.getElementById('temaBtn'); if (b) b.textContent = t === 'dark' ? '☀️' : '🌙';
 }
+document.getElementById('recBtn')?.addEventListener('click', () => window.__refrescar ? window.__refrescar() : location.reload());
 document.getElementById('temaBtn')?.addEventListener('click', () => { ponTema(document.documentElement.dataset.theme === 'dark' ? 'light' : 'dark'); if (listo) pinta(); });
 
 let toastT;
