@@ -10,7 +10,7 @@ html[data-theme=light]{
   --bg:#f3f6f4; --surface:#ffffff; --surface-2:#eef2ef; --surface-3:#e0e6e2;
   --line:#dfe5e1; --text:#0e1511; --muted:#56615a; --faint:#8a948d;
   --accent:#14B85C; --accent-soft:rgba(20,184,92,.12); --on-accent:#ffffff;
-  --ok:#14B85C; --ok-soft:rgba(20,184,92,.12); --p:#2F80ED; --c:#E0A000; --g:#E0507A;
+  --ok:#14B85C; --ok-soft:rgba(20,184,92,.12); --p:#2F80ED; --c:#E0A000; --g:#E0507A; --gold:#B07800; --danger:#D93838;
 }
 /* Logo: la P en verde (la imagen es naranja; el filtro solo cambia el color, la J blanca/negra no se toca) */
 .jplogo img{filter:hue-rotate(118deg) saturate(1.15) brightness(1.05)}
