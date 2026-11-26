@@ -162,9 +162,10 @@ function coach() {
 // ---------- vistas ----------
 function pinta() {
   if (!listo) return;
-  document.querySelectorAll('#tabbar button').forEach(b => b.classList.toggle('on', b.dataset.v === vista));
+  document.querySelectorAll('#tabbar button').forEach(b => b.classList.toggle('on', b.dataset.v === vista || (vista === 'historial' && b.dataset.v === 'rutinas')));
   const m = $('#main');
-  m.innerHTML = ({ hoy: vHoy, rutinas: vRutinas, comida: vComida, historial: vHistorial, ejercicios: vProgreso }[vista] || vHoy)();
+  m.innerHTML = ({ hoy: vHoy, rutinas: vRutinas, comida: vComida, compra: vCompra, historial: vHistorial, ejercicios: vProgreso }[vista] || vHoy)();
+  if (vista === 'compra') filtraCompra();
   pintaEnCurso();
 }
 
@@ -200,8 +201,9 @@ function cardRutina(r) {
     <p>${(r.ej || []).map(e => esc(nombreDe(e))).join(' · ') || 'Sin ejercicios'}</p>
     <div class="acts"><button class="btn primary" data-act="empRut" data-id="${r.id}">Empezar</button><button class="btn" data-act="editRut" data-id="${r.id}">Editar</button></div></div>`;
 }
+const segEnt = () => `<div class="seg"><button data-act="vEnt" data-v="rutinas" class="${vista === 'rutinas' ? 'on' : ''}">🏋️ Rutinas</button><button data-act="vEnt" data-v="historial" class="${vista === 'historial' ? 'on' : ''}">🗓️ Historial</button></div>`;
 function vRutinas() {
-  return `<div class="sec" style="margin-top:4px"><h2>Mis rutinas</h2><span class="sp"></span><button class="btn sm" data-act="nuevaRut">＋ Nueva</button></div>
+  return `${segEnt()}<div class="sec" style="margin-top:4px"><h2>Mis rutinas</h2><span class="sp"></span><button class="btn sm" data-act="nuevaRut">＋ Nueva</button></div>
   <div class="stack">${F.rutinas.map(cardRutina).join('') || '<div class="empty">Aún no tienes rutinas. Crea una o importa las de Hevy desde ⚙︎.</div>'}</div>
   <button class="btn big" style="margin-top:14px" data-act="vacio">Empezar entreno vacío</button>`;
 }
@@ -212,8 +214,8 @@ function cardEntreno(w) {
     <ul>${(w.ej || []).slice(0, 4).map(e => { const b = mejor(e); return `<li>${seriesBuenas(e).length} × ${esc(nombreDe(e))}${b ? ` <span class="faint">· ${fmtKgR(b.kg, b.r)}</span>` : ''}</li>`; }).join('')}${(w.ej || []).length > 4 ? `<li class="faint">+${w.ej.length - 4} más</li>` : ''}</ul></div>`;
 }
 function vHistorial() {
-  if (!F.entrenos.length) return '<div class="empty">Sin entrenos todavía.</div>';
-  let mes = '', out = `<p class="muted small" style="margin:2px 0 0">${F.entrenos.length} entrenos guardados</p>`;
+  if (!F.entrenos.length) return segEnt() + '<div class="empty">Sin entrenos todavía.</div>';
+  let mes = '', out = segEnt() + `<p class="muted small" style="margin:2px 0 0">${F.entrenos.length} entrenos guardados</p>`;
   for (const w of F.entrenos.slice(0, histN)) {
     const d = new Date(w.ini), m = MESES[d.getMonth()] + ' ' + d.getFullYear();
     if (m !== mes) { const nm = F.entrenos.filter(x => { const y = new Date(x.ini); return y.getMonth() === d.getMonth() && y.getFullYear() === d.getFullYear(); }).length;
@@ -488,6 +490,7 @@ document.addEventListener('click', async ev => {
     case 'verEnt': return verEntreno(id);
     case 'verEj': return verEjercicio(b.dataset.k);
     case 'masHist': histN += 40; return pinta();
+    case 'vEnt': vista = b.dataset.v; lsSet('jp-fit-vista', vista); return pinta();
     case 'cierra': return cierraHoja();
     case 'borraEnt': if (!confirm('¿Eliminar este entreno? No se puede deshacer.')) return;
       try { await borraEntreno(F.porId[id]); } catch (e) { return toast('No se pudo borrar: ' + (e.code || e.message)); }
@@ -746,7 +749,9 @@ function hojaAlimento(id) {
   <div class="f2"><div><label>Kcal</label><input type="number" inputmode="decimal" id="aK" value="${a.k}"></div><div><label>Proteína (g)</label><input type="number" inputmode="decimal" id="aP" value="${a.p}"></div>
   <div><label>Hidratos (g)</label><input type="number" inputmode="decimal" id="aC" value="${a.c}"></div><div><label>Grasa (g)</label><input type="number" inputmode="decimal" id="aG" value="${a.g}"></div></div>
   <div class="f2"><div><label>Unidad (opcional)</label><input type="text" id="aU" value="${esc(a.ud || '')}" placeholder="lata, huevo, loncha…"></div><div><label>Gramos por unidad</label><input type="number" inputmode="decimal" id="aGu" value="${a.gUd || ''}"></div></div>
+  <label>Sección en la lista de la compra</label><select id="aCat"><option value="">Automática (según tu dieta)</option>${CATS.map(c => `<option ${a.compra === c ? 'selected' : ''}>${c}</option>`).join('')}</select>
   <label style="display:flex;gap:8px;align-items:center"><input type="checkbox" id="aMl" ${a.ml ? 'checked' : ''}> Es líquido (se mide en ml)</label>
+  ${!id && hojaCtx?.volver?.tipo === 'compraProd' ? '<label style="display:flex;gap:8px;align-items:center"><input type="checkbox" id="aFalta" checked> Añadirlo ya a «Comprar»</label>' : ''}
   ${a.aprox ? '<p class="faint small">Valores aproximados: cámbialos por los de la etiqueta de tu producto.</p>' : ''}
   <div class="stack" style="margin-top:12px"><button class="btn primary" data-act="cAlimOk">Guardar alimento</button>${id ? '<button class="btn danger" data-act="cAlimDel">Eliminar</button>' : ''}</div>`);
 }
@@ -848,9 +853,10 @@ document.addEventListener('click', ev => {
     case 'cNuevoAlim': return hojaAlimento(null);
     case 'cAlimOk': { const n = $('#aN').value.trim(); if (!n) return toast('Ponle nombre');
       const v = id => num($(id).value); let K = v('#aK'); const P = v('#aP') || 0, C = v('#aC') || 0, G = v('#aG') || 0; if (K == null) K = Math.round(P * 4 + C * 4 + G * 9);
-      const id = hojaCtx.id, al = { id: id || 'a' + uid8(), n, marca: $('#aM').value.trim(), super: $('#aS').value.trim(), k: K, p: P, c: C, g: G, ud: $('#aU').value.trim(), gUd: v('#aGu') || null, ml: $('#aMl').checked };
+      const id = hojaCtx.id, al = { id: id || 'a' + uid8(), n, marca: $('#aM').value.trim(), super: $('#aS').value.trim(), k: K, p: P, c: C, g: G, ud: $('#aU').value.trim(), gUd: v('#aGu') || null, ml: $('#aMl').checked, compra: $('#aCat').value || '' };
       const i = F.alimentos.findIndex(x => x.id === al.id); if (i >= 0) F.alimentos[i] = al; else F.alimentos.push(al);
-      guardaAlimentos(); const vol = hojaCtx.volver; toast('Alimento guardado');
+      guardaAlimentos(); const vol = hojaCtx.volver; toast('Guardado');
+      if (vol && vol.tipo === 'compraProd') { if ($('#aFalta')?.checked) { (F.compra.falta ||= {})[al.id] = true; kModo = 'comprar'; lsSet('jp-fit-kmodo', kModo); guardaCompra(); } cierraHoja(); return repinta(); }
       if (vol && vol.tipo === 'calims') { if (vol.modo === 'add' && !id) return hojaCantidad(al, vol.k, null); return hojaAlimentos(vol.modo, vol.k); } cierraHoja(); return pinta(); }
     case 'cAlimDel': { if (!confirm('¿Eliminar este alimento? Lo que ya apuntaste se queda igual.')) return; F.alimentos = F.alimentos.filter(x => x.id !== hojaCtx.id); guardaAlimentos(); return hojaAlimentos('gest'); }
     case 'cQu': $('#cQ').value = b.dataset.q; return $('#cQ').dispatchEvent(new Event('input'));
@@ -1054,33 +1060,56 @@ function hojaObjetivos() {
 }
 
 // ---- lista de la compra ----
-// ---- lista de la compra: revisas en casa por comidas, marcas lo que falta y con eso se hace la lista ----
+// ---- LISTA DE LA COMPRA (pestaña propia): en casa marcas lo que falta → en el súper lo vas metiendo en el carro ----
+const CATS = ['Desayuno', 'Comida', 'Merienda', 'Cena', 'Snacks y postres', 'Bebidas', 'Casa y limpieza', 'Otros'];
+const CAT_IC = { Desayuno: '🥣', Comida: '🍝', Merienda: '🍌', Cena: '🍳', 'Snacks y postres': '🍮', Bebidas: '🥤', 'Casa y limpieza': '🧽', Otros: '🛍️' };
 function alimsDeComida(cm) { const ids = []; for (const g of cm.grupos) for (const o of g.opciones) for (const it of o.items) if (!ids.includes(it.a)) ids.push(it.a); return ids.map(alim).filter(Boolean); }
-function bloquesCompra() { const vistos = new Set(); return (F.dieta.comidas || []).map(cm => ({ cm, ls: alimsDeComida(cm).filter(a => { if (vistos.has(a.id)) return false; vistos.add(a.id); return true; }) })); }
-function hojaCompra(tab) {
-  const t = tab || hojaCtx?.ktab || (Object.keys(F.compra.falta || {}).length ? 'lista' : 'casa'); hojaCtx = { tipo: 'compra', ktab: t };
-  const falta = F.compra.falta || {}, comp = F.compra.comprado || {}, ex = F.compra.extra || [];
-  const nFalta = Object.keys(falta).length + ex.length;
-  const tabs = `<div class="seg"><button data-act="kTab" data-t="casa" class="${t === 'casa' ? 'on' : ''}">🏠 Revisar en casa</button><button data-act="kTab" data-t="lista" class="${t === 'lista' ? 'on' : ''}">🛒 Mi lista (${nFalta})</button></div>`;
-  let cuerpo;
-  if (t === 'casa') {
-    cuerpo = `<p class="muted small" style="margin:0 0 6px">Mira en casa y toca lo que <b>te falta</b>. Se va añadiendo a tu lista.</p>` +
-      bloquesCompra().map(({ cm, ls }) => ls.length ? `<div class="dgrp">${esc(cm.nombre)}</div>${ls.map(a => `<button class="kit falta ${falta[a.id] ? 'ok' : ''}" data-act="kFalta" data-id="${a.id}"><span class="ck">${falta[a.id] ? '🛒' : ''}</span><span class="n">${esc(a.n)}${a.marca ? ` <small class="faint">${esc(a.marca)}</small>` : ''}</span><span class="q">${falta[a.id] ? 'falta' : ''}</span></button>`).join('')}` : '').join('') +
-      `<div class="row" style="margin-top:12px"><input type="text" id="kNuevo" placeholder="Otra cosa que falte (papel, café…)" style="flex:1"><button class="btn sm primary" data-act="kExAdd">Añadir</button></div>
-      <button class="btn primary big" style="margin-top:12px" data-act="kTab" data-t="lista">Ver mi lista (${nFalta})</button>`;
-  } else {
-    const bl = bloquesCompra().map(({ cm, ls }) => ({ cm, ls: ls.filter(a => falta[a.id]) })).filter(x => x.ls.length);
-    const nOk = Object.keys(falta).filter(id => comp[id]).length + ex.filter(e => e.ok).length;
-    cuerpo = !nFalta ? `<div class="empty">Tu lista está vacía.<br>Ve a «Revisar en casa» y marca lo que te falta.</div>` :
-      `<div class="row" style="margin:0 0 4px"><span class="muted small">${nOk}/${nFalta} en el carro</span><span class="sp"></span><button class="btn sm" data-act="kCopiar">Copiar</button></div>` +
-      bl.map(({ cm, ls }) => `<div class="dgrp">${esc(cm.nombre)}</div>${ls.map(a => `<button class="kit ${comp[a.id] ? 'ok' : ''}" data-act="kComp" data-id="${a.id}"><span class="ck">${comp[a.id] ? '✓' : ''}</span><span class="n">${esc(a.n)}${a.marca ? ` <small class="faint">${esc(a.marca)}</small>` : ''}</span><span class="q faint">${esc(a.super || '')}</span></button>`).join('')}`).join('') +
-      (ex.length ? `<div class="dgrp">Otras cosas</div>${ex.map((e, i) => `<div class="kit ${e.ok ? 'ok' : ''}"><button class="ck" data-act="kExOk" data-i="${i}">${e.ok ? '✓' : ''}</button><span class="n">${esc(e.n)}</span><button class="x" data-act="kExDel" data-i="${i}" aria-label="Quitar">✕</button></div>`).join('')}` : '') +
-      `<button class="btn primary big" style="margin-top:14px" data-act="kFin">✅ Compra hecha</button><p class="faint small" style="text-align:center">Quita de la lista lo que hayas comprado; lo que no, se queda para la próxima.</p>`;
-  }
-  hoja(`<h2>🛒 Lista de la compra</h2>${tabs}${cuerpo}`);
+function catalogoCompra() {
+  const m = new Map(CATS.map(c => [c, []])), vistos = new Set();
+  for (const a of F.alimentos) if (a.compra) { (m.get(a.compra) || m.get('Otros')).push(a); vistos.add(a.id); }
+  for (const cm of F.dieta.comidas || []) for (const a of alimsDeComida(cm)) if (!vistos.has(a.id)) { vistos.add(a.id); (m.get(cm.nombre) || m.get('Otros')).push(a); }
+  return [...m].filter(([, l]) => l.length).map(([cat, items]) => ({ cat, items }));
 }
+let kModo = lsGet('jp-fit-kmodo', 'casa'), kAgr = lsGet('jp-fit-kagr', 'cat'), kFiltro = '';
+function repinta() { const y = scrollY; pinta(); scrollTo(0, y); }
+function filaCompra(a, modo) {
+  const falta = !!F.compra.falta?.[a.id], comp = !!F.compra.comprado?.[a.id], on = modo === 'casa' ? falta : comp;
+  return `<div class="kit ${modo === 'casa' ? 'falta' : ''} ${on ? 'ok' : ''}" data-n="${esc(norm(a.n + ' ' + (a.marca || '') + ' ' + (a.super || '')))}">
+    <button class="kmain" data-act="${modo === 'casa' ? 'kFalta' : 'kComp'}" data-id="${a.id}"><span class="ck">${on ? (modo === 'casa' ? '!' : '✓') : ''}</span>
+    <span class="n">${esc(a.n)}${a.marca ? ` <small class="faint">${esc(a.marca)}</small>` : ''}</span>${a.super ? `<span class="sup">${esc(a.super)}</span>` : ''}${modo === 'casa' && falta ? '<span class="ftag">Falta</span>' : ''}</button>
+    <button class="kmas" data-act="kEdit" data-id="${a.id}" aria-label="Editar producto">⋯</button></div>`;
+}
+function vCompra() {
+  const cat = catalogoCompra(), falta = F.compra.falta || {}, comp = F.compra.comprado || {}, ex = F.compra.extra || [];
+  const todos = cat.flatMap(c => c.items), fl = todos.filter(a => falta[a.id]), nF = fl.length + ex.length, nC = fl.filter(a => comp[a.id]).length + ex.filter(e => e.ok).length;
+  const pc = nF ? Math.round(nC / nF * 100) : 0;
+  let cuerpo = '';
+  if (kModo === 'casa') {
+    cuerpo = `<p class="muted small" style="margin:4px 0 2px">Repasa la despensa y toca lo que <b>te falta</b>. Lo marcado pasa a «Comprar».</p>` +
+      cat.map(({ cat: c, items }) => `<div class="kcat"><span>${CAT_IC[c] || '🛍️'} ${esc(c)}</span><span class="faint">${items.filter(a => falta[a.id]).length}/${items.length}</span></div><div class="card klist">${items.map(a => filaCompra(a, 'casa')).join('')}</div>`).join('');
+  } else if (!nF) {
+    cuerpo = `<div class="empty">🧺 No te falta nada.<br>Pasa por «En casa» y marca lo que se ha acabado.</div>`;
+  } else {
+    const grupos = kAgr === 'super' ? Object.entries(fl.reduce((o, a) => ((o[a.super || 'Sin súper'] ||= []).push(a), o), {})).map(([s, l]) => ({ t: '🏪 ' + s, l }))
+      : cat.map(({ cat: c, items }) => ({ t: (CAT_IC[c] || '🛍️') + ' ' + c, l: items.filter(a => falta[a.id]) })).filter(g => g.l.length);
+    cuerpo = `<div class="seg mini" style="max-width:260px;margin:6px auto 4px"><button data-act="kAgr" data-a="cat" class="${kAgr === 'cat' ? 'on' : ''}">Por comida</button><button data-act="kAgr" data-a="super" class="${kAgr === 'super' ? 'on' : ''}">Por súper</button></div>` +
+      grupos.map(g => `<div class="kcat"><span>${esc(g.t)}</span><span class="faint">${g.l.filter(a => comp[a.id]).length}/${g.l.length}</span></div><div class="card klist">${g.l.map(a => filaCompra(a, 'comprar')).join('')}</div>`).join('') +
+      (ex.length ? `<div class="kcat"><span>📝 Otras cosas</span></div><div class="card klist">${ex.map((e, i) => `<div class="kit ${e.ok ? 'ok' : ''}"><button class="kmain" data-act="kExOk" data-i="${i}"><span class="ck">${e.ok ? '✓' : ''}</span><span class="n">${esc(e.n)}</span></button><button class="kmas" data-act="kExDel" data-i="${i}" aria-label="Quitar">✕</button></div>`).join('')}</div>` : '') +
+      `<button class="btn primary big" style="margin-top:16px" data-act="kFin">✅ Compra hecha</button><p class="faint small" style="text-align:center;margin-top:6px">Quita lo que has metido en el carro; lo demás se queda para la próxima.</p>`;
+  }
+  return `<div class="card khead"><div class="row"><div style="flex:1"><span class="muted small">Lista de la compra</span><div class="kbig">${nF ? nF - nC : 0}<small> por comprar</small></div></div>
+     <div class="row btnrow" style="justify-content:flex-end"><button class="btn sm primary" data-act="kProd">＋ Producto</button><button class="btn sm" data-act="kCopiar" ${nF ? '' : 'disabled'}>Copiar</button></div></div>
+     ${nF ? `<div class="barra gruesa" style="margin-top:10px"><i style="width:${pc}%"></i></div><div class="faint small" style="margin-top:4px">${nC} de ${nF} en el carro</div>` : ''}</div>
+   <div class="seg" style="margin-top:12px"><button data-act="kModo" data-m="casa" class="${kModo === 'casa' ? 'on' : ''}">🏠 En casa</button><button data-act="kModo" data-m="comprar" class="${kModo === 'comprar' ? 'on' : ''}">🛒 Comprar${nF ? ` (${nF - nC})` : ''}</button></div>
+   <input class="buscar" id="kQ" placeholder="Buscar producto…" value="${esc(kFiltro)}" autocomplete="off">
+   ${cuerpo}
+   <div class="row" style="margin-top:14px"><input type="text" class="buscar" id="kNuevo" placeholder="Apuntar algo rápido (papel, café…)" style="flex:1"><button class="btn primary" data-act="kExAdd">Añadir</button></div>`;
+}
+function filtraCompra() { const f = norm(kFiltro); document.querySelectorAll('.klist .kit[data-n]').forEach(r => { r.hidden = !!f && !r.dataset.n.includes(f); }); }
 let compraT = null;
 function guardaCompra() { clearTimeout(compraT); compraT = setTimeout(() => setDoc(fitRef('compra'), F.compra).catch(e => toast('No se pudo guardar: ' + (e.code || e.message))), 500); }
+document.addEventListener('input', ev => { if (ev.target.id === 'kQ') { kFiltro = ev.target.value; filtraCompra(); } });
+document.addEventListener('keydown', ev => { if (ev.target.id === 'kNuevo' && ev.key === 'Enter') document.querySelector('[data-act=kExAdd]')?.click(); });
 
 document.addEventListener('click', async ev => {
   const b = ev.target.closest('[data-act]'); if (!b) return;
@@ -1096,17 +1125,20 @@ document.addEventListener('click', async ev => {
     case 'objEdit': return hojaObjetivos();
     case 'objOk': { const a = F.ajustes; a.meta = $('#oMeta').value.trim(); a.objPeso = num($('#oPeso').value); a.objFecha = $('#oFecha').value || null; a.objIni = num($('#oIni').value); a.objSemana = Math.max(1, Math.min(7, parseInt($('#oSem').value) || 4));
       guardaPerfil(0); cierraHoja(); pinta(); return toast('Objetivos guardados'); }
-    case 'kAbrir': return hojaCompra();
-    case 'kTab': return hojaCompra(b.dataset.t);
-    case 'kFalta': { const f = F.compra.falta ||= {}; if (f[b.dataset.id]) { delete f[b.dataset.id]; delete (F.compra.comprado || {})[b.dataset.id]; } else f[b.dataset.id] = true; guardaCompra(); return hojaCompra('casa'); }
-    case 'kComp': { const c = F.compra.comprado ||= {}; c[b.dataset.id] = !c[b.dataset.id]; guardaCompra(); return hojaCompra('lista'); }
-    case 'kExOk': F.compra.extra[+b.dataset.i].ok = !F.compra.extra[+b.dataset.i].ok; guardaCompra(); return hojaCompra('lista');
-    case 'kExDel': F.compra.extra.splice(+b.dataset.i, 1); guardaCompra(); return hojaCompra();
-    case 'kExAdd': { const n = $('#kNuevo').value.trim(); if (!n) return; (F.compra.extra ||= []).push({ n, ok: false }); guardaCompra(); return hojaCompra('casa'); }
+    case 'kAbrir': vista = 'compra'; lsSet('jp-fit-vista', vista); scrollTo(0, 0); return pinta();
+    case 'kModo': kModo = b.dataset.m; lsSet('jp-fit-kmodo', kModo); return repinta();
+    case 'kAgr': kAgr = b.dataset.a; lsSet('jp-fit-kagr', kAgr); return repinta();
+    case 'kFalta': { const f = F.compra.falta ||= {}; if (f[b.dataset.id]) { delete f[b.dataset.id]; delete (F.compra.comprado || {})[b.dataset.id]; } else f[b.dataset.id] = true; guardaCompra(); repinta(); return filtraCompra(); }
+    case 'kComp': { const c = F.compra.comprado ||= {}; c[b.dataset.id] = !c[b.dataset.id]; guardaCompra(); repinta(); return filtraCompra(); }
+    case 'kExOk': F.compra.extra[+b.dataset.i].ok = !F.compra.extra[+b.dataset.i].ok; guardaCompra(); return repinta();
+    case 'kExDel': F.compra.extra.splice(+b.dataset.i, 1); guardaCompra(); return repinta();
+    case 'kExAdd': { const n = $('#kNuevo').value.trim(); if (!n) return $('#kNuevo').focus(); (F.compra.extra ||= []).push({ n, ok: false }); guardaCompra(); toast('Añadido a «Comprar»'); return repinta(); }
+    case 'kProd': hojaCtx = { tipo: 'compraProd' }; return hojaAlimento(null);
+    case 'kEdit': hojaCtx = { tipo: 'compraProd' }; return hojaAlimento(b.dataset.id);
     case 'kFin': { const c = F.compra.comprado || {}; for (const id of Object.keys(c)) if (c[id]) delete F.compra.falta[id]; F.compra.comprado = {}; F.compra.extra = (F.compra.extra || []).filter(e => !e.ok);
-      guardaCompra(); toast('¡Compra hecha! 🛒'); return hojaCompra('lista'); }
-    case 'kCopiar': { const falta = F.compra.falta || {};
-      const txt = '🛒 Lista de la compra\n' + bloquesCompra().map(({ cm, ls }) => { const l = ls.filter(a => falta[a.id] && !(F.compra.comprado || {})[a.id]); return l.length ? `\n${cm.nombre}\n` + l.map(a => '- ' + a.n + (a.super ? ` (${a.super})` : '')).join('\n') : ''; }).join('') +
+      guardaCompra(); toast('¡Compra hecha! 🛒'); scrollTo(0, 0); return pinta(); }
+    case 'kCopiar': { const falta = F.compra.falta || {}, comp = F.compra.comprado || {};
+      const txt = '🛒 Lista de la compra\n' + catalogoCompra().map(({ cat: c, items }) => { const l = items.filter(a => falta[a.id] && !comp[a.id]); return l.length ? `\n${c}\n` + l.map(a => '- ' + a.n + (a.super ? ` (${a.super})` : '')).join('\n') : ''; }).join('') +
         ((F.compra.extra || []).filter(e => !e.ok).length ? '\n\nOtras cosas\n' + F.compra.extra.filter(e => !e.ok).map(e => '- ' + e.n).join('\n') : '');
       try { await navigator.clipboard.writeText(txt); toast('Lista copiada: pégala en WhatsApp o Notas'); } catch (e) { toast('No pude copiar'); } return; }
   }
@@ -1291,7 +1323,7 @@ onAuthStateChanged(auth, user => {
       } else if (id === 'dieta') { const ds = d?.dietas || (d?.comidas ? [{ id: 'd1', nombre: 'Dieta 1', comidas: d.comidas, obj: d.obj || null, at: Date.now() }] : []);
         F.dietas = ds; F.dietaActiva = d?.activa || ds[0]?.id || null; F.dieta = ds.find(x => x.id === F.dietaActiva) || { comidas: [], obj: null }; F.dieta.ult = d?.ult || {};
       } else if (id === 'cuerpo') { F.pesos = d?.pesos || {};
-      } else if (id === 'compra') { if (d) F.compra = { falta: d.falta || {}, comprado: d.comprado || {}, extra: d.extra || [] }; if (hojaCtx?.tipo === 'compra' && !$('#sheet').hidden) hojaCompra();
+      } else if (id === 'compra') { if (d) F.compra = { falta: d.falta || {}, comprado: d.comprado || {}, extra: d.extra || [] };
       } else if (id.startsWith('d-')) { if (d) Object.assign(F.diario, d.dias || {});
       } else if (id.startsWith('m-')) { if (d) F.meses[id.slice(2)] = d.e || {}; else delete F.meses[id.slice(2)]; }
     }
