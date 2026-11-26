@@ -45,15 +45,14 @@ const lsSet = (k, v) => { try { v == null ? localStorage.removeItem(k) : localSt
 
 // Tema: el mismo que elijas en el Organizador
 (() => { let m = 'light'; try { m = localStorage.getItem('jp-theme') || 'light'; } catch (e) {}
-  const dark = m === 'dark' || (m === 'auto' && matchMedia('(prefers-color-scheme: dark)').matches);
-  document.documentElement.dataset.theme = dark ? 'dark' : 'light';
-  const mc = document.querySelector('meta[name=theme-color]'); if (mc) mc.content = dark ? '#0a0a0b' : '#f5f5f7'; })();
+  document.documentElement.dataset.theme = 'dark';   // Fitness siempre en negro y verde
+  const mc = document.querySelector('meta[name=theme-color]'); if (mc) mc.content = '#000000'; })();
 
 let toastT;
 const toast = (m, ms = 2600) => { const t = $('#toast'); t.textContent = m; t.hidden = false; clearTimeout(toastT); toastT = setTimeout(() => t.hidden = true, ms); };
 
 // ---------- estado ----------
-const F = { rutinas: [], ajustes: { descanso: 120, objSemana: 4 }, meses: {}, entrenos: [], porId: {}, ultimoFin: null };
+const F = { rutinas: [], ajustes: { descanso: 120, objSemana: 4 }, meses: {}, entrenos: [], porId: {}, ultimoFin: null, alimentos: [], dieta: { comidas: [], obj: null }, diario: {}, pesos: {} };
 let U = null, listo = false, vista = lsGet('jp-fit-vista', 'hoy');
 let activo = lsGet('jp-fit-activo', null);
 const perfilRef = () => doc(db, 'users', U.uid, 'fit', 'perfil');
@@ -160,7 +159,7 @@ function pinta() {
   if (!listo) return;
   document.querySelectorAll('#tabbar button').forEach(b => b.classList.toggle('on', b.dataset.v === vista));
   const m = $('#main');
-  m.innerHTML = ({ hoy: vHoy, rutinas: vRutinas, historial: vHistorial, ejercicios: vEjercicios }[vista] || vHoy)();
+  m.innerHTML = ({ hoy: vHoy, rutinas: vRutinas, comida: vComida, historial: vHistorial, ejercicios: vEjercicios }[vista] || vHoy)();
   pintaEnCurso();
 }
 
@@ -182,6 +181,8 @@ function vHoy() {
   </div>
   <div style="margin-top:16px">${activo ? `<button class="btn primary big" data-act="abrirWo">⏱️ Seguir con el entreno</button>` : `<button class="btn primary big" data-act="empezar">💪 Empezar entreno</button>`}</div>
   ${sug && !activo ? `<div class="sec"><h2>Te toca</h2></div>${cardRutina(sug)}` : ''}
+  <div class="sec"><h2>Comida de hoy</h2></div>${resumenMacros(fISO(Date.now()), true)}
+  <div class="sec"><h2>Peso</h2></div>${cardPeso()}
   ${ult ? `<div class="sec"><h2>Último entreno</h2></div>${cardEntreno(ult)}` : ''}
   ${dur ? `<p class="faint small" style="text-align:center;margin-top:18px">Esta semana: ${fDur(dur)} entrenando</p>` : ''}`;
 }
@@ -220,7 +221,7 @@ function vEjercicios() {
   const lista = [...catalogo().values()].filter(x => x.veces).sort((a, b) => b.ult - a.ult);
   const f = norm(filtroEj);
   const vis = f ? lista.filter(x => norm(x.n).includes(f)) : lista;
-  return `<input class="buscar" id="buscaEj" placeholder="Buscar ejercicio…" value="${esc(filtroEj)}" autocomplete="off">
+  return `${cardPeso()}<div class="sec"><h2>Ejercicios</h2></div><input class="buscar" id="buscaEj" placeholder="Buscar ejercicio…" value="${esc(filtroEj)}" autocomplete="off">
   <div class="card" style="padding:0;margin-top:12px">${vis.map(x => { const h = historialDe(x.k); const best = h.map(o => mejor(o.e)).filter(Boolean).sort((a, b) => e1rm(b.kg, b.r) - e1rm(a.kg, a.r))[0];
     return `<div class="ej-li" data-act="verEj" data-k="${esc(x.k)}" style="border-bottom:1px solid var(--line)"><div class="n"><b>${esc(x.n)}</b><span>${x.veces} sesiones · última ${fDia(x.ult)}</span></div>
     <div class="v">${best ? fmtKgR(best.kg, best.r) : '—'}<small>mejor serie</small></div></div>`; }).join('') || '<div class="empty">Nada por aquí.</div>'}</div>`;
@@ -615,7 +616,8 @@ function deCSV(txt) {
 }
 $('#fileIn').addEventListener('change', async ev => {
   const f = ev.target.files[0]; ev.target.value = ''; if (!f) return;
-  let d; try { const txt = await f.text(); d = /\.csv$/i.test(f.name) || !txt.trim().startsWith('{') ? deCSV(txt) : deJSON(JSON.parse(txt)); }
+  let d; try { const txt = await f.text(); if (/weight_kg/.test(txt.slice(0, 300)) && !/exercise_title/.test(txt.slice(0, 300))) { const n = await importaPesos(deMedidas(txt)); return toast(`Importados ${n} pesos ✓`, 4000); }
+    d = /\.csv$/i.test(f.name) || !txt.trim().startsWith('{') ? deCSV(txt) : deJSON(JSON.parse(txt)); }
   catch (e) { return toast('No pude leer el archivo: ' + e.message, 5000); }
   // Evita duplicados: mismo inicio (al minuto) = mismo entreno
   const ya = new Set(F.entrenos.map(w => Math.floor(w.ini / 60000)));
@@ -635,6 +637,192 @@ window.__fit = { F, deJSON, importa: async d => { const x = deJSON(d); const ya 
   for (const [k, e] of Object.entries(porMes)) { Object.assign(F.meses[k] ||= {}, e); await setDoc(mesRef(k), { e }, { merge: true }); }
   for (const r of x.rutinas) { const i = F.rutinas.findIndex(y => y.id === r.id); if (i >= 0) F.rutinas[i] = r; else F.rutinas.push(r); }
   guardaPerfil(0); reconstruye(); pinta(); return { entrenos: nuevos.length, rutinas: x.rutinas.length }; } };
+
+
+// ================= ALIMENTACIÓN Y PESO =================
+// users/{uid}/fit/alimentos  { lista: [{id,n,marca,super,k,p,c,g,ud,gUd}] }  (macros por 100 g/ml)
+// users/{uid}/fit/dieta      { comidas: [{k,nombre,grupos:[{nombre,opciones:[{nombre,items:[{a,q}]}]}]}], obj:{k,p,c,g} }
+// users/{uid}/fit/d-AAAA-MM  { dias: { 'AAAA-MM-DD': { c: { des:[item], com:[], mer:[], cen:[], ext:[] } } } }  item = {a,n,q,m:[k,p,c,g]}
+// users/{uid}/fit/cuerpo     { pesos: { 'AAAA-MM-DD': kg } }
+const COMIDAS = [['des', 'Desayuno', '🥣'], ['com', 'Comida', '🍝'], ['mer', 'Merienda', '🍌'], ['cen', 'Cena', '🍳'], ['ext', 'Extras / picoteo', '🍫']];
+const SUPERS = ['Mercadona', 'Lidl', 'Carrefour', 'Dia', 'Alcampo', 'Eroski', 'Aldi', 'Consum', 'Gadis', 'Froiz', 'El Corte Inglés'];
+const fISO = t => { const d = new Date(t); return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0'); };
+const deISO = s => { const [y, m, d] = s.split('-').map(Number); return new Date(y, m - 1, d).getTime(); };
+let diaSel = fISO(Date.now());
+const alim = id => F.alimentos.find(a => a.id === id);
+const mac = it => { const f = (it.q || 0) / 100, m = it.m || [0, 0, 0, 0]; return { k: m[0] * f, p: m[1] * f, c: m[2] * f, g: m[3] * f }; };
+const suma = items => items.reduce((t, it) => { const m = mac(it); t.k += m.k; t.p += m.p; t.c += m.c; t.g += m.g; return t; }, { k: 0, p: 0, c: 0, g: 0 });
+const deDieta = it => { const a = alim(it.a); return a ? { a: a.id, n: a.n, q: it.q, m: [a.k, a.p, a.c, a.g] } : null; };
+const fQ = (a, q) => { if (a && a.ud && a.gUd) { const u = q / a.gUd; if (Math.abs(u - Math.round(u)) < 0.05 && u >= 1) return `${Math.round(u)} ${a.ud}${Math.round(u) > 1 && !/s$/.test(a.ud) ? 's' : ''} · ${fmtN(q)} g`; } return fmtN(q) + (a && a.ml ? ' ml' : ' g'); };
+const r0 = n => Math.round(n || 0);
+const tagM = m => `<span class="mtag"><b>${r0(m.k)}</b> kcal · P ${r0(m.p)} · H ${r0(m.c)} · G ${r0(m.g)}</span>`;
+function diaDe(f) { const d = F.diario[f] ||= { c: {} }; for (const [k] of COMIDAS) d.c[k] ||= []; return d; }
+const itemsDia = f => { const d = F.diario[f]; return d ? COMIDAS.flatMap(([k]) => d.c?.[k] || []) : []; };
+function objDieta() { // un día «tipo» con la primera opción de cada grupo
+  const t = { k: 0, p: 0, c: 0, g: 0 };
+  for (const cm of F.dieta.comidas || []) for (const gr of cm.grupos || []) { const s = suma((gr.opciones?.[0]?.items || []).map(deDieta).filter(Boolean)); t.k += s.k; t.p += s.p; t.c += s.c; t.g += s.g; }
+  return t;
+}
+const objetivo = () => { const o = F.dieta.obj; return o && o.k ? o : objDieta(); };
+
+const fitRef = id => doc(db, 'users', U.uid, 'fit', id);
+const guardaAlimentos = () => setDoc(fitRef('alimentos'), { lista: F.alimentos }).catch(e => toast('No se pudo guardar: ' + (e.code || e.message)));
+const guardaDieta = () => setDoc(fitRef('dieta'), { comidas: F.dieta.comidas, obj: F.dieta.obj || null }).catch(e => toast('No se pudo guardar: ' + (e.code || e.message)));
+const guardaDia = f => setDoc(fitRef('d-' + f.slice(0, 7)), { dias: { [f]: F.diario[f] } }, { merge: true }).catch(e => toast('No se pudo guardar: ' + (e.code || e.message)));
+const guardaPeso = (f, kg) => (kg == null ? updateDoc(fitRef('cuerpo'), new FieldPath('pesos', f), deleteField()) : setDoc(fitRef('cuerpo'), { pesos: { [f]: kg } }, { merge: true })).catch(e => toast('No se pudo guardar: ' + (e.code || e.message)));
+
+function barra(v, o, cls = '') { const pc = o ? Math.min(100, v / o * 100) : 0; return `<div class="barra ${cls} ${o && v > o * 1.08 ? 'over' : ''}"><i style="width:${pc}%"></i></div>`; }
+function resumenMacros(f, corto) {
+  const t = suma(itemsDia(f)), o = objetivo();
+  return `<div class="card macros"${corto ? ' data-act="irComida" style="cursor:pointer"' : ''}><div class="kc"><b>${fmtN(r0(t.k))}</b><span class="muted">/ ${fmtN(r0(o.k))} kcal</span><span class="sp"></span><span class="muted small">${o.k ? (t.k <= o.k ? 'quedan ' + fmtN(r0(o.k - t.k)) : 'te pasas ' + fmtN(r0(t.k - o.k))) : ''}</span></div>${barra(t.k, o.k)}
+    <div class="mac3"><div class="P">Proteína<b>${r0(t.p)} / ${r0(o.p)} g</b>${barra(t.p, o.p)}</div><div class="C">Hidratos<b>${r0(t.c)} / ${r0(o.c)} g</b>${barra(t.c, o.c)}</div><div class="G">Grasa<b>${r0(t.g)} / ${r0(o.g)} g</b>${barra(t.g, o.g)}</div></div></div>`;
+}
+function vComida() {
+  const d = F.diario[diaSel], hoy = fISO(Date.now());
+  const nom = diaSel === hoy ? 'Hoy' : diaSel === fISO(Date.now() - DIA) ? 'Ayer' : fDia(deISO(diaSel));
+  return `<div class="dianav"><button data-act="cDia" data-d="-1" aria-label="Día anterior">‹</button><b>${nom}</b><button data-act="cDia" data-d="1" aria-label="Día siguiente" ${diaSel >= hoy ? 'disabled style="opacity:.3"' : ''}>›</button></div>
+  ${resumenMacros(diaSel)}
+  ${COMIDAS.map(([k, nombre, ic]) => { const its = d?.c?.[k] || [], t = suma(its), enDieta = (F.dieta.comidas || []).some(c => c.k === k);
+    return `<div class="card meal"><div class="meal-h"><h3>${ic} ${nombre}</h3><span>${its.length ? r0(t.k) + ' kcal · P ' + r0(t.p) : ''}</span></div>
+    ${its.map((it, i) => { const m = mac(it); return `<div class="it" data-act="cItem" data-k="${k}" data-i="${i}"><div class="n"><b>${esc(it.n)}</b><span>${fQ(alim(it.a), it.q)}</span></div><div class="k">${r0(m.k)} kcal<small>P ${r0(m.p)} · H ${r0(m.c)} · G ${r0(m.g)}</small></div></div>`; }).join('')}
+    <div class="acts">${enDieta ? `<button class="btn sm primary" data-act="cDeDieta" data-k="${k}">📋 De mi dieta</button>` : ''}<button class="btn sm" data-act="cAdd" data-k="${k}">＋ Alimento</button></div></div>`; }).join('')}
+  <div class="stack" style="margin-top:16px"><button class="btn" data-act="cVerDieta">🥗 Mi dieta y objetivos</button><button class="btn" data-act="cAlims">🛒 Mis alimentos (${F.alimentos.length})</button></div>`;
+}
+
+// ---- hojas de comida ----
+function hojaDeDieta(k) {
+  const cm = F.dieta.comidas.find(c => c.k === k); if (!cm) return;
+  if (!hojaCtx || hojaCtx.tipo !== 'cdieta' || hojaCtx.k !== k) hojaCtx = { tipo: 'cdieta', k, sel: (F.dieta.ult?.[k] || cm.grupos.map(() => 0)).slice(0, cm.grupos.length) };
+  const sel = hojaCtx.sel; while (sel.length < cm.grupos.length) sel.push(0);
+  const items = cm.grupos.flatMap((g, gi) => sel[gi] < 0 ? [] : (g.opciones[sel[gi]]?.items || []).map(deDieta).filter(Boolean));
+  hoja(`<h2>${esc(cm.nombre)} · de mi dieta</h2>
+  ${cm.grupos.map((g, gi) => `<div class="dgrp">${esc(g.nombre)}</div><div class="chips">${g.opciones.map((o, oi) => { const s = suma(o.items.map(deDieta).filter(Boolean));
+    return `<button class="${sel[gi] === oi ? 'on' : ''}" data-act="cSel" data-g="${gi}" data-o="${oi}">${esc(o.nombre)}<small>${r0(s.k)} kcal · P ${r0(s.p)}</small></button>`; }).join('')}${g.opciones.length > 1 || g.opcional ? '' : ''}<button class="${sel[gi] < 0 ? 'on' : ''}" data-act="cSel" data-g="${gi}" data-o="-1">No<small>nada de esto</small></button></div>`).join('')}
+  <div class="card" style="margin-top:12px">${items.map(it => `<div class="small">${esc(it.n)} · <span class="muted">${fQ(alim(it.a), it.q)}</span></div>`).join('') || '<span class="muted small">Nada elegido</span>'}<div style="margin-top:8px">${tagM(suma(items))}</div></div>
+  <button class="btn primary big" style="margin-top:12px" data-act="cDietaOk">Añadir a ${esc(cm.nombre.toLowerCase())}</button>`);
+}
+let alimFiltro = '';
+function hojaAlimentos(modo, k) { // modo 'add' (elegir para añadir a la comida k) o 'gest'
+  hojaCtx = { tipo: 'calims', modo, k };
+  hoja(`<h2>${modo === 'add' ? 'Añadir alimento' : 'Mis alimentos'}</h2><input class="buscar" id="alimQ" placeholder="Buscar por nombre, marca o súper…" value="${esc(alimFiltro)}" autocomplete="off">
+  <div class="pick" id="alimL"></div><button class="btn" style="width:100%;margin-top:10px" data-act="cNuevoAlim">＋ Crear alimento nuevo</button>`);
+  pintaAlims(); $('#alimQ').addEventListener('input', e => { alimFiltro = e.target.value; pintaAlims(); });
+}
+function pintaAlims() {
+  const f = norm(alimFiltro), uso = {};
+  for (const f2 of Object.keys(F.diario)) for (const it of itemsDia(f2)) uso[it.a] = (uso[it.a] || 0) + 1;
+  const l = F.alimentos.filter(a => !f || norm(a.n + ' ' + (a.marca || '') + ' ' + (a.super || '')).includes(f)).sort((a, b) => (uso[b.id] || 0) - (uso[a.id] || 0) || a.n.localeCompare(b.n));
+  $('#alimL').innerHTML = l.map(a => `<button data-act="cAlim" data-id="${a.id}">${esc(a.n)}<small>${[a.marca, a.super].filter(Boolean).map(esc).join(' · ') || 'sin marca'} · ${r0(a.k)} kcal · P ${fmtN(a.p)} · H ${fmtN(a.c)} · G ${fmtN(a.g)} /100${a.ml ? 'ml' : 'g'}${a.aprox ? ' · aprox.' : ''}</small></button>`).join('') || '<p class="faint small">No hay ninguno con ese nombre.</p>';
+}
+function hojaCantidad(a, k, i) { // añadir (i == null) o editar el item i de la comida k
+  const it = i != null ? F.diario[diaSel].c[k][i] : null, q = it ? it.q : (a.gUd || 100);
+  hojaCtx = { tipo: 'cq', a: a.id, k, i };
+  hoja(`<h2>${esc(a.n)}</h2><p class="muted small" style="margin:-6px 0 6px">${[a.marca, a.super].filter(Boolean).map(esc).join(' · ')} ${r0(a.k)} kcal/100${a.ml ? 'ml' : 'g'}</p>
+  <label>Cantidad (${a.ml ? 'ml' : 'gramos'})</label><input type="number" inputmode="decimal" id="cQ" value="${q}">
+  ${a.gUd ? `<div class="qbtns">${[0.5, 1, 2, 3, 4].map(u => `<button data-act="cQu" data-q="${u * a.gUd}">${fmtN(u)} ${esc(a.ud || 'ud')}</button>`).join('')}</div>` : `<div class="qbtns">${[50, 100, 150, 200, 250].map(g => `<button data-act="cQu" data-q="${g}">${g}</button>`).join('')}</div>`}
+  <div class="card" style="margin-top:12px" id="cQm"></div>
+  <div class="stack" style="margin-top:12px"><button class="btn primary" data-act="cQok">${it ? 'Guardar' : 'Añadir'}</button>${it ? '<button class="btn danger" data-act="cQdel">Quitar</button>' : ''}</div>`);
+  const pm = () => { $('#cQm').innerHTML = tagM(mac({ q: num($('#cQ').value) || 0, m: [a.k, a.p, a.c, a.g] })); };
+  $('#cQ').addEventListener('input', pm); pm();
+}
+function hojaAlimento(id) {
+  const a = id ? alim(id) : { n: '', marca: '', super: 'Mercadona', k: '', p: '', c: '', g: '', ud: '', gUd: '' };
+  hojaCtx = { ...(hojaCtx || {}), tipo: 'calim', id, volver: hojaCtx };
+  hoja(`<h2>${id ? 'Editar alimento' : 'Nuevo alimento'}</h2>
+  <label>Nombre</label><input type="text" id="aN" value="${esc(a.n)}" placeholder="Ej.: Queso fresco batido 0%">
+  <div class="f2"><div><label>Marca</label><input type="text" id="aM" value="${esc(a.marca || '')}" placeholder="Hacendado"></div>
+  <div><label>Supermercado</label><input type="text" id="aS" list="supers" value="${esc(a.super || '')}"><datalist id="supers">${SUPERS.map(s => `<option value="${s}">`).join('')}</datalist></div></div>
+  <label>Por cada 100 g (o ml) — mira la etiqueta</label>
+  <div class="f2"><div><label>Kcal</label><input type="number" inputmode="decimal" id="aK" value="${a.k}"></div><div><label>Proteína (g)</label><input type="number" inputmode="decimal" id="aP" value="${a.p}"></div>
+  <div><label>Hidratos (g)</label><input type="number" inputmode="decimal" id="aC" value="${a.c}"></div><div><label>Grasa (g)</label><input type="number" inputmode="decimal" id="aG" value="${a.g}"></div></div>
+  <div class="f2"><div><label>Unidad (opcional)</label><input type="text" id="aU" value="${esc(a.ud || '')}" placeholder="lata, huevo, loncha…"></div><div><label>Gramos por unidad</label><input type="number" inputmode="decimal" id="aGu" value="${a.gUd || ''}"></div></div>
+  <label style="display:flex;gap:8px;align-items:center"><input type="checkbox" id="aMl" ${a.ml ? 'checked' : ''}> Es líquido (se mide en ml)</label>
+  ${a.aprox ? '<p class="faint small">Valores aproximados: cámbialos por los de la etiqueta de tu producto.</p>' : ''}
+  <div class="stack" style="margin-top:12px"><button class="btn primary" data-act="cAlimOk">Guardar alimento</button>${id ? '<button class="btn danger" data-act="cAlimDel">Eliminar</button>' : ''}</div>`);
+}
+function hojaDieta() {
+  const o = objetivo(), od = objDieta();
+  hojaCtx = { tipo: 'cverdieta' };
+  hoja(`<h2>Mi dieta</h2>
+  <div class="card"><b>Objetivo diario</b><p class="faint small" style="margin:2px 0 8px">Por defecto sale de tu dieta (primera opción de cada comida: ${r0(od.k)} kcal · P ${r0(od.p)}). Cámbialo si tu objetivo es otro.</p>
+  <div class="f2"><div><label>Kcal</label><input type="number" id="oK" value="${r0(o.k)}"></div><div><label>Proteína (g)</label><input type="number" id="oP" value="${r0(o.p)}"></div>
+  <div><label>Hidratos (g)</label><input type="number" id="oC" value="${r0(o.c)}"></div><div><label>Grasa (g)</label><input type="number" id="oG" value="${r0(o.g)}"></div></div>
+  <div class="row" style="margin-top:10px"><button class="btn primary sm" data-act="cObjOk">Guardar objetivo</button><button class="btn sm" data-act="cObjDieta">Usar el de la dieta</button></div></div>
+  ${(F.dieta.comidas || []).map(cm => `<div class="sec"><h2>${esc(cm.nombre)}</h2></div>${cm.grupos.map(g => `<div class="dgrp">${esc(g.nombre)}</div>${g.opciones.map(op => { const its = op.items.map(deDieta).filter(Boolean);
+    return `<div class="dop"><b>${esc(op.nombre)}</b> ${tagM(suma(its))}<div class="muted small">${its.map(it => esc(it.n) + ' ' + fQ(alim(it.a), it.q)).join(' · ')}</div>${op.nota ? `<div class="faint small">${esc(op.nota)}</div>` : ''}</div>`; }).join('')}`).join('')}`).join('') || '<p class="muted">Aún no hay dieta cargada.</p>'}`);
+}
+
+// ---- peso ----
+function pesosOrden() { return Object.entries(F.pesos).map(([f, kg]) => ({ f, t: deISO(f), kg })).sort((a, b) => a.t - b.t); }
+function cardPeso() {
+  const ps = pesosOrden(); if (!ps.length) return `<div class="card"><b>Peso</b><p class="muted small">Apunta tu peso para ver la tendencia.</p><button class="btn sm primary" data-act="cPeso">＋ Apuntar peso</button></div>`;
+  const u = ps[ps.length - 1], hace30 = ps.filter(p => p.t <= u.t - 30 * DIA).pop(), obj = F.ajustes.objPeso;
+  const media7 = ps.filter(p => p.t > Date.now() - 7 * DIA).map(p => p.kg), m7 = media7.length ? media7.reduce((a, b) => a + b, 0) / media7.length : null;
+  const desde = Date.now() - 365 * DIA, pts = ps.filter(p => p.t >= desde).map(p => ({ t: p.t, v: p.kg }));
+  return `<div class="card"><div class="row"><div style="flex:1"><span class="muted small">Peso · ${fDia(u.t)}</span><div style="font:700 28px var(--head)">${fmtN(u.kg)} kg</div></div>
+    <div style="text-align:right" class="small">${hace30 ? `<div>${u.kg - hace30.kg <= 0 ? '▼' : '▲'} ${fmtN(Math.abs(Math.round((u.kg - hace30.kg) * 10) / 10))} kg en 30 días</div>` : ''}${m7 ? `<div class="muted">media 7 días ${fmtN(Math.round(m7 * 10) / 10)}</div>` : ''}${obj ? `<div class="muted">objetivo ${fmtN(obj)} kg · ${u.kg > obj ? 'faltan ' + fmtN(Math.round((u.kg - obj) * 10) / 10) : '¡conseguido!'}</div>` : ''}</div></div>
+    ${pts.length > 1 ? grafica(pts).replace('aria-label="Progreso"', 'aria-label="Peso"') : ''}<div class="row" style="margin-top:8px"><button class="btn sm primary" data-act="cPeso">＋ Apuntar peso</button><button class="btn sm" data-act="cPesos">Ver todos (${ps.length})</button></div></div>`;
+}
+function hojaPeso() {
+  hoja(`<h2>Apuntar peso</h2><label>Fecha</label><input type="text" id="pF" value="${fISO(Date.now())}" placeholder="AAAA-MM-DD"><label>Peso (kg)</label><input type="number" inputmode="decimal" id="pK" placeholder="82,5">
+  <label>Objetivo de peso (kg, opcional)</label><input type="number" inputmode="decimal" id="pO" value="${F.ajustes.objPeso || ''}">
+  <button class="btn primary big" style="margin-top:12px" data-act="cPesoOk">Guardar</button>`); setTimeout(() => $('#pK')?.focus(), 50);
+}
+
+document.addEventListener('click', ev => {
+  const b = ev.target.closest('[data-act]'); if (!b) return;
+  const a = b.dataset.act; if (!a.startsWith('c') || ['cierra', 'copia'].includes(a)) { if (a === 'irComida') { vista = 'comida'; lsSet('jp-fit-vista', vista); pinta(); } return; }
+  const k = b.dataset.k;
+  switch (a) {
+    case 'cDia': { const t = deISO(diaSel) + (+b.dataset.d) * DIA; if (t > Date.now()) return; diaSel = fISO(t); return pinta(); }
+    case 'cDeDieta': hojaCtx = null; return hojaDeDieta(k);
+    case 'cSel': hojaCtx.sel[+b.dataset.g] = +b.dataset.o; return hojaDeDieta(hojaCtx.k);
+    case 'cDietaOk': { const cm = F.dieta.comidas.find(c => c.k === hojaCtx.k), sel = hojaCtx.sel;
+      const its = cm.grupos.flatMap((g, gi) => sel[gi] < 0 ? [] : (g.opciones[sel[gi]]?.items || []).map(deDieta).filter(Boolean));
+      diaDe(diaSel).c[hojaCtx.k].push(...its); (F.dieta.ult ||= {})[hojaCtx.k] = sel; guardaDia(diaSel); setDoc(fitRef('dieta'), { ult: F.dieta.ult }, { merge: true }).catch(() => {});
+      cierraHoja(); pinta(); return toast(`Añadido: ${r0(suma(its).k)} kcal`); }
+    case 'cAdd': alimFiltro = ''; return hojaAlimentos('add', k);
+    case 'cAlims': alimFiltro = ''; return hojaAlimentos('gest');
+    case 'cAlim': { const al = alim(b.dataset.id); if (!al) return; if (hojaCtx?.modo === 'add') return hojaCantidad(al, hojaCtx.k, null); return hojaAlimento(al.id); }
+    case 'cNuevoAlim': return hojaAlimento(null);
+    case 'cAlimOk': { const n = $('#aN').value.trim(); if (!n) return toast('Ponle nombre');
+      const v = id => num($(id).value); let K = v('#aK'); const P = v('#aP') || 0, C = v('#aC') || 0, G = v('#aG') || 0; if (K == null) K = Math.round(P * 4 + C * 4 + G * 9);
+      const id = hojaCtx.id, al = { id: id || 'a' + uid8(), n, marca: $('#aM').value.trim(), super: $('#aS').value.trim(), k: K, p: P, c: C, g: G, ud: $('#aU').value.trim(), gUd: v('#aGu') || null, ml: $('#aMl').checked };
+      const i = F.alimentos.findIndex(x => x.id === al.id); if (i >= 0) F.alimentos[i] = al; else F.alimentos.push(al);
+      guardaAlimentos(); const vol = hojaCtx.volver; toast('Alimento guardado');
+      if (vol && vol.tipo === 'calims') { if (vol.modo === 'add' && !id) return hojaCantidad(al, vol.k, null); return hojaAlimentos(vol.modo, vol.k); } cierraHoja(); return pinta(); }
+    case 'cAlimDel': { if (!confirm('¿Eliminar este alimento? Lo que ya apuntaste se queda igual.')) return; F.alimentos = F.alimentos.filter(x => x.id !== hojaCtx.id); guardaAlimentos(); return hojaAlimentos('gest'); }
+    case 'cQu': $('#cQ').value = b.dataset.q; return $('#cQ').dispatchEvent(new Event('input'));
+    case 'cQok': { const al = alim(hojaCtx.a), q = num($('#cQ').value); if (!q) return toast('Pon una cantidad'); const d = diaDe(diaSel);
+      const it = { a: al.id, n: al.n, q, m: [al.k, al.p, al.c, al.g] }; if (hojaCtx.i != null) d.c[hojaCtx.k][hojaCtx.i] = it; else d.c[hojaCtx.k].push(it);
+      guardaDia(diaSel); cierraHoja(); pinta(); return; }
+    case 'cQdel': diaDe(diaSel).c[hojaCtx.k].splice(hojaCtx.i, 1); guardaDia(diaSel); cierraHoja(); return pinta();
+    case 'cItem': { const it = F.diario[diaSel].c[k][+b.dataset.i]; const al = alim(it.a) || { id: it.a, n: it.n, k: it.m[0], p: it.m[1], c: it.m[2], g: it.m[3] }; return hojaCantidad(al, k, +b.dataset.i); }
+    case 'cVerDieta': return hojaDieta();
+    case 'cObjOk': F.dieta.obj = { k: num($('#oK').value) || 0, p: num($('#oP').value) || 0, c: num($('#oC').value) || 0, g: num($('#oG').value) || 0 }; guardaDieta(); cierraHoja(); pinta(); return toast('Objetivo guardado');
+    case 'cObjDieta': F.dieta.obj = null; guardaDieta(); cierraHoja(); pinta(); return toast('Objetivo = tu dieta');
+    case 'cPeso': return hojaPeso();
+    case 'cPesoOk': { const f = $('#pF').value.trim(), kg = num($('#pK').value), o = num($('#pO').value);
+      if (o !== (F.ajustes.objPeso ?? null)) { F.ajustes.objPeso = o; guardaPerfil(0); }
+      if (kg) { if (!/^\d{4}-\d{2}-\d{2}$/.test(f)) return toast('Fecha AAAA-MM-DD'); F.pesos[f] = kg; guardaPeso(f, kg); }
+      cierraHoja(); pinta(); return toast('Guardado'); }
+    case 'cPesos': { const ps = pesosOrden().reverse(); return hoja(`<h2>Pesos</h2>${ps.map(p => `<div class="it"><div class="n"><b>${fmtN(p.kg)} kg</b><span>${fDia(p.t)} ${new Date(p.t).getFullYear()}</span></div><button class="btn sm ghost" data-act="cPesoDel" data-f="${p.f}">✕</button></div>`).join('')}`); }
+    case 'cPesoDel': if (!confirm('¿Borrar este peso?')) return; delete F.pesos[b.dataset.f]; guardaPeso(b.dataset.f, null); b.closest('.it').remove(); return pinta();
+  }
+});
+
+// Importaciones de peso (CSV de medidas de Hevy) y de CSV en texto (para cargas desde Claude)
+function deMedidas(txt) {
+  const filas = csvFilas(txt.replace(/^﻿/, '')); const h = filas.shift().map(x => x.trim().toLowerCase());
+  const cf = h.indexOf('date'), ck = h.indexOf('weight_kg'); const out = {};
+  for (const f of filas) { const t = fechaHevy(f[cf]), kg = num(f[ck]); if (t && kg) out[fISO(t)] = kg; }
+  return out;
+}
+async function importaPesos(p) { Object.assign(F.pesos, p); await setDoc(fitRef('cuerpo'), { pesos: p }, { merge: true }); pinta(); return Object.keys(p).length; }
+Object.assign(window.__fit, { importaPesos, deMedidas,
+  importaCSV: async txt => { const d = deCSV(txt); return window.__fit.importa({ entrenos: d.entrenos.map(w => ({ ...w, ej: w.ej })) }); },
+  ponAlimentos: async l => { F.alimentos = l; await guardaAlimentos(); pinta(); return l.length; },
+  ponDieta: async c => { F.dieta.comidas = c; await guardaDieta(); pinta(); return c.length; } });
 
 // ---------- login (igual que el Organizador) ----------
 const gate = $('#gate'), gateMsg = $('#gateMsg'), gateBtn = $('#gateBtn');
@@ -675,6 +863,10 @@ onAuthStateChanged(auth, user => {
         if (activo && F.ultimoFin === activo.id) { activo = null; lsSet('jp-fit-activo', null); if (!$('#wo').hidden) minimizaWo(); }
         else if (d.activo && d.activo.id !== F.ultimoFin && (!activo || ((d.activo.upd || 0) > (activo.upd || 0) + 1000 && $('#wo').hidden))) { activo = d.activo; lsSet('jp-fit-activo', activo); }   // empezado o avanzado en otro dispositivo
         else if (!d.activo && activo && !ch.doc.metadata.hasPendingWrites && (d.at || 0) > (activo.upd || 0) + 3000) { activo = null; lsSet('jp-fit-activo', null); }   // lo descartaste en otro dispositivo
+      } else if (id === 'alimentos') { F.alimentos = d?.lista || [];
+      } else if (id === 'dieta') { F.dieta = { comidas: d?.comidas || [], obj: d?.obj || null, ult: d?.ult || {} };
+      } else if (id === 'cuerpo') { F.pesos = d?.pesos || {};
+      } else if (id.startsWith('d-')) { if (d) Object.assign(F.diario, d.dias || {});
       } else if (id.startsWith('m-')) { if (d) F.meses[id.slice(2)] = d.e || {}; else delete F.meses[id.slice(2)]; }
     }
     reconstruye();
