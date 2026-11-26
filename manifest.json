@@ -1,7 +1,7 @@
 {
-  "name": "Organizador JP",
-  "short_name": "Organizador",
-  "start_url": "./",
+  "name": "Jorge Control",
+  "short_name": "JP Control",
+  "start_url": "inicio.html",
   "scope": "./",
   "display": "standalone",
   "background_color": "#0a0a0b",
