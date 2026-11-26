@@ -760,7 +760,7 @@ function cardPeso() {
   const media7 = ps.filter(p => p.t > Date.now() - 7 * DIA).map(p => p.kg), m7 = media7.length ? media7.reduce((a, b) => a + b, 0) / media7.length : null;
   const desde = Date.now() - 365 * DIA, pts = ps.filter(p => p.t >= desde).map(p => ({ t: p.t, v: p.kg }));
   return `<div class="card"><div class="row"><div style="flex:1"><span class="muted small">Peso · ${fDia(u.t)}</span><div style="font:700 28px var(--head)">${fmtN(u.kg)} kg</div></div>
-    <div style="text-align:right" class="small">${hace30 ? `<div>${u.kg - hace30.kg <= 0 ? '▼' : '▲'} ${fmtN(Math.abs(Math.round((u.kg - hace30.kg) * 10) / 10))} kg en 30 días</div>` : ''}${m7 ? `<div class="muted">media 7 días ${fmtN(Math.round(m7 * 10) / 10)}</div>` : ''}${obj ? `<div class="muted">objetivo ${fmtN(obj)} kg · ${u.kg > obj ? 'faltan ' + fmtN(Math.round((u.kg - obj) * 10) / 10) : '¡conseguido!'}</div>` : ''}</div></div>
+    <div style="text-align:right" class="small">${hace30 ? `<div>${u.kg - hace30.kg <= 0 ? '▼' : '▲'} ${fmtN(Math.abs(Math.round((u.kg - hace30.kg) * 10) / 10))} kg ${u.t - hace30.t > 45 * DIA ? 'desde el ' + fDia(hace30.t) : 'en 30 días'}</div>` : ''}${m7 ? `<div class="muted">media 7 días ${fmtN(Math.round(m7 * 10) / 10)}</div>` : ''}${obj ? `<div class="muted">objetivo ${fmtN(obj)} kg · ${u.kg > obj ? 'faltan ' + fmtN(Math.round((u.kg - obj) * 10) / 10) : '¡conseguido!'}</div>` : ''}</div></div>
     ${pts.length > 1 ? grafica(pts).replace('aria-label="Progreso"', 'aria-label="Peso"') : ''}<div class="row" style="margin-top:8px"><button class="btn sm primary" data-act="cPeso">＋ Apuntar peso</button><button class="btn sm" data-act="cPesos">Ver todos (${ps.length})</button></div></div>`;
 }
 function hojaPeso() {
