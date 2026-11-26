@@ -794,7 +794,7 @@ function focoView(){
     <h2 class="fo-t">${esc(actual.bname || 'Trabajo')}</h2>
     <div class="fo-reloj" id="foReloj" data-fin="${actual.end}" data-ini="${actual.start}">--:--</div>
     <div class="fo-barra"><i id="foBarra"></i></div>
-    <button type="button" class="fo-mini" id="foMini" aria-label="Ver el temporizador"><b id="foMiniT">--:--</b><span class="fo-mini-b"><i id="foMiniB"></i></span></button>
+    <button type="button" class="fo-mini" id="foMini" aria-label="Ver el temporizador"><b id="foMiniT">--:--</b><span class="fo-mini-b"><i id="foMiniB"></i></span>${ts.length ? `<span class="fo-mini-n${hechas === ts.length ? ' ok' : ''}" title="Tareas hechas del bloque">✓ ${hechas}/${ts.length}</span>` : ''}</button>
     <div class="fo-prog">${ts.length ? `${hechas} de ${ts.length} tareas hechas${hechas === ts.length ? ' · ¡bloque completado! 🎉' : ''}` : 'Este bloque no tiene tareas: arrástralas desde «Para hoy» en la Semana'}</div>
     <div class="fo-lista" data-field="slot" data-value="${actual.at}" data-day="${hoy}">${cards}</div>
     ${frase}
