@@ -824,11 +824,15 @@ Object.assign(window.__fit, { importaPesos, deMedidas,
 // ================= GRÁFICAS, OBJETIVOS, CALENDARIO Y LISTA DE LA COMPRA =================
 const CH = new Map(); let chId = 0; const rangos = lsGet('jp-fit-rangos', {});
 const RANGOS = [['1M', 30], ['3M', 91], ['6M', 182], ['1A', 365], ['Todo', 0]];
-function suave(p) {
-  if (p.length < 3) return p.map((q, i) => (i ? 'L' : 'M') + q[0].toFixed(1) + ' ' + q[1].toFixed(1)).join(' ');
+function suave(p) {   // curva monótona: suave pero sin pasarse de los datos
+  const n = p.length, L = q => q.map((x, i) => (i ? 'L' : 'M') + x[0].toFixed(1) + ' ' + x[1].toFixed(1)).join(' ');
+  if (n < 3) return L(p);
+  const dx = [], m = [], t = [];
+  for (let i = 0; i < n - 1; i++) { dx[i] = p[i + 1][0] - p[i][0]; m[i] = dx[i] ? (p[i + 1][1] - p[i][1]) / dx[i] : 0; }
+  t[0] = m[0]; for (let i = 1; i < n - 1; i++) t[i] = m[i - 1] * m[i] <= 0 ? 0 : (m[i - 1] + m[i]) / 2; t[n - 1] = m[n - 2];
+  for (let i = 0; i < n - 1; i++) { if (!m[i]) { t[i] = 0; t[i + 1] = 0; continue; } const a = t[i] / m[i], b = t[i + 1] / m[i], h = a * a + b * b; if (h > 9) { const k = 3 / Math.sqrt(h); t[i] = k * a * m[i]; t[i + 1] = k * b * m[i]; } }
   let d = 'M' + p[0][0].toFixed(1) + ' ' + p[0][1].toFixed(1);
-  for (let i = 0; i < p.length - 1; i++) { const a = p[i - 1] || p[i], b = p[i], c = p[i + 1], e = p[i + 2] || c;
-    d += ` C${(b[0] + (c[0] - a[0]) / 6).toFixed(1)} ${(b[1] + (c[1] - a[1]) / 6).toFixed(1)} ${(c[0] - (e[0] - b[0]) / 6).toFixed(1)} ${(c[1] - (e[1] - b[1]) / 6).toFixed(1)} ${c[0].toFixed(1)} ${c[1].toFixed(1)}`; }
+  for (let i = 0; i < n - 1; i++) { const h = dx[i] / 3; d += ` C${(p[i][0] + h).toFixed(1)} ${(p[i][1] + t[i] * h).toFixed(1)} ${(p[i + 1][0] - h).toFixed(1)} ${(p[i + 1][1] - t[i + 1] * h).toFixed(1)} ${p[i + 1][0].toFixed(1)} ${p[i + 1][1].toFixed(1)}`; }
   return d;
 }
 const mediaMovil = (pts, dias = 7) => pts.map(p => { const w = pts.filter(q => q.t <= p.t && q.t > p.t - dias * DIA); return { t: p.t, v: w.reduce((a, b) => a + b.v, 0) / w.length }; });
@@ -902,7 +906,7 @@ function cardPeso(compacto) {
     <span class="small ${hace > 7 ? 'aviso' : 'faint'}">${hace <= 0 ? 'pesado hoy' : hace === 1 ? 'pesado ayer' : 'último pesaje hace ' + hace + ' días'}${hace > 7 ? ' · ¡pésate!' : ''}</span></div>
     <div class="dchips">${chip('7 días', ref(7))}${chip('30 días', ref(30))}${chip('90 días', ref(90))}</div></div>
     ${objHtml}${compacto ? '' : graficaPro({ key: 'peso', puntos: ps.map(p => ({ t: p.t, v: p.kg })), unidad: ' kg', objetivo: obj || null, media: true, rangoDef: 182 })}
-    <div class="row" style="margin-top:12px"><button class="btn sm primary" data-act="cPeso">＋ Apuntar peso</button>${compacto ? '<button class="btn sm" data-act="irProg">Ver gráfica</button>' : `<button class="btn sm" data-act="cPesos">Todos (${ps.length})</button>`}${obj ? '' : '<button class="btn sm" data-act="objEdit">🎯 Poner objetivo</button>'}</div></div>`;
+    <div class="row btnrow" style="margin-top:12px"><button class="btn sm primary" data-act="cPeso">＋ Peso</button>${compacto ? '<button class="btn sm" data-act="irProg">📈 Gráfica</button>' : `<button class="btn sm" data-act="cPesos">Todos (${ps.length})</button>`}<button class="btn sm" data-act="objEdit">🎯 ${obj ? 'Objetivo' : 'Poner objetivo'}</button></div></div>`;
 }
 
 // ---- datos por día ----

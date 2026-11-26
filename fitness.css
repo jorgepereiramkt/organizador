@@ -299,3 +299,5 @@ details.rep summary{font-weight:600;font-size:14px;cursor:pointer}
 .kit .q{font-size:13px;font-weight:700;text-align:right}
 .kit.ok .n,.kit.ok .q{text-decoration:line-through;opacity:.45}
 .kit .x{color:var(--faint);width:26px}
+.btnrow{flex-wrap:wrap;gap:8px}
+.btnrow .btn{white-space:nowrap}
