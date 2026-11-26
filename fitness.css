@@ -310,3 +310,11 @@ details.rep summary{font-weight:600;font-size:14px;cursor:pointer}
 .semres li:last-child{border-bottom:0}
 .semres li::before{position:absolute;left:2px;top:5px}
 .semres li.ok::before{content:"✅"} .semres li.ko::before{content:"❌"} .semres li.tip::before{content:"👉"}
+
+.dieta-it.activa{border-color:var(--accent);background:linear-gradient(135deg,var(--accent-soft),transparent 70%),var(--surface)}
+.de-op{padding:10px;margin-bottom:8px}
+.de-op input[type=text]{padding:8px 10px!important;font-weight:600}
+.kit.falta.ok .n,.kit.falta.ok .q{text-decoration:none;opacity:1}
+.kit.falta.ok .ck{background:var(--gold);border-color:var(--gold)}
+.kit.falta .q{color:var(--gold)}
+.meal-h span b{color:var(--text)}

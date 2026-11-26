@@ -57,7 +57,7 @@ let toastT;
 const toast = (m, ms = 2600) => { const t = $('#toast'); t.textContent = m; t.hidden = false; clearTimeout(toastT); toastT = setTimeout(() => t.hidden = true, ms); };
 
 // ---------- estado ----------
-const F = { rutinas: [], ajustes: { descanso: 120, objSemana: 4 }, meses: {}, entrenos: [], porId: {}, ultimoFin: null, alimentos: [], dieta: { comidas: [], obj: null }, diario: {}, pesos: {}, compra: { dias: 7, rep: {}, ok: {}, extra: [] } };
+const F = { rutinas: [], ajustes: { descanso: 120, objSemana: 4 }, meses: {}, entrenos: [], porId: {}, ultimoFin: null, alimentos: [], dieta: { comidas: [], obj: null }, dietas: [], dietaActiva: null, diario: {}, pesos: {}, compra: { falta: {}, comprado: {}, extra: [] } };
 let U = null, listo = false, vista = lsGet('jp-fit-vista', 'hoy');
 let activo = lsGet('jp-fit-activo', null);
 const perfilRef = () => doc(db, 'users', U.uid, 'fit', 'perfil');
@@ -169,6 +169,7 @@ function pinta() {
 }
 
 function vHoy() {
+  if (preparaDia(fISO(Date.now()))) guardaDia(fISO(Date.now()));
   const h = new Date().getHours(), saludo = h < 6 ? 'Buenas noches' : h < 14 ? 'Buenos días' : h < 21 ? 'Buenas tardes' : 'Buenas noches';
   const [av, t, p] = coach();
   const l = lunes(Date.now()), sem = semanaActual();
@@ -663,7 +664,7 @@ const deDieta = it => { const a = alim(it.a); return a ? { a: a.id, n: a.n, q: i
 const fQ = (a, q) => { if (a && a.ud && a.gUd) { const u = q / a.gUd; if (Math.abs(u - Math.round(u)) < 0.05 && u >= 1) return `${Math.round(u)} ${a.ud}${Math.round(u) > 1 && !/s$/.test(a.ud) ? 's' : ''} · ${fmtN(q)} g`; } return fmtN(q) + (a && a.ml ? ' ml' : ' g'); };
 const r0 = n => Math.round(n || 0);
 const tagM = m => `<span class="mtag"><b>${r0(m.k)}</b> kcal · P ${r0(m.p)} · H ${r0(m.c)} · G ${r0(m.g)}</span>`;
-function diaDe(f) { const d = F.diario[f] ||= { c: {} }; for (const [k] of COMIDAS) d.c[k] ||= []; return d; }
+function diaDe(f) { preparaDia(f); return F.diario[f]; }
 const itemsDia = f => { const d = F.diario[f]; return d ? COMIDAS.flatMap(([k]) => d.c?.[k] || []) : []; };
 function objDieta() { // un día «tipo» con la primera opción de cada grupo
   const t = { k: 0, p: 0, c: 0, g: 0 };
@@ -674,7 +675,7 @@ const objetivo = () => { const o = F.dieta.obj; return o && o.k ? o : objDieta()
 
 const fitRef = id => doc(db, 'users', U.uid, 'fit', id);
 const guardaAlimentos = () => setDoc(fitRef('alimentos'), { lista: F.alimentos }).catch(e => toast('No se pudo guardar: ' + (e.code || e.message)));
-const guardaDieta = () => setDoc(fitRef('dieta'), { comidas: F.dieta.comidas, obj: F.dieta.obj || null }).catch(e => toast('No se pudo guardar: ' + (e.code || e.message)));
+const guardaDieta = () => setDoc(fitRef('dieta'), { dietas: F.dietas.map(({ ult, ...x }) => x), activa: F.dietaActiva, ult: F.dieta.ult || {} }).catch(e => toast('No se pudo guardar: ' + (e.code || e.message)));
 const guardaDia = f => (mandaSemana('cambio'), setDoc)(fitRef('d-' + f.slice(0, 7)), { dias: { [f]: F.diario[f] } }, { merge: true }).catch(e => toast('No se pudo guardar: ' + (e.code || e.message)));
 const guardaPeso = (f, kg) => (kg == null ? updateDoc(fitRef('cuerpo'), new FieldPath('pesos', f), deleteField()) : setDoc(fitRef('cuerpo'), { pesos: { [f]: kg } }, { merge: true })).catch(e => toast('No se pudo guardar: ' + (e.code || e.message)));
 
@@ -685,15 +686,17 @@ function resumenMacros(f, corto) {
     <div class="mac3"><div class="P">Proteína<b>${r0(t.p)} / ${r0(o.p)} g</b>${barra(t.p, o.p)}</div><div class="C">Hidratos<b>${r0(t.c)} / ${r0(o.c)} g</b>${barra(t.c, o.c)}</div><div class="G">Grasa<b>${r0(t.g)} / ${r0(o.g)} g</b>${barra(t.g, o.g)}</div></div></div>`;
 }
 function vComida() {
+  if (diaSel <= fISO(Date.now()) && preparaDia(diaSel)) guardaDia(diaSel);
   const d = F.diario[diaSel], hoy = fISO(Date.now());
   const nom = diaSel === hoy ? 'Hoy' : diaSel === fISO(Date.now() - DIA) ? 'Ayer' : fDia(deISO(diaSel));
   return `<div class="dianav"><button data-act="cDia" data-d="-1" aria-label="Día anterior">‹</button><b>${nom}</b><button data-act="cDia" data-d="1" aria-label="Día siguiente" ${diaSel >= hoy ? 'disabled style="opacity:.3"' : ''}>›</button></div>
   ${resumenMacros(diaSel)}
-  ${COMIDAS.map(([k, nombre, ic]) => { const its = d?.c?.[k] || [], t = suma(its), enDieta = (F.dieta.comidas || []).some(c => c.k === k);
-    return `<div class="card meal"><div class="meal-h"><h3>${ic} ${nombre}</h3><span>${its.length ? r0(t.k) + ' kcal · P ' + r0(t.p) : ''}</span></div>
+  ${COMIDAS.map(([k, nombre, ic]) => { const its = d?.c?.[k] || [], t = suma(its), cm = comDieta(k), sel = d?.sel?.[k] || [];
+    const chips = cm && k !== 'ext' ? cm.grupos.map((g, gi) => `${g.opciones.length > 1 ? `<div class="faint small" style="margin-top:6px">${esc(g.nombre)}</div>` : ''}<div class="chips">${g.opciones.map((o, oi) => `<button class="${(sel[gi] ?? 0) === oi ? 'on' : ''}" data-act="cOp" data-k="${k}" data-g="${gi}" data-o="${oi}">${g.opciones.length === 1 ? ((sel[gi] ?? 0) === 0 ? '✓ ' : '') : ''}${esc(o.nombre)}</button>`).join('')}${g.opciones.length > 1 ? `<button class="${sel[gi] === -1 ? 'on' : ''}" data-act="cOp" data-k="${k}" data-g="${gi}" data-o="-1">Nada</button>` : ''}</div>`).join('') : '';
+    return `<div class="card meal"><div class="meal-h"><h3>${ic} ${nombre}</h3><span><b>${r0(t.k)} kcal</b> · P ${r0(t.p)} · H ${r0(t.c)} · G ${r0(t.g)}</span></div>${chips}
     ${its.map((it, i) => { const m = mac(it); return `<div class="it" data-act="cItem" data-k="${k}" data-i="${i}"><div class="n"><b>${esc(it.n)}</b><span>${fQ(alim(it.a), it.q)}</span></div><div class="k">${r0(m.k)} kcal<small>P ${r0(m.p)} · H ${r0(m.c)} · G ${r0(m.g)}</small></div></div>`; }).join('')}
-    <div class="acts">${enDieta ? `<button class="btn sm primary" data-act="cDeDieta" data-k="${k}">📋 De mi dieta</button>` : ''}<button class="btn sm" data-act="cAdd" data-k="${k}">＋ Alimento</button></div></div>`; }).join('')}
-  <div class="stack" style="margin-top:16px"><button class="btn" data-act="cVerDieta">🥗 Mi dieta y objetivos</button><button class="btn primary" data-act="kAbrir">🛒 Lista de la compra</button><button class="btn" data-act="cAlims">📦 Mis alimentos (${F.alimentos.length})</button></div>`;
+    <div class="acts"><button class="btn sm" data-act="cAdd" data-k="${k}">＋ Añadir otro alimento</button></div></div>`; }).join('')}
+  <div class="stack" style="margin-top:16px"><button class="btn" data-act="cVerDieta">🥗 Mis dietas y objetivos</button><button class="btn primary" data-act="kAbrir">🛒 Lista de la compra</button><button class="btn" data-act="cAlims">📦 Mis alimentos (${F.alimentos.length})</button></div>`;
 }
 
 // ---- hojas de comida ----
@@ -711,7 +714,7 @@ function hojaDeDieta(k) {
 let alimFiltro = '';
 function hojaAlimentos(modo, k) { // modo 'add' (elegir para añadir a la comida k) o 'gest'
   hojaCtx = { tipo: 'calims', modo, k };
-  hoja(`<h2>${modo === 'add' ? 'Añadir alimento' : 'Mis alimentos'}</h2><input class="buscar" id="alimQ" placeholder="Buscar por nombre, marca o súper…" value="${esc(alimFiltro)}" autocomplete="off">
+  hoja(`<h2>${modo === 'gest' ? 'Mis alimentos' : 'Añadir alimento'}</h2><input class="buscar" id="alimQ" placeholder="Buscar por nombre, marca o súper…" value="${esc(alimFiltro)}" autocomplete="off">
   <div class="pick" id="alimL"></div><button class="btn" style="width:100%;margin-top:10px" data-act="cNuevoAlim">＋ Crear alimento nuevo</button>`);
   pintaAlims(); $('#alimQ').addEventListener('input', e => { alimFiltro = e.target.value; pintaAlims(); });
 }
@@ -747,17 +750,76 @@ function hojaAlimento(id) {
   ${a.aprox ? '<p class="faint small">Valores aproximados: cámbialos por los de la etiqueta de tu producto.</p>' : ''}
   <div class="stack" style="margin-top:12px"><button class="btn primary" data-act="cAlimOk">Guardar alimento</button>${id ? '<button class="btn danger" data-act="cAlimDel">Eliminar</button>' : ''}</div>`);
 }
+// ---- dietas guardadas, comida del día rellena con la dieta ----
+const comDieta = k => (F.dieta.comidas || []).find(c => c.k === k);
+const itemsSel = (cm, sel) => cm.grupos.flatMap((g, gi) => (sel[gi] ?? 0) < 0 ? [] : (g.opciones[sel[gi] ?? 0]?.items || []).map(deDieta).filter(Boolean).map(it => ({ ...it, d: 1 })));
+function selDef(k) { const cm = comDieta(k), u = F.dieta.ult?.[k]; return cm.grupos.map((g, gi) => (u && u[gi] != null && u[gi] < g.opciones.length) ? u[gi] : 0); }
+function preparaDia(f) { // rellena con la dieta las comidas que aún no se han tocado ese día
+  const d = F.diario[f] ||= { c: {} }; d.c ||= {}; d.sel ||= {}; let cambio = false;
+  for (const [k] of COMIDAS) {
+    if (d.c[k] !== undefined) continue;
+    const cm = comDieta(k); if (!cm || k === 'ext') { d.c[k] = []; continue; }
+    d.sel[k] = selDef(k); d.c[k] = itemsSel(cm, d.sel[k]); cambio = true;
+  }
+  return cambio;
+}
 function hojaDieta() {
   const o = objetivo(), od = objDieta();
   hojaCtx = { tipo: 'cverdieta' };
-  hoja(`<h2>Mi dieta</h2>
-  <div class="card"><b>Objetivo diario</b><p class="faint small" style="margin:2px 0 8px">Por defecto sale de tu dieta (primera opción de cada comida: ${r0(od.k)} kcal · P ${r0(od.p)}). Cámbialo si tu objetivo es otro.</p>
+  hoja(`<h2>Mis dietas</h2>
+  <div class="stack">${F.dietas.map(dt => `<div class="card dieta-it ${dt.id === F.dietaActiva ? 'activa' : ''}"><div class="row"><div style="flex:1"><b>${esc(dt.nombre)}</b><div class="faint small">${dt.id === F.dietaActiva ? '✅ Aplicada ahora' : 'Guardada'}${dt.at ? ' · ' + fDia(dt.at) : ''}</div></div>
+    ${dt.id === F.dietaActiva ? '' : `<button class="btn sm primary" data-act="cDAplica" data-id="${dt.id}">Aplicar</button>`}<button class="btn sm" data-act="cDEdit" data-id="${dt.id}">✏️</button>${dt.id === F.dietaActiva ? '' : `<button class="btn sm ghost" data-act="cDBorra" data-id="${dt.id}">🗑</button>`}</div></div>`).join('')}</div>
+  <p class="faint small">Al editar una dieta se guarda como una dieta nueva; tú eliges si la aplicas.</p>
+  <div class="card" style="margin-top:12px"><b>Objetivo diario</b><p class="faint small" style="margin:2px 0 8px">Por defecto sale de la dieta aplicada (${r0(od.k)} kcal · P ${r0(od.p)}).</p>
   <div class="f2"><div><label>Kcal</label><input type="number" id="oK" value="${r0(o.k)}"></div><div><label>Proteína (g)</label><input type="number" id="oP" value="${r0(o.p)}"></div>
   <div><label>Hidratos (g)</label><input type="number" id="oC" value="${r0(o.c)}"></div><div><label>Grasa (g)</label><input type="number" id="oG" value="${r0(o.g)}"></div></div>
   <div class="row" style="margin-top:10px"><button class="btn primary sm" data-act="cObjOk">Guardar objetivo</button><button class="btn sm" data-act="cObjDieta">Usar el de la dieta</button></div></div>
-  ${(F.dieta.comidas || []).map(cm => `<div class="sec"><h2>${esc(cm.nombre)}</h2></div>${cm.grupos.map(g => `<div class="dgrp">${esc(g.nombre)}</div>${g.opciones.map(op => { const its = op.items.map(deDieta).filter(Boolean);
+  <div class="sec"><h2>${esc(F.dieta.nombre || 'Dieta')}</h2></div>
+  ${(F.dieta.comidas || []).map(cm => `<div class="dgrp" style="font-size:13px">${esc(cm.nombre)}</div>${cm.grupos.map(g => `${cm.grupos.length > 1 || g.opciones.length > 1 ? `<div class="faint small" style="margin-top:4px">${esc(g.nombre)}</div>` : ''}${g.opciones.map(op => { const its = op.items.map(deDieta).filter(Boolean);
     return `<div class="dop"><b>${esc(op.nombre)}</b> ${tagM(suma(its))}<div class="muted small">${its.map(it => esc(it.n) + ' ' + fQ(alim(it.a), it.q)).join(' · ')}</div>${op.nota ? `<div class="faint small">${esc(op.nota)}</div>` : ''}</div>`; }).join('')}`).join('')}`).join('') || '<p class="muted">Aún no hay dieta cargada.</p>'}`);
 }
+let deCtx = null;
+function hojaEditDieta() {
+  const dt = deCtx.d;
+  hojaCtx = { tipo: 'dedit' };
+  hoja(`<h2>Editar dieta</h2><label>Nombre de la dieta nueva</label><input type="text" id="deN" value="${esc(dt.nombre)}">
+  ${dt.comidas.map((cm, ci) => `<div class="sec"><h2>${esc(cm.nombre)}</h2></div>${cm.grupos.map((g, gi) => `<div class="dgrp">${esc(g.nombre)}</div>${g.opciones.map((op, oi) => {
+    const its = op.items.map(deDieta).filter(Boolean);
+    return `<div class="card de-op"><div class="row"><input type="text" class="deOpN" data-c="${ci}" data-g="${gi}" data-o="${oi}" value="${esc(op.nombre)}" style="flex:1"><button class="btn sm ghost" data-act="dOpDel" data-c="${ci}" data-g="${gi}" data-o="${oi}" title="Quitar opción">🗑</button></div>
+      ${op.items.map((it, ii) => { const a = alim(it.a); return `<div class="re-ej"><b>${esc(a ? a.n : it.a)}</b><input type="number" inputmode="decimal" class="deQ" data-c="${ci}" data-g="${gi}" data-o="${oi}" data-i="${ii}" value="${it.q}"><span class="faint small">${a?.ml ? 'ml' : 'g'}</span><button type="button" data-act="dItDel" data-c="${ci}" data-g="${gi}" data-o="${oi}" data-i="${ii}">✕</button></div>`; }).join('')}
+      <div class="row" style="margin-top:6px"><span class="mtag">${tagM(suma(its))}</span><span class="sp"></span><button class="btn sm" data-act="dItAdd" data-c="${ci}" data-g="${gi}" data-o="${oi}">＋ Alimento</button></div></div>`; }).join('')}
+    <button class="btn sm" style="margin:4px 0 6px" data-act="dOpAdd" data-c="${ci}" data-g="${gi}">＋ Otra opción en «${esc(g.nombre)}»</button>`).join('')}`).join('')}
+  <label style="display:flex;gap:8px;align-items:center;margin-top:16px"><input type="checkbox" id="deApl" checked> Aplicarla ya (si no, se queda guardada)</label>
+  <div class="stack" style="margin-top:10px"><button class="btn primary big" data-act="dGuardar">Guardar como dieta nueva</button><button class="btn" data-act="cVerDieta">Cancelar</button></div>`);
+}
+function leeEditDieta() {
+  if (!deCtx || !$('#deN')) return; const dt = deCtx.d; dt.nombre = $('#deN').value.trim() || dt.nombre;
+  document.querySelectorAll('.deOpN').forEach(i => { dt.comidas[+i.dataset.c].grupos[+i.dataset.g].opciones[+i.dataset.o].nombre = i.value; });
+  document.querySelectorAll('.deQ').forEach(i => { const v = num(i.value); if (v != null) dt.comidas[+i.dataset.c].grupos[+i.dataset.g].opciones[+i.dataset.o].items[+i.dataset.i].q = v; });
+}
+document.addEventListener('click', ev => {
+  const b = ev.target.closest('[data-act]'); if (!b) return; const ds = b.dataset;
+  const op = () => deCtx.d.comidas[+ds.c].grupos[+ds.g].opciones[+ds.o];
+  switch (ds.act) {
+    case 'cOp': { const k = ds.k, cm = comDieta(k), d = (preparaDia(diaSel), F.diario[diaSel]), gi = +ds.g, o = +ds.o;
+      const sel = (d.sel[k] || selDef(k)).slice(); while (sel.length < cm.grupos.length) sel.push(0);
+      sel[gi] = cm.grupos[gi].opciones.length === 1 && o >= 0 ? (sel[gi] === 0 ? -1 : 0) : o;
+      d.sel[k] = sel; d.c[k] = [...itemsSel(cm, sel), ...(d.c[k] || []).filter(i => !i.d)];
+      if (o >= 0 && cm.grupos[gi].opciones.length > 1) { (F.dieta.ult ||= {})[k] = sel; setDoc(fitRef('dieta'), { ult: F.dieta.ult }, { merge: true }).catch(() => {}); }
+      guardaDia(diaSel); return pinta(); }
+    case 'cDAplica': { const dt = F.dietas.find(x => x.id === ds.id); if (!dt) return; F.dietaActiva = dt.id; const ult = F.dieta.ult; F.dieta = dt; F.dieta.ult = ult; guardaDieta(); toast('Aplicada: ' + dt.nombre); return hojaDieta(); }
+    case 'cDBorra': if (!confirm('¿Borrar esta dieta guardada?')) return; F.dietas = F.dietas.filter(x => x.id !== ds.id); guardaDieta(); return hojaDieta();
+    case 'cDEdit': { const dt = F.dietas.find(x => x.id === ds.id); if (!dt) return; const c = JSON.parse(JSON.stringify({ comidas: dt.comidas, obj: dt.obj || null }));
+      deCtx = { base: dt.id, d: { ...c, nombre: 'Dieta ' + (F.dietas.length + 1) } }; return hojaEditDieta(); }
+    case 'dItDel': leeEditDieta(); op().items.splice(+ds.i, 1); return hojaEditDieta();
+    case 'dOpDel': { leeEditDieta(); const g = deCtx.d.comidas[+ds.c].grupos[+ds.g]; if (g.opciones.length < 2) return toast('Debe quedar al menos una opción'); g.opciones.splice(+ds.o, 1); return hojaEditDieta(); }
+    case 'dOpAdd': leeEditDieta(); deCtx.d.comidas[+ds.c].grupos[+ds.g].opciones.push({ nombre: 'Nueva opción', items: [] }); return hojaEditDieta();
+    case 'dItAdd': leeEditDieta(); deCtx.dest = [+ds.c, +ds.g, +ds.o]; alimFiltro = ''; return hojaAlimentos('dedit');
+    case 'dGuardar': { leeEditDieta(); const dt = { id: 'd' + uid8(), nombre: deCtx.d.nombre, comidas: deCtx.d.comidas, obj: deCtx.d.obj, at: Date.now() };
+      F.dietas.push(dt); if ($('#deApl').checked) { const ult = F.dieta.ult; F.dietaActiva = dt.id; F.dieta = dt; F.dieta.ult = ult; }
+      guardaDieta(); deCtx = null; toast('Dieta guardada' + (F.dietaActiva === dt.id ? ' y aplicada' : '')); pinta(); return hojaDieta(); }
+  }
+});
 
 // ---- peso ----
 function pesosOrden() { return Object.entries(F.pesos).map(([f, kg]) => ({ f, t: deISO(f), kg })).sort((a, b) => a.t - b.t); }
@@ -781,7 +843,8 @@ document.addEventListener('click', ev => {
       cierraHoja(); pinta(); return toast(`Añadido: ${r0(suma(its).k)} kcal`); }
     case 'cAdd': alimFiltro = ''; return hojaAlimentos('add', k);
     case 'cAlims': alimFiltro = ''; return hojaAlimentos('gest');
-    case 'cAlim': { const al = alim(b.dataset.id); if (!al) return; if (hojaCtx?.modo === 'add') return hojaCantidad(al, hojaCtx.k, null); return hojaAlimento(al.id); }
+    case 'cAlim': { const al = alim(b.dataset.id); if (!al) return; if (hojaCtx?.modo === 'add') return hojaCantidad(al, hojaCtx.k, null);
+      if (hojaCtx?.modo === 'dedit' && deCtx) { const [ci, gi, oi] = deCtx.dest; deCtx.d.comidas[ci].grupos[gi].opciones[oi].items.push({ a: al.id, q: al.gUd || 100 }); return hojaEditDieta(); } return hojaAlimento(al.id); }
     case 'cNuevoAlim': return hojaAlimento(null);
     case 'cAlimOk': { const n = $('#aN').value.trim(); if (!n) return toast('Ponle nombre');
       const v = id => num($(id).value); let K = v('#aK'); const P = v('#aP') || 0, C = v('#aC') || 0, G = v('#aG') || 0; if (K == null) K = Math.round(P * 4 + C * 4 + G * 9);
@@ -792,7 +855,7 @@ document.addEventListener('click', ev => {
     case 'cAlimDel': { if (!confirm('¿Eliminar este alimento? Lo que ya apuntaste se queda igual.')) return; F.alimentos = F.alimentos.filter(x => x.id !== hojaCtx.id); guardaAlimentos(); return hojaAlimentos('gest'); }
     case 'cQu': $('#cQ').value = b.dataset.q; return $('#cQ').dispatchEvent(new Event('input'));
     case 'cQok': { const al = alim(hojaCtx.a), q = num($('#cQ').value); if (!q) return toast('Pon una cantidad'); const d = diaDe(diaSel);
-      const it = { a: al.id, n: al.n, q, m: [al.k, al.p, al.c, al.g] }; if (hojaCtx.i != null) d.c[hojaCtx.k][hojaCtx.i] = it; else d.c[hojaCtx.k].push(it);
+      const it = { a: al.id, n: al.n, q, m: [al.k, al.p, al.c, al.g] }; if (hojaCtx.i != null) { if (d.c[hojaCtx.k][hojaCtx.i]?.d) it.d = 1; d.c[hojaCtx.k][hojaCtx.i] = it; } else d.c[hojaCtx.k].push(it);
       guardaDia(diaSel); cierraHoja(); pinta(); return; }
     case 'cQdel': diaDe(diaSel).c[hojaCtx.k].splice(hojaCtx.i, 1); guardaDia(diaSel); cierraHoja(); return pinta();
     case 'cItem': { const it = F.diario[diaSel].c[k][+b.dataset.i]; const al = alim(it.a) || { id: it.a, n: it.n, k: it.m[0], p: it.m[1], c: it.m[2], g: it.m[3] }; return hojaCantidad(al, k, +b.dataset.i); }
@@ -820,7 +883,8 @@ async function importaPesos(p) { Object.assign(F.pesos, p); await setDoc(fitRef(
 Object.assign(window.__fit, { importaPesos, deMedidas,
   importaCSV: async txt => { const d = deCSV(txt); return window.__fit.importa({ entrenos: d.entrenos.map(w => ({ ...w, ej: w.ej })) }); },
   ponAlimentos: async l => { F.alimentos = l; await guardaAlimentos(); pinta(); return l.length; },
-  ponDieta: async c => { F.dieta.comidas = c; await guardaDieta(); pinta(); return c.length; } });
+  ponDieta: async c => { F.dieta.comidas = c; await guardaDieta(); pinta(); return c.length; },
+  quitaDeDieta: async (aid, nombreOp) => { for (const cm of F.dieta.comidas) for (const g of cm.grupos) for (const o of g.opciones) o.items = o.items.filter(i => i.a !== aid); if (nombreOp) F.dieta.comidas.find(c => c.k === 'des').grupos[0].opciones[0].nombre = nombreOp; await guardaDieta(); pinta(); return true; } });
 
 
 // ================= GRÁFICAS, OBJETIVOS, CALENDARIO Y LISTA DE LA COMPRA =================
@@ -990,39 +1054,33 @@ function hojaObjetivos() {
 }
 
 // ---- lista de la compra ----
-function repDe(key, n, dias) {
-  const r = F.compra.rep?.[key]; if (r && r.length === n) return r;
-  const base = Math.floor(dias / n), resto = dias % n; return [...Array(n)].map((_, i) => base + (i < resto ? 1 : 0));
-}
-function calculaCompra() {
-  const dias = F.compra.dias || 7, tot = {};
-  for (const cm of F.dieta.comidas || []) cm.grupos.forEach((g, gi) => { const c = g.opciones.length === 1 ? [dias] : repDe(cm.k + '|' + gi, g.opciones.length, dias);
-    g.opciones.forEach((o, oi) => { for (const it of o.items) tot[it.a] = (tot[it.a] || 0) + it.q * (c[oi] || 0); }); });
-  return tot;
-}
-function fCompra(a, q) {
-  if (a.gUd) { const u = Math.ceil(q / a.gUd - 0.05); return `${u} ${a.ud}${u > 1 && !/s$/.test(a.ud) ? (/[aeiouáéó]$/.test(a.ud) ? 's' : 'es') : ''} <span class="faint">(${fmtN(r0(q))} ${a.ml ? 'ml' : 'g'})</span>`; }
-  return q >= 1000 ? `${fmtN(redondea(q / 1000, 2))} ${a.ml ? 'L' : 'kg'}` : `${fmtN(r0(q))} ${a.ml ? 'ml' : 'g'}`;
-}
-function hojaCompra() {
-  hojaCtx = { tipo: 'compra' };
-  const dias = F.compra.dias || 7, tot = calculaCompra(), ok = F.compra.ok || {}, porSuper = {};
-  for (const [aid, q] of Object.entries(tot)) { if (!q) continue; const a = alim(aid); if (!a) continue; (porSuper[a.super || 'Otros'] ||= []).push([a, q]); }
-  const grupos = Object.entries(porSuper).sort((a, b) => b[1].length - a[1].length);
-  const nTot = Object.values(porSuper).flat().length + (F.compra.extra || []).length, nOk = Object.values(porSuper).flat().filter(([a]) => ok[a.id]).length + (F.compra.extra || []).filter(e => e.ok).length;
-  const reparto = (F.dieta.comidas || []).flatMap(cm => cm.grupos.map((g, gi) => g.opciones.length < 2 ? '' : (() => { const key = cm.k + '|' + gi, c = repDe(key, g.opciones.length, dias), s = c.reduce((x, y) => x + y, 0);
-    return `<div class="dgrp">${esc(cm.nombre)} · ${esc(g.nombre)} <span class="${s === dias ? '' : 'aviso'}">${s}/${dias} días</span></div>${g.opciones.map((o, oi) => `<div class="step"><span>${esc(o.nombre)}</span><button data-act="kRep" data-key="${key}" data-i="${oi}" data-n="${g.opciones.length}" data-d="-1">−</button><b>${c[oi]}</b><button data-act="kRep" data-key="${key}" data-i="${oi}" data-n="${g.opciones.length}" data-d="1">＋</button></div>`).join('')}`; })())).join('');
-  hoja(`<h2>🛒 Lista de la compra</h2>
-   <div class="step big"><span>Comprar para</span><button data-act="kDias" data-d="-1">−</button><b>${dias} días</b><button data-act="kDias" data-d="1">＋</button></div>
-   <details class="rep"><summary>Qué vas a comer esos días (reparto de opciones)</summary>${reparto}</details>
-   <div class="row" style="margin:12px 0 4px"><span class="muted small">${nOk}/${nTot} en el carro</span><span class="sp"></span><button class="btn sm" data-act="kCopiar">Copiar</button><button class="btn sm" data-act="kReset">Desmarcar</button></div>
-   ${grupos.map(([s, l]) => `<div class="dgrp">${esc(s)}</div>${l.sort((a, b) => a[0].n.localeCompare(b[0].n)).map(([a, q]) => `<button class="kit ${ok[a.id] ? 'ok' : ''}" data-act="kOk" data-id="${a.id}"><span class="ck">${ok[a.id] ? '✓' : ''}</span><span class="n">${esc(a.n)}${a.marca ? ` <small class="faint">${esc(a.marca)}</small>` : ''}</span><span class="q">${fCompra(a, q)}</span></button>`).join('')}`).join('')}
-   <div class="dgrp">Otras cosas</div>${(F.compra.extra || []).map((e, i) => `<div class="kit ${e.ok ? 'ok' : ''}"><button class="ck" data-act="kExOk" data-i="${i}">${e.ok ? '✓' : ''}</button><span class="n">${esc(e.n)}</span><button class="x" data-act="kExDel" data-i="${i}" aria-label="Quitar">✕</button></div>`).join('')}
-   <div class="row" style="margin-top:8px"><input type="text" id="kNuevo" placeholder="Añadir (papel de cocina, café…)" style="flex:1"><button class="btn sm primary" data-act="kExAdd">Añadir</button></div>`);
-  const det = $('#sheet details.rep'); if (det && hojaCtx.abierto) det.open = true; det?.addEventListener('toggle', () => { hojaCtx.abierto = det.open; });
+// ---- lista de la compra: revisas en casa por comidas, marcas lo que falta y con eso se hace la lista ----
+function alimsDeComida(cm) { const ids = []; for (const g of cm.grupos) for (const o of g.opciones) for (const it of o.items) if (!ids.includes(it.a)) ids.push(it.a); return ids.map(alim).filter(Boolean); }
+function bloquesCompra() { const vistos = new Set(); return (F.dieta.comidas || []).map(cm => ({ cm, ls: alimsDeComida(cm).filter(a => { if (vistos.has(a.id)) return false; vistos.add(a.id); return true; }) })); }
+function hojaCompra(tab) {
+  const t = tab || hojaCtx?.ktab || (Object.keys(F.compra.falta || {}).length ? 'lista' : 'casa'); hojaCtx = { tipo: 'compra', ktab: t };
+  const falta = F.compra.falta || {}, comp = F.compra.comprado || {}, ex = F.compra.extra || [];
+  const nFalta = Object.keys(falta).length + ex.length;
+  const tabs = `<div class="seg"><button data-act="kTab" data-t="casa" class="${t === 'casa' ? 'on' : ''}">🏠 Revisar en casa</button><button data-act="kTab" data-t="lista" class="${t === 'lista' ? 'on' : ''}">🛒 Mi lista (${nFalta})</button></div>`;
+  let cuerpo;
+  if (t === 'casa') {
+    cuerpo = `<p class="muted small" style="margin:0 0 6px">Mira en casa y toca lo que <b>te falta</b>. Se va añadiendo a tu lista.</p>` +
+      bloquesCompra().map(({ cm, ls }) => ls.length ? `<div class="dgrp">${esc(cm.nombre)}</div>${ls.map(a => `<button class="kit falta ${falta[a.id] ? 'ok' : ''}" data-act="kFalta" data-id="${a.id}"><span class="ck">${falta[a.id] ? '🛒' : ''}</span><span class="n">${esc(a.n)}${a.marca ? ` <small class="faint">${esc(a.marca)}</small>` : ''}</span><span class="q">${falta[a.id] ? 'falta' : ''}</span></button>`).join('')}` : '').join('') +
+      `<div class="row" style="margin-top:12px"><input type="text" id="kNuevo" placeholder="Otra cosa que falte (papel, café…)" style="flex:1"><button class="btn sm primary" data-act="kExAdd">Añadir</button></div>
+      <button class="btn primary big" style="margin-top:12px" data-act="kTab" data-t="lista">Ver mi lista (${nFalta})</button>`;
+  } else {
+    const bl = bloquesCompra().map(({ cm, ls }) => ({ cm, ls: ls.filter(a => falta[a.id]) })).filter(x => x.ls.length);
+    const nOk = Object.keys(falta).filter(id => comp[id]).length + ex.filter(e => e.ok).length;
+    cuerpo = !nFalta ? `<div class="empty">Tu lista está vacía.<br>Ve a «Revisar en casa» y marca lo que te falta.</div>` :
+      `<div class="row" style="margin:0 0 4px"><span class="muted small">${nOk}/${nFalta} en el carro</span><span class="sp"></span><button class="btn sm" data-act="kCopiar">Copiar</button></div>` +
+      bl.map(({ cm, ls }) => `<div class="dgrp">${esc(cm.nombre)}</div>${ls.map(a => `<button class="kit ${comp[a.id] ? 'ok' : ''}" data-act="kComp" data-id="${a.id}"><span class="ck">${comp[a.id] ? '✓' : ''}</span><span class="n">${esc(a.n)}${a.marca ? ` <small class="faint">${esc(a.marca)}</small>` : ''}</span><span class="q faint">${esc(a.super || '')}</span></button>`).join('')}`).join('') +
+      (ex.length ? `<div class="dgrp">Otras cosas</div>${ex.map((e, i) => `<div class="kit ${e.ok ? 'ok' : ''}"><button class="ck" data-act="kExOk" data-i="${i}">${e.ok ? '✓' : ''}</button><span class="n">${esc(e.n)}</span><button class="x" data-act="kExDel" data-i="${i}" aria-label="Quitar">✕</button></div>`).join('')}` : '') +
+      `<button class="btn primary big" style="margin-top:14px" data-act="kFin">✅ Compra hecha</button><p class="faint small" style="text-align:center">Quita de la lista lo que hayas comprado; lo que no, se queda para la próxima.</p>`;
+  }
+  hoja(`<h2>🛒 Lista de la compra</h2>${tabs}${cuerpo}`);
 }
 let compraT = null;
-function guardaCompra() { clearTimeout(compraT); compraT = setTimeout(() => setDoc(fitRef('compra'), F.compra).catch(e => toast('No se pudo guardar: ' + (e.code || e.message))), 600); }
+function guardaCompra() { clearTimeout(compraT); compraT = setTimeout(() => setDoc(fitRef('compra'), F.compra).catch(e => toast('No se pudo guardar: ' + (e.code || e.message))), 500); }
 
 document.addEventListener('click', async ev => {
   const b = ev.target.closest('[data-act]'); if (!b) return;
@@ -1039,15 +1097,17 @@ document.addEventListener('click', async ev => {
     case 'objOk': { const a = F.ajustes; a.meta = $('#oMeta').value.trim(); a.objPeso = num($('#oPeso').value); a.objFecha = $('#oFecha').value || null; a.objIni = num($('#oIni').value); a.objSemana = Math.max(1, Math.min(7, parseInt($('#oSem').value) || 4));
       guardaPerfil(0); cierraHoja(); pinta(); return toast('Objetivos guardados'); }
     case 'kAbrir': return hojaCompra();
-    case 'kDias': F.compra.dias = Math.max(1, Math.min(31, (F.compra.dias || 7) + (+b.dataset.d))); F.compra.rep = {}; guardaCompra(); return hojaCompra();
-    case 'kRep': { const key = b.dataset.key, n = +b.dataset.n, c = repDe(key, n, F.compra.dias || 7).slice(); c[+b.dataset.i] = Math.max(0, c[+b.dataset.i] + (+b.dataset.d)); (F.compra.rep ||= {})[key] = c; guardaCompra(); return hojaCompra(); }
-    case 'kOk': { const ok = F.compra.ok ||= {}; ok[b.dataset.id] = !ok[b.dataset.id]; guardaCompra(); return hojaCompra(); }
-    case 'kExOk': F.compra.extra[+b.dataset.i].ok = !F.compra.extra[+b.dataset.i].ok; guardaCompra(); return hojaCompra();
+    case 'kTab': return hojaCompra(b.dataset.t);
+    case 'kFalta': { const f = F.compra.falta ||= {}; if (f[b.dataset.id]) { delete f[b.dataset.id]; delete (F.compra.comprado || {})[b.dataset.id]; } else f[b.dataset.id] = true; guardaCompra(); return hojaCompra('casa'); }
+    case 'kComp': { const c = F.compra.comprado ||= {}; c[b.dataset.id] = !c[b.dataset.id]; guardaCompra(); return hojaCompra('lista'); }
+    case 'kExOk': F.compra.extra[+b.dataset.i].ok = !F.compra.extra[+b.dataset.i].ok; guardaCompra(); return hojaCompra('lista');
     case 'kExDel': F.compra.extra.splice(+b.dataset.i, 1); guardaCompra(); return hojaCompra();
-    case 'kExAdd': { const n = $('#kNuevo').value.trim(); if (!n) return; (F.compra.extra ||= []).push({ n, ok: false }); guardaCompra(); return hojaCompra(); }
-    case 'kReset': F.compra.ok = {}; (F.compra.extra || []).forEach(e => e.ok = false); guardaCompra(); return hojaCompra();
-    case 'kCopiar': { const tot = calculaCompra(), porS = {}; for (const [aid, q] of Object.entries(tot)) { const a = alim(aid); if (a && q) (porS[a.super || 'Otros'] ||= []).push(`- ${a.n}: ${fCompra(a, q).replace(/<[^>]+>/g, '')}`); }
-      const txt = `🛒 Compra para ${F.compra.dias || 7} días\n` + Object.entries(porS).map(([s, l]) => `\n${s}\n${l.join('\n')}`).join('\n') + ((F.compra.extra || []).length ? '\n\nOtras cosas\n' + F.compra.extra.map(e => '- ' + e.n).join('\n') : '');
+    case 'kExAdd': { const n = $('#kNuevo').value.trim(); if (!n) return; (F.compra.extra ||= []).push({ n, ok: false }); guardaCompra(); return hojaCompra('casa'); }
+    case 'kFin': { const c = F.compra.comprado || {}; for (const id of Object.keys(c)) if (c[id]) delete F.compra.falta[id]; F.compra.comprado = {}; F.compra.extra = (F.compra.extra || []).filter(e => !e.ok);
+      guardaCompra(); toast('¡Compra hecha! 🛒'); return hojaCompra('lista'); }
+    case 'kCopiar': { const falta = F.compra.falta || {};
+      const txt = '🛒 Lista de la compra\n' + bloquesCompra().map(({ cm, ls }) => { const l = ls.filter(a => falta[a.id] && !(F.compra.comprado || {})[a.id]); return l.length ? `\n${cm.nombre}\n` + l.map(a => '- ' + a.n + (a.super ? ` (${a.super})` : '')).join('\n') : ''; }).join('') +
+        ((F.compra.extra || []).filter(e => !e.ok).length ? '\n\nOtras cosas\n' + F.compra.extra.filter(e => !e.ok).map(e => '- ' + e.n).join('\n') : '');
       try { await navigator.clipboard.writeText(txt); toast('Lista copiada: pégala en WhatsApp o Notas'); } catch (e) { toast('No pude copiar'); } return; }
   }
 });
@@ -1228,9 +1288,10 @@ onAuthStateChanged(auth, user => {
         else if (d.activo && d.activo.id !== F.ultimoFin && (!activo || ((d.activo.upd || 0) > (activo.upd || 0) + 1000 && $('#wo').hidden))) { activo = d.activo; lsSet('jp-fit-activo', activo); }   // empezado o avanzado en otro dispositivo
         else if (!d.activo && activo && !ch.doc.metadata.hasPendingWrites && (d.at || 0) > (activo.upd || 0) + 3000) { activo = null; lsSet('jp-fit-activo', null); }   // lo descartaste en otro dispositivo
       } else if (id === 'alimentos') { F.alimentos = d?.lista || [];
-      } else if (id === 'dieta') { F.dieta = { comidas: d?.comidas || [], obj: d?.obj || null, ult: d?.ult || {} };
+      } else if (id === 'dieta') { const ds = d?.dietas || (d?.comidas ? [{ id: 'd1', nombre: 'Dieta 1', comidas: d.comidas, obj: d.obj || null, at: Date.now() }] : []);
+        F.dietas = ds; F.dietaActiva = d?.activa || ds[0]?.id || null; F.dieta = ds.find(x => x.id === F.dietaActiva) || { comidas: [], obj: null }; F.dieta.ult = d?.ult || {};
       } else if (id === 'cuerpo') { F.pesos = d?.pesos || {};
-      } else if (id === 'compra') { if (d) F.compra = { dias: 7, rep: {}, ok: {}, extra: [], ...d }; if (hojaCtx?.tipo === 'compra' && !$('#sheet').hidden) hojaCompra();
+      } else if (id === 'compra') { if (d) F.compra = { falta: d.falta || {}, comprado: d.comprado || {}, extra: d.extra || [] }; if (hojaCtx?.tipo === 'compra' && !$('#sheet').hidden) hojaCompra();
       } else if (id.startsWith('d-')) { if (d) Object.assign(F.diario, d.dias || {});
       } else if (id.startsWith('m-')) { if (d) F.meses[id.slice(2)] = d.e || {}; else delete F.meses[id.slice(2)]; }
     }

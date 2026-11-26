@@ -6,16 +6,22 @@
 <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' https://www.gstatic.com https://apis.google.com https://accounts.google.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://accounts.google.com; font-src https://fonts.gstatic.com; connect-src 'self' https://script.google.com https://script.googleusercontent.com https://accounts.google.com https://firestore.googleapis.com https://identitytoolkit.googleapis.com https://securetoken.googleapis.com https://www.googleapis.com https://apis.google.com; frame-src 'self' https://organizador-jp.firebaseapp.com https://accounts.google.com; img-src 'self' data: blob: https://lh3.googleusercontent.com; manifest-src 'self'; base-uri 'none'; form-action 'self'; object-src 'none'">
 <meta name="referrer" content="no-referrer">
 <meta name="robots" content="noindex, nofollow">
-<link rel="manifest" href="manifest.json?v=20261126134317">
-<link rel="icon" href="icon-192.png">
-<link rel="apple-touch-icon" href="icon-180.png">
+<link rel="manifest" href="manifest-fit.json">
+<link rel="icon" href="fit-icon-192.png">
+<link rel="apple-touch-icon" href="fit-icon-180.png">
 <meta name="theme-color" content="#000000">
 <meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="JP Fitness">
+<meta property="og:title" content="JP Fitness">
+<meta property="og:description" content="Entrenos, comida, objetivos y descanso">
+<meta property="og:image" content="https://jorgepereiramkt.github.io/organizador/fit-icon-512.png">
+<meta property="og:type" content="website">
+
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <title>JP Fitness</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Space+Grotesk:wght@500;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="fitness.css?v=20261126134317">
+<link rel="stylesheet" href="fitness.css?v=20261126135200">
 </head>
 <body>
 <div class="gate loading" id="gate">
@@ -54,6 +60,6 @@
 <div class="toast" id="toast" hidden></div>
 <input type="file" id="fileIn" accept=".json,.csv,application/json,text/csv" hidden>
 
-<script type="module" src="fitness.js?v=20261126134317"></script>
+<script type="module" src="fitness.js?v=20261126135200"></script>
 </body>
 </html>
