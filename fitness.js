@@ -156,8 +156,8 @@ function coach() {
   if (faltan > 0 && faltan >= quedan) return ['🚨', `Te faltan ${faltan} entrenos y quedan ${quedan} días`, `Sin excusas: hoy toca${sug ? ' «' + sug.nombre + '»' : ''}.`];
   if (dias >= 3) return ['😤', `Llevas ${dias} días sin entrenar`, `Así no se llega. Hoy toca${sug ? ' «' + sug.nombre + '»' : ' moverse'}, aunque sea una sesión corta.`];
   if (sem >= obj) return ['🏆', `Objetivo semanal cumplido (${sem}/${obj})`, 'Lo que hagas de más es extra. Prioriza descanso y técnica.'];
-  if (prs) return ['💪', `${prs} récord${prs > 1 ? 's' : ''} en los últimos 7 días`, `Vas ${sem}/${obj} esta semana. Mantén el ritmo.`];
-  return ['🎯', `Vas ${sem}/${obj} esta semana`, sug ? `La que más tiempo llevas sin hacer: «${sug.nombre}».` : 'Sigue sumando.'];
+  if (prs) return ['💪', `${prs} récord${prs > 1 ? 's' : ''} en los últimos 7 días`, sug ? `Mantén el ritmo: hoy te toca «${sug.nombre}».` : 'Mantén el ritmo.'];
+  return ['🎯', sug ? `Hoy te toca «${sug.nombre}»` : 'Sigue sumando', sug ? 'Es la rutina que más tiempo llevas sin hacer.' : 'Cada entreno cuenta.'];
 }
 
 // ---------- áreas (arriba) y submenú (abajo) ----------

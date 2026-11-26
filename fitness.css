@@ -356,3 +356,8 @@ body.sinsub .enCurso{bottom:calc(env(safe-area-inset-bottom) + 14px)}
 .aro-t{font:700 18px var(--head);fill:var(--text)}
 .rtit{font:700 19px/1.25 var(--head);margin:2px 0 3px}
 @media (min-width:760px){ .areas{max-width:720px;margin:8px auto 0} }
+
+.areas{display:grid;grid-template-columns:repeat(4,1fr);overflow:visible}
+.areas button{min-width:0;flex-direction:column;gap:1px;padding:7px 2px;font-size:12px;line-height:1.15}
+.areas button span{font-size:18px}
+@media (min-width:600px){ .areas button{flex-direction:row;gap:6px;font-size:14px;padding:9px 10px} }
