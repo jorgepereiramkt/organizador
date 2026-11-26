@@ -45,14 +45,19 @@ const lsSet = (k, v) => { try { v == null ? localStorage.removeItem(k) : localSt
 
 // Tema: el mismo que elijas en el Organizador
 (() => { let m = 'light'; try { m = localStorage.getItem('jp-theme') || 'light'; } catch (e) {}
-  document.documentElement.dataset.theme = 'dark';   // Fitness siempre en negro y verde
-  const mc = document.querySelector('meta[name=theme-color]'); if (mc) mc.content = '#000000'; })();
+  ponTema(lsGet('jp-fit-tema', 'dark')); })();
+function ponTema(t) {   // modo claro / oscuro propio de Fitness (por defecto oscuro)
+  document.documentElement.dataset.theme = t; lsSet('jp-fit-tema', t);
+  const mc = document.querySelector('meta[name=theme-color]'); if (mc) mc.content = t === 'dark' ? '#000000' : '#f3f6f4';
+  const b = document.getElementById('temaBtn'); if (b) b.textContent = t === 'dark' ? '☀️' : '🌙';
+}
+document.getElementById('temaBtn')?.addEventListener('click', () => { ponTema(document.documentElement.dataset.theme === 'dark' ? 'light' : 'dark'); if (listo) pinta(); });
 
 let toastT;
 const toast = (m, ms = 2600) => { const t = $('#toast'); t.textContent = m; t.hidden = false; clearTimeout(toastT); toastT = setTimeout(() => t.hidden = true, ms); };
 
 // ---------- estado ----------
-const F = { rutinas: [], ajustes: { descanso: 120, objSemana: 4 }, meses: {}, entrenos: [], porId: {}, ultimoFin: null, alimentos: [], dieta: { comidas: [], obj: null }, diario: {}, pesos: {} };
+const F = { rutinas: [], ajustes: { descanso: 120, objSemana: 4 }, meses: {}, entrenos: [], porId: {}, ultimoFin: null, alimentos: [], dieta: { comidas: [], obj: null }, diario: {}, pesos: {}, compra: { dias: 7, rep: {}, ok: {}, extra: [] } };
 let U = null, listo = false, vista = lsGet('jp-fit-vista', 'hoy');
 let activo = lsGet('jp-fit-activo', null);
 const perfilRef = () => doc(db, 'users', U.uid, 'fit', 'perfil');
@@ -159,7 +164,7 @@ function pinta() {
   if (!listo) return;
   document.querySelectorAll('#tabbar button').forEach(b => b.classList.toggle('on', b.dataset.v === vista));
   const m = $('#main');
-  m.innerHTML = ({ hoy: vHoy, rutinas: vRutinas, comida: vComida, historial: vHistorial, ejercicios: vEjercicios }[vista] || vHoy)();
+  m.innerHTML = ({ hoy: vHoy, rutinas: vRutinas, comida: vComida, historial: vHistorial, ejercicios: vProgreso }[vista] || vHoy)();
   pintaEnCurso();
 }
 
@@ -182,7 +187,7 @@ function vHoy() {
   <div style="margin-top:16px">${activo ? `<button class="btn primary big" data-act="abrirWo">⏱️ Seguir con el entreno</button>` : `<button class="btn primary big" data-act="empezar">💪 Empezar entreno</button>`}</div>
   ${sug && !activo ? `<div class="sec"><h2>Te toca</h2></div>${cardRutina(sug)}` : ''}
   <div class="sec"><h2>Comida de hoy</h2></div>${resumenMacros(fISO(Date.now()), true)}
-  <div class="sec"><h2>Peso</h2></div>${cardPeso()}
+  <div class="sec"><h2>Peso</h2></div>${cardPeso(true)}
   ${ult ? `<div class="sec"><h2>Último entreno</h2></div>${cardEntreno(ult)}` : ''}
   ${dur ? `<p class="faint small" style="text-align:center;margin-top:18px">Esta semana: ${fDur(dur)} entrenando</p>` : ''}`;
 }
@@ -221,7 +226,7 @@ function vEjercicios() {
   const lista = [...catalogo().values()].filter(x => x.veces).sort((a, b) => b.ult - a.ult);
   const f = norm(filtroEj);
   const vis = f ? lista.filter(x => norm(x.n).includes(f)) : lista;
-  return `${cardPeso()}<div class="sec"><h2>Ejercicios</h2></div><input class="buscar" id="buscaEj" placeholder="Buscar ejercicio…" value="${esc(filtroEj)}" autocomplete="off">
+  return `<input class="buscar" id="buscaEj" placeholder="Buscar ejercicio…" value="${esc(filtroEj)}" autocomplete="off">
   <div class="card" style="padding:0;margin-top:12px">${vis.map(x => { const h = historialDe(x.k); const best = h.map(o => mejor(o.e)).filter(Boolean).sort((a, b) => e1rm(b.kg, b.r) - e1rm(a.kg, a.r))[0];
     return `<div class="ej-li" data-act="verEj" data-k="${esc(x.k)}" style="border-bottom:1px solid var(--line)"><div class="n"><b>${esc(x.n)}</b><span>${x.veces} sesiones · última ${fDia(x.ult)}</span></div>
     <div class="v">${best ? fmtKgR(best.kg, best.r) : '—'}<small>mejor serie</small></div></div>`; }).join('') || '<div class="empty">Nada por aquí.</div>'}</div>`;
@@ -262,7 +267,7 @@ function grafica(puntos) { // puntos: [{t, v}] en orden cronológico
     <text x="2" y="12">${fmtN(Math.round(y1))}</text></svg>`;
 }
 function verEjercicio(k) {
-  const h = historialDe(k), x = catalogo().get(k); if (!x) return;
+  const h = historialDe(k), x = catalogo().get(k); if (!x) return; hojaCtx = { tipo: 'ej', k };
   const pts = h.map(o => ({ t: o.w.ini, v: Math.max(0, ...seriesBuenas(o.e).map(s => e1rm(s.kg, s.r))) })).filter(p => p.v).reverse();
   const maxKg = Math.max(0, ...h.flatMap(o => seriesBuenas(o.e).map(s => s.kg || 0)));
   const best = h.map(o => mejor(o.e)).filter(Boolean).sort((a, b) => e1rm(b.kg, b.r) - e1rm(a.kg, a.r))[0];
@@ -271,7 +276,7 @@ function verEjercicio(k) {
   <div class="grid3"><div class="stat"><b>${maxKg ? fmtN(maxKg) : '—'}</b><span>Peso máximo (kg)</span></div>
   <div class="stat"><b>${best && best.kg ? fmtN(Math.round(e1rm(best.kg, best.r))) : '—'}</b><span>1RM estimado</span></div>
   <div class="stat"><b>${maxReps || '—'}</b><span>Más reps</span></div></div>
-  <div class="sec"><h2>1RM estimado</h2></div>${grafica(pts)}
+  <div class="sec"><h2>1RM estimado</h2></div>${graficaPro({ key: 'ej', puntos: pts, unidad: ' kg', dec: 0 })}
   <div class="sec"><h2>Historial</h2><span class="sp"></span><span class="faint small">${h.length} sesiones</span></div>
   ${h.slice(0, 15).map(o => `<div class="det-ex"><b class="small">${fDia(o.w.ini)} · ${esc(o.w.t || '')}</b><div>${seriesBuenas(o.e).map(s => fmtKgR(s.kg, s.r)).join(' · ')}</div></div>`).join('')}`);
 }
@@ -686,7 +691,7 @@ function vComida() {
     return `<div class="card meal"><div class="meal-h"><h3>${ic} ${nombre}</h3><span>${its.length ? r0(t.k) + ' kcal · P ' + r0(t.p) : ''}</span></div>
     ${its.map((it, i) => { const m = mac(it); return `<div class="it" data-act="cItem" data-k="${k}" data-i="${i}"><div class="n"><b>${esc(it.n)}</b><span>${fQ(alim(it.a), it.q)}</span></div><div class="k">${r0(m.k)} kcal<small>P ${r0(m.p)} · H ${r0(m.c)} · G ${r0(m.g)}</small></div></div>`; }).join('')}
     <div class="acts">${enDieta ? `<button class="btn sm primary" data-act="cDeDieta" data-k="${k}">📋 De mi dieta</button>` : ''}<button class="btn sm" data-act="cAdd" data-k="${k}">＋ Alimento</button></div></div>`; }).join('')}
-  <div class="stack" style="margin-top:16px"><button class="btn" data-act="cVerDieta">🥗 Mi dieta y objetivos</button><button class="btn" data-act="cAlims">🛒 Mis alimentos (${F.alimentos.length})</button></div>`;
+  <div class="stack" style="margin-top:16px"><button class="btn" data-act="cVerDieta">🥗 Mi dieta y objetivos</button><button class="btn primary" data-act="kAbrir">🛒 Lista de la compra</button><button class="btn" data-act="cAlims">📦 Mis alimentos (${F.alimentos.length})</button></div>`;
 }
 
 // ---- hojas de comida ----
@@ -754,15 +759,6 @@ function hojaDieta() {
 
 // ---- peso ----
 function pesosOrden() { return Object.entries(F.pesos).map(([f, kg]) => ({ f, t: deISO(f), kg })).sort((a, b) => a.t - b.t); }
-function cardPeso() {
-  const ps = pesosOrden(); if (!ps.length) return `<div class="card"><b>Peso</b><p class="muted small">Apunta tu peso para ver la tendencia.</p><button class="btn sm primary" data-act="cPeso">＋ Apuntar peso</button></div>`;
-  const u = ps[ps.length - 1], hace30 = ps.filter(p => p.t <= u.t - 30 * DIA).pop(), obj = F.ajustes.objPeso;
-  const media7 = ps.filter(p => p.t > Date.now() - 7 * DIA).map(p => p.kg), m7 = media7.length ? media7.reduce((a, b) => a + b, 0) / media7.length : null;
-  const desde = Date.now() - 365 * DIA, pts = ps.filter(p => p.t >= desde).map(p => ({ t: p.t, v: p.kg }));
-  return `<div class="card"><div class="row"><div style="flex:1"><span class="muted small">Peso · ${fDia(u.t)}</span><div style="font:700 28px var(--head)">${fmtN(u.kg)} kg</div></div>
-    <div style="text-align:right" class="small">${hace30 ? `<div>${u.kg - hace30.kg <= 0 ? '▼' : '▲'} ${fmtN(Math.abs(Math.round((u.kg - hace30.kg) * 10) / 10))} kg ${u.t - hace30.t > 45 * DIA ? 'desde el ' + fDia(hace30.t) : 'en 30 días'}</div>` : ''}${m7 ? `<div class="muted">media 7 días ${fmtN(Math.round(m7 * 10) / 10)}</div>` : ''}${obj ? `<div class="muted">objetivo ${fmtN(obj)} kg · ${u.kg > obj ? 'faltan ' + fmtN(Math.round((u.kg - obj) * 10) / 10) : '¡conseguido!'}</div>` : ''}</div></div>
-    ${pts.length > 1 ? grafica(pts).replace('aria-label="Progreso"', 'aria-label="Peso"') : ''}<div class="row" style="margin-top:8px"><button class="btn sm primary" data-act="cPeso">＋ Apuntar peso</button><button class="btn sm" data-act="cPesos">Ver todos (${ps.length})</button></div></div>`;
-}
 function hojaPeso() {
   hoja(`<h2>Apuntar peso</h2><label>Fecha</label><input type="text" id="pF" value="${fISO(Date.now())}" placeholder="AAAA-MM-DD"><label>Peso (kg)</label><input type="number" inputmode="decimal" id="pK" placeholder="82,5">
   <label>Objetivo de peso (kg, opcional)</label><input type="number" inputmode="decimal" id="pO" value="${F.ajustes.objPeso || ''}">
@@ -824,6 +820,229 @@ Object.assign(window.__fit, { importaPesos, deMedidas,
   ponAlimentos: async l => { F.alimentos = l; await guardaAlimentos(); pinta(); return l.length; },
   ponDieta: async c => { F.dieta.comidas = c; await guardaDieta(); pinta(); return c.length; } });
 
+
+// ================= GRÁFICAS, OBJETIVOS, CALENDARIO Y LISTA DE LA COMPRA =================
+const CH = new Map(); let chId = 0; const rangos = lsGet('jp-fit-rangos', {});
+const RANGOS = [['1M', 30], ['3M', 91], ['6M', 182], ['1A', 365], ['Todo', 0]];
+function suave(p) {
+  if (p.length < 3) return p.map((q, i) => (i ? 'L' : 'M') + q[0].toFixed(1) + ' ' + q[1].toFixed(1)).join(' ');
+  let d = 'M' + p[0][0].toFixed(1) + ' ' + p[0][1].toFixed(1);
+  for (let i = 0; i < p.length - 1; i++) { const a = p[i - 1] || p[i], b = p[i], c = p[i + 1], e = p[i + 2] || c;
+    d += ` C${(b[0] + (c[0] - a[0]) / 6).toFixed(1)} ${(b[1] + (c[1] - a[1]) / 6).toFixed(1)} ${(c[0] - (e[0] - b[0]) / 6).toFixed(1)} ${(c[1] - (e[1] - b[1]) / 6).toFixed(1)} ${c[0].toFixed(1)} ${c[1].toFixed(1)}`; }
+  return d;
+}
+const mediaMovil = (pts, dias = 7) => pts.map(p => { const w = pts.filter(q => q.t <= p.t && q.t > p.t - dias * DIA); return { t: p.t, v: w.reduce((a, b) => a + b.v, 0) / w.length }; });
+const redondea = (v, dec) => Math.round(v * 10 ** dec) / 10 ** dec;
+function graficaPro({ key, puntos, unidad = '', objetivo = null, media = false, dec = 1, alto = 210, rangoDef = 0 }) {
+  const r = rangos[key] ?? rangoDef, ult = puntos.length ? puntos[puntos.length - 1].t : Date.now();
+  let pts = r ? puntos.filter(p => p.t >= ult - r * DIA) : puntos;
+  if (pts.length < 2) pts = puntos.slice(-2);
+  const chips = `<div class="rchips">${RANGOS.map(([n, d]) => `<button data-act="rango" data-key="${key}" data-d="${d}" class="${d === r ? 'on' : ''}">${n}</button>`).join('')}</div>`;
+  if (pts.length < 2) return chips + '<p class="faint small">Necesito al menos dos datos para dibujar la gráfica.</p>';
+  const W = 420, H = alto, PL = 6, PR = 40, PT = 14, PB = 24;
+  const ys = pts.map(p => p.v).concat(objetivo != null ? [objetivo] : []);
+  let y0 = Math.min(...ys), y1 = Math.max(...ys); const pad = (y1 - y0) * 0.14 || 1; y0 -= pad; y1 += pad;
+  const x0 = pts[0].t, x1 = pts[pts.length - 1].t;
+  const X = t => PL + (W - PL - PR) * ((t - x0) / ((x1 - x0) || 1)), Y = v => PT + (H - PT - PB) * (1 - (v - y0) / ((y1 - y0) || 1));
+  const id = 'g' + (++chId); CH.set(id, { pts, X, Y, unidad, dec, W, H, PT, PB });
+  const linea = suave(pts.map(p => [X(p.t), Y(p.v)])), mm = media ? suave(mediaMovil(pts).map(p => [X(p.t), Y(p.v)])) : null;
+  const grid = [0, 1, 2, 3, 4].map(i => { const v = y0 + (y1 - y0) * i / 4; return `<line x1="${PL}" x2="${W - PR}" y1="${Y(v).toFixed(1)}" y2="${Y(v).toFixed(1)}" class="gl"/><text x="${W - PR + 5}" y="${(Y(v) + 3.5).toFixed(1)}" class="gt">${fmtN(redondea(v, dec))}</text>`; }).join('');
+  const xl = [0, 1, 2, 3].map(i => { const t = x0 + (x1 - x0) * i / 3, d = new Date(t);
+    const lab = (x1 - x0) > 300 * DIA ? MESES[d.getMonth()].slice(0, 3) + ' ' + String(d.getFullYear()).slice(2) : d.getDate() + ' ' + MESES[d.getMonth()].slice(0, 3);
+    return `<text x="${X(t).toFixed(1)}" y="${H - 6}" class="gt" text-anchor="${i === 0 ? 'start' : i === 3 ? 'end' : 'middle'}">${lab}</text>`; }).join('');
+  const last = pts[pts.length - 1];
+  const obj = objetivo != null ? `<line x1="${PL}" x2="${W - PR}" y1="${Y(objetivo).toFixed(1)}" y2="${Y(objetivo).toFixed(1)}" class="gobj"/><text x="${PL + 3}" y="${(Y(objetivo) - 5).toFixed(1)}" class="gt gobjt">🎯 ${fmtN(objetivo)}${unidad}</text>` : '';
+  return chips + `<div class="gchart" data-g="${id}"><svg viewBox="0 0 ${W} ${H}" class="gsvg" role="img" aria-label="Gráfica">
+   <defs><linearGradient id="${id}f" x1="0" x2="0" y1="0" y2="1"><stop offset="0" stop-color="var(--accent)" stop-opacity=".32"/><stop offset="1" stop-color="var(--accent)" stop-opacity="0"/></linearGradient></defs>
+   ${grid}${obj}<path d="${linea} L${X(x1).toFixed(1)} ${H - PB} L${X(x0).toFixed(1)} ${H - PB} Z" fill="url(#${id}f)"/>
+   ${media ? `<path d="${linea}" fill="none" stroke="var(--accent)" stroke-opacity=".35" stroke-width="1.2"/>` : ''}
+   <path d="${media ? mm : linea}" fill="none" stroke="var(--accent)" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/>
+   ${pts.length <= 45 ? pts.map(p => `<circle cx="${X(p.t).toFixed(1)}" cy="${Y(p.v).toFixed(1)}" r="2.3" class="gdot"/>`).join('') : ''}
+   <circle cx="${X(last.t).toFixed(1)}" cy="${Y(last.v).toFixed(1)}" r="5" class="glast"/>${xl}
+   <line class="gcur" x1="0" x2="0" y1="${PT}" y2="${H - PB}" visibility="hidden"/><circle class="gcurp" r="5" cx="0" cy="0" visibility="hidden"/></svg>
+   <div class="gtip" hidden></div></div>${media ? '<p class="faint small" style="margin:4px 0 0">Línea gruesa: media de 7 días · fina: cada pesaje. Toca la gráfica para ver cada dato.</p>' : ''}`;
+}
+function gMueve(ev) {
+  const g = ev.target.closest?.('.gchart'); if (!g) return; const c = CH.get(g.dataset.g); if (!c) return;
+  const svg = g.querySelector('svg'), rc = svg.getBoundingClientRect(), x = (ev.clientX - rc.left) / rc.width * c.W;
+  let best = c.pts[0]; for (const p of c.pts) if (Math.abs(c.X(p.t) - x) < Math.abs(c.X(best.t) - x)) best = p;
+  const cx = c.X(best.t), cy = c.Y(best.v), cur = svg.querySelector('.gcur'), cp = svg.querySelector('.gcurp'), tip = g.querySelector('.gtip');
+  cur.setAttribute('x1', cx); cur.setAttribute('x2', cx); cur.setAttribute('visibility', 'visible'); cp.setAttribute('cx', cx); cp.setAttribute('cy', cy); cp.setAttribute('visibility', 'visible');
+  const d = new Date(best.t); tip.hidden = false; tip.textContent = `${fmtN(redondea(best.v, c.dec))}${c.unidad} · ${d.getDate()} ${MESES[d.getMonth()].slice(0, 3)} ${d.getFullYear()}`;
+  tip.style.left = Math.min(Math.max(cx / c.W * 100, 14), 86) + '%';
+  clearTimeout(g._t); g._t = setTimeout(() => { tip.hidden = true; cur.setAttribute('visibility', 'hidden'); cp.setAttribute('visibility', 'hidden'); }, 2500);
+}
+document.addEventListener('pointermove', gMueve); document.addEventListener('pointerdown', gMueve);
+
+function barras(items, obj, alto = 120) { // items [{lab, v, hoy}]
+  const W = 420, H = alto, PB = 20, PT = 10, max = Math.max(obj || 0, ...items.map(i => i.v), 1), bw = (W - 10) / items.length;
+  const Y = v => PT + (H - PT - PB) * (1 - v / max);
+  return `<svg viewBox="0 0 ${W} ${H}" class="gsvg" role="img" aria-label="Barras">${obj ? `<line x1="0" x2="${W}" y1="${Y(obj)}" y2="${Y(obj)}" class="gobj"/>` : ''}
+    ${items.map((it, i) => { const x = 5 + i * bw + bw * 0.18, w = bw * 0.64, y = Y(it.v); return `<rect x="${x.toFixed(1)}" y="${y.toFixed(1)}" width="${w.toFixed(1)}" height="${Math.max(0, H - PB - y).toFixed(1)}" rx="5" class="${obj && it.v >= obj ? 'bok' : 'bno'} ${it.hoy ? 'bhoy' : ''}"/>
+      ${it.v ? `<text x="${(x + w / 2).toFixed(1)}" y="${(y - 3).toFixed(1)}" text-anchor="middle" class="gt">${fmtN(it.v)}</text>` : ''}<text x="${(x + w / 2).toFixed(1)}" y="${H - 5}" text-anchor="middle" class="gt">${it.lab}</text>`; }).join('')}</svg>`;
+}
+
+// ---- peso (tarjeta nueva) ----
+function cardPeso(compacto) {
+  const ps = pesosOrden();
+  if (!ps.length) return `<div class="card"><b>Peso</b><p class="muted small">Apunta tu peso para ver la tendencia.</p><button class="btn sm primary" data-act="cPeso">＋ Apuntar peso</button></div>`;
+  const u = ps[ps.length - 1], obj = F.ajustes.objPeso, ff = F.ajustes.objFecha;
+  const ref = d => { const c = ps.filter(p => p.t <= u.t - d * DIA).pop(); return c && (u.t - c.t) <= d * DIA * 1.6 ? c : null; };
+  const chip = (lab, r) => { if (!r) return ''; const dif = redondea(u.kg - r.kg, 1), bien = obj ? (obj < u.kg ? dif <= 0 : dif >= 0) : dif <= 0;
+    return `<span class="dchip ${dif === 0 ? '' : bien ? 'bien' : 'mal'}">${dif > 0 ? '▲' : dif < 0 ? '▼' : '='} ${fmtN(Math.abs(dif))} kg <small>${lab}</small></span>`; };
+  const hace = Math.round((new Date().setHours(0, 0, 0, 0) - u.t) / DIA);
+  let objHtml = '';
+  if (obj) {
+    const ini = F.ajustes.objIni || Math.max(...ps.filter(p => p.t >= u.t - 120 * DIA).map(p => p.kg)), tot = ini - obj, pc = tot ? Math.max(0, Math.min(100, (ini - u.kg) / tot * 100)) : 100;
+    let ritmo = ''; if (ff) { const sem = (deISO(ff) - Date.now()) / (7 * DIA); ritmo = sem > 0 ? `necesitas ${fmtN(redondea((u.kg - obj) / sem, 2))} kg/semana hasta el ${fDia(deISO(ff))}` : 'la fecha del objetivo ya pasó'; }
+    objHtml = `<div class="objbar"><div class="row small"><span class="muted">${fmtN(ini)} kg</span><span class="sp"></span><b>${(u.kg - obj) * Math.sign(tot || 1) > 0 ? 'Faltan ' + fmtN(redondea(Math.abs(u.kg - obj), 1)) + ' kg' : '¡Objetivo conseguido! 🏆'}</b><span class="sp"></span><span class="muted">🎯 ${fmtN(obj)} kg</span></div>
+      <div class="barra gruesa"><i style="width:${pc}%"></i></div><div class="faint small" style="margin-top:4px">${Math.round(pc)}% del camino${ritmo ? ' · ' + ritmo : ''}</div></div>`;
+  }
+  return `<div class="card peso"><div class="row" style="align-items:flex-start"><div style="flex:1"><span class="muted small">Peso actual</span><div class="pbig">${fmtN(u.kg)}<small> kg</small></div>
+    <span class="small ${hace > 7 ? 'aviso' : 'faint'}">${hace <= 0 ? 'pesado hoy' : hace === 1 ? 'pesado ayer' : 'último pesaje hace ' + hace + ' días'}${hace > 7 ? ' · ¡pésate!' : ''}</span></div>
+    <div class="dchips">${chip('7 días', ref(7))}${chip('30 días', ref(30))}${chip('90 días', ref(90))}</div></div>
+    ${objHtml}${compacto ? '' : graficaPro({ key: 'peso', puntos: ps.map(p => ({ t: p.t, v: p.kg })), unidad: ' kg', objetivo: obj || null, media: true, rangoDef: 182 })}
+    <div class="row" style="margin-top:12px"><button class="btn sm primary" data-act="cPeso">＋ Apuntar peso</button>${compacto ? '<button class="btn sm" data-act="irProg">Ver gráfica</button>' : `<button class="btn sm" data-act="cPesos">Todos (${ps.length})</button>`}${obj ? '' : '<button class="btn sm" data-act="objEdit">🎯 Poner objetivo</button>'}</div></div>`;
+}
+
+// ---- datos por día ----
+const entrenosDia = f => { const t0 = deISO(f); return F.entrenos.filter(w => w.ini >= t0 && w.ini < t0 + DIA); };
+function estadoDieta(f) {
+  const its = itemsDia(f); if (!its.length) return '';
+  const t = suma(its), o = objetivo(); if (!o.k) return 'ok';
+  const dk = Math.abs(t.k - o.k) / o.k, okP = !o.p || t.p >= o.p * 0.9;
+  return dk <= 0.1 && okP ? 'ok' : dk <= 0.2 ? 'meh' : 'mal';
+}
+
+// ---- Progreso: pestañas ----
+let progTab = lsGet('jp-fit-prog', 'objetivos'), calModo = 'mes', calRef = (() => { const d = new Date(); return new Date(d.getFullYear(), d.getMonth(), 1).getTime(); })();
+function vProgreso() {
+  const seg = `<div class="seg">${[['objetivos', '🎯 Objetivos'], ['calendario', '📅 Calendario'], ['ejercicios', '🏋️ Ejercicios']].map(([k, n]) => `<button data-act="progTab" data-t="${k}" class="${progTab === k ? 'on' : ''}">${n}</button>`).join('')}</div>`;
+  return seg + (progTab === 'calendario' ? vCalendario() : progTab === 'ejercicios' ? vEjercicios() : vObjetivos());
+}
+function vObjetivos() {
+  const a = F.ajustes, hoy = new Date(), m0 = new Date(hoy.getFullYear(), hoy.getMonth(), 1).getTime();
+  const semanas = [...Array(8)].map((_, i) => { const l = lunes(Date.now()) - (7 - i) * 7 * DIA; const n = F.entrenos.filter(w => w.ini >= l && w.ini < l + 7 * DIA).length; const d = new Date(l); return { lab: d.getDate() + '/' + (d.getMonth() + 1), v: n, hoy: i === 7 }; });
+  const delMes = F.entrenos.filter(w => w.ini >= m0), diasMes = hoy.getDate(), esperados = Math.round((a.objSemana || 4) * diasMes / 7);
+  const fechas = [...Array(diasMes)].map((_, i) => fISO(m0 + i * DIA + 3600e3)), est = fechas.map(estadoDieta);
+  const reg = est.filter(Boolean).length, okD = est.filter(e => e === 'ok').length;
+  const ult7 = [...Array(7)].map((_, i) => fISO(Date.now() - (6 - i) * DIA)).filter(f => itemsDia(f).length).map(f => suma(itemsDia(f)));
+  const med = k => ult7.length ? r0(ult7.reduce((s, t) => s + t[k], 0) / ult7.length) : null, o = objetivo();
+  return `<div class="card meta" data-act="objEdit"><span class="muted small">Mi objetivo</span><h2>${esc(a.meta || 'Toca para escribir tu objetivo (p. ej. «Estar definido en enero»)')}</h2>
+    ${a.objFecha ? `<span class="pill">📅 ${fDia(deISO(a.objFecha))} · quedan ${Math.max(0, Math.ceil((deISO(a.objFecha) - Date.now()) / DIA))} días</span>` : ''}</div>
+  <div class="sec"><h2>Peso</h2></div>${cardPeso(false)}
+  <div class="sec"><h2>Entrenos</h2><span class="sp"></span><span class="muted small">objetivo ${a.objSemana || 4}/semana</span></div>
+  <div class="card"><div class="grid3"><div><b class="nb">${delMes.length}</b><span class="muted small">este mes (de ~${esperados})</span></div><div><b class="nb">${racha()}</b><span class="muted small">semanas cumpliendo</span></div><div><b class="nb">${semanaActual().length}/${a.objSemana || 4}</b><span class="muted small">esta semana</span></div></div>
+    <div style="margin-top:10px">${barras(semanas, a.objSemana || 4)}</div><p class="faint small" style="margin:2px 0 0">Entrenos por semana (últimas 8). La línea es tu objetivo.</p></div>
+  <div class="sec"><h2>Comida</h2><span class="sp"></span><span class="muted small">este mes</span></div>
+  <div class="card"><div class="grid3"><div><b class="nb">${reg}/${diasMes}</b><span class="muted small">días apuntados</span></div><div><b class="nb">${okD}</b><span class="muted small">días en objetivo</span></div><div><b class="nb">${med('p') ?? '—'}</b><span class="muted small">proteína media 7 d (obj. ${r0(o.p)})</span></div></div>
+    ${ult7.length ? `<p class="small muted" style="margin:10px 0 0">Media últimos días apuntados: <b>${fmtN(med('k'))} kcal</b> de ${fmtN(r0(o.k))}.</p>` : '<p class="small muted" style="margin:10px 0 0">Empieza a apuntar tus comidas en la pestaña Comida para ver aquí tu cumplimiento.</p>'}</div>`;
+}
+function vCalendario() {
+  const d = new Date(calRef), y = d.getFullYear(), m = d.getMonth();
+  const tog = `<div class="dianav"><button data-act="calNav" data-d="-1" aria-label="Anterior">‹</button><b>${calModo === 'mes' ? MESES[m].charAt(0).toUpperCase() + MESES[m].slice(1) + ' ' + y : y}</b><button data-act="calNav" data-d="1" aria-label="Siguiente">›</button></div>
+   <div class="seg mini"><button data-act="calModo" data-m="mes" class="${calModo === 'mes' ? 'on' : ''}">Mes</button><button data-act="calModo" data-m="año" class="${calModo === 'año' ? 'on' : ''}">Año</button></div>`;
+  if (calModo === 'año') {
+    const vols = F.entrenos.map(volumen).sort((a, b) => a - b), q = p => vols[Math.floor(vols.length * p)] || 0, q1 = q(.33), q2 = q(.66);
+    let tot = 0;
+    const meses = [...Array(12)].map((_, mi) => { const p = new Date(y, mi, 1), off = (p.getDay() + 6) % 7, nd = new Date(y, mi + 1, 0).getDate(); let n = 0;
+      const celdas = [...Array(off)].map(() => '<i class="v"></i>').join('') + [...Array(nd)].map((_, i) => { const f = fISO(new Date(y, mi, i + 1).getTime()), ws = entrenosDia(f); n += ws.length;
+        const v = ws.reduce((s, w) => s + volumen(w), 0); return `<i class="${ws.length ? (v > q2 ? 'n3' : v > q1 ? 'n2' : 'n1') : ''} ${f === fISO(Date.now()) ? 'hoy' : ''}"></i>`; }).join('');
+      tot += n; return `<button class="mm" data-act="calMes" data-m="${mi}"><b>${MESES[mi].slice(0, 3)}</b><span class="faint small">${n || ''}</span><div class="mmg">${celdas}</div></button>`; }).join('');
+    return tog + `<p class="muted small" style="text-align:center;margin:4px 0 10px">${tot} entrenos en ${y}</p><div class="anio">${meses}</div><div class="leyenda"><span><i class="n1"></i>poco volumen</span><span><i class="n2"></i>medio</span><span><i class="n3"></i>mucho</span></div>`;
+  }
+  const off = (new Date(y, m, 1).getDay() + 6) % 7, nd = new Date(y, m + 1, 0).getDate(), hoyF = fISO(Date.now());
+  let ent = 0, vol = 0, dOk = 0, dReg = 0; const pesosMes = [];
+  const celdas = [...Array(off)].map(() => '<span></span>').join('') + [...Array(nd)].map((_, i) => {
+    const f = fISO(new Date(y, m, i + 1).getTime()), ws = entrenosDia(f), ed = estadoDieta(f), kg = F.pesos[f];
+    ent += ws.length; vol += ws.reduce((s, w) => s + volumen(w), 0); if (ed) dReg++; if (ed === 'ok') dOk++; if (kg) pesosMes.push(kg);
+    const ic = ws.length ? (/pierna|leg/i.test(ws[0].t + (F.rutinas.find(r => r.id === ws[0].rut)?.nombre || '')) ? '🦵' : '💪') : '';
+    return `<button class="cd ${ws.length ? 'tr' : ''} ${f === hoyF ? 'hoy' : ''} ${f > hoyF ? 'fut' : ''}" data-act="calDia" data-f="${f}"><span class="dn">${i + 1}</span><span class="ic">${ic}</span><span class="cb ${ed}"></span>${kg ? '<span class="pd" title="Peso apuntado"></span>' : ''}</button>`; }).join('');
+  return tog + `<div class="cal"><div class="cdh">${'LMXJVSD'.split('').map(x => `<span>${x}</span>`).join('')}</div><div class="cdg">${celdas}</div></div>
+   <div class="leyenda"><span><i class="tr"></i>entreno</span><span><i class="ok"></i>dieta en objetivo</span><span><i class="meh"></i>cerca</span><span><i class="mal"></i>lejos</span><span><i class="pd"></i>peso</span></div>
+   <div class="grid3" style="margin-top:12px"><div class="stat"><b>${ent}</b><span>Entrenos</span></div><div class="stat"><b>${vol >= 1000 ? fmtN(redondea(vol / 1000, 1)) + ' t' : fmtN(r0(vol)) + ' kg'}</b><span>Volumen</span></div>
+   <div class="stat"><b>${dOk}/${dReg || 0}</b><span>Días dieta OK</span></div></div>
+   ${pesosMes.length > 1 ? `<p class="muted small" style="text-align:center;margin-top:10px">Peso del mes: ${fmtN(pesosMes[0])} → ${fmtN(pesosMes[pesosMes.length - 1])} kg</p>` : ''}`;
+}
+function hojaDia(f) {
+  const ws = entrenosDia(f), kg = F.pesos[f], its = itemsDia(f);
+  hoja(`<h2>${fDia(deISO(f))}</h2>${kg ? `<p class="muted">⚖️ ${fmtN(kg)} kg</p>` : ''}
+   <div class="sec" style="margin-top:6px"><h2>Entreno</h2></div>${ws.map(cardEntreno).join('<div style="height:8px"></div>') || '<p class="faint small">Sin entreno este día.</p>'}
+   <div class="sec"><h2>Comida</h2></div>${its.length ? resumenMacros(f) : '<p class="faint small">No apuntaste comida este día.</p>'}
+   <button class="btn" style="width:100%;margin-top:10px" data-act="calComida" data-f="${f}">🥗 Ver / apuntar la comida de este día</button>`);
+}
+function hojaObjetivos() {
+  const a = F.ajustes;
+  hoja(`<h2>Mis objetivos</h2><label>Mi objetivo en una frase</label><input type="text" id="oMeta" value="${esc(a.meta || '')}" placeholder="Estar definido para enero">
+   <div class="f2"><div><label>Peso objetivo (kg)</label><input type="number" inputmode="decimal" id="oPeso" value="${a.objPeso || ''}"></div><div><label>Para el día</label><input type="date" id="oFecha" value="${a.objFecha || ''}"></div>
+   <div><label>Peso de partida (kg)</label><input type="number" inputmode="decimal" id="oIni" value="${a.objIni || ''}" placeholder="auto"></div><div><label>Entrenos por semana</label><input type="number" id="oSem" min="1" max="7" value="${a.objSemana || 4}"></div></div>
+   <p class="faint small">Las kcal y macros diarios se cambian en Comida → Mi dieta y objetivos.</p>
+   <button class="btn primary big" style="margin-top:10px" data-act="objOk">Guardar objetivos</button>`);
+}
+
+// ---- lista de la compra ----
+function repDe(key, n, dias) {
+  const r = F.compra.rep?.[key]; if (r && r.length === n) return r;
+  const base = Math.floor(dias / n), resto = dias % n; return [...Array(n)].map((_, i) => base + (i < resto ? 1 : 0));
+}
+function calculaCompra() {
+  const dias = F.compra.dias || 7, tot = {};
+  for (const cm of F.dieta.comidas || []) cm.grupos.forEach((g, gi) => { const c = g.opciones.length === 1 ? [dias] : repDe(cm.k + '|' + gi, g.opciones.length, dias);
+    g.opciones.forEach((o, oi) => { for (const it of o.items) tot[it.a] = (tot[it.a] || 0) + it.q * (c[oi] || 0); }); });
+  return tot;
+}
+function fCompra(a, q) {
+  if (a.gUd) { const u = Math.ceil(q / a.gUd - 0.05); return `${u} ${a.ud}${u > 1 && !/s$/.test(a.ud) ? (/[aeiouáéó]$/.test(a.ud) ? 's' : 'es') : ''} <span class="faint">(${fmtN(r0(q))} ${a.ml ? 'ml' : 'g'})</span>`; }
+  return q >= 1000 ? `${fmtN(redondea(q / 1000, 2))} ${a.ml ? 'L' : 'kg'}` : `${fmtN(r0(q))} ${a.ml ? 'ml' : 'g'}`;
+}
+function hojaCompra() {
+  hojaCtx = { tipo: 'compra' };
+  const dias = F.compra.dias || 7, tot = calculaCompra(), ok = F.compra.ok || {}, porSuper = {};
+  for (const [aid, q] of Object.entries(tot)) { if (!q) continue; const a = alim(aid); if (!a) continue; (porSuper[a.super || 'Otros'] ||= []).push([a, q]); }
+  const grupos = Object.entries(porSuper).sort((a, b) => b[1].length - a[1].length);
+  const nTot = Object.values(porSuper).flat().length + (F.compra.extra || []).length, nOk = Object.values(porSuper).flat().filter(([a]) => ok[a.id]).length + (F.compra.extra || []).filter(e => e.ok).length;
+  const reparto = (F.dieta.comidas || []).flatMap(cm => cm.grupos.map((g, gi) => g.opciones.length < 2 ? '' : (() => { const key = cm.k + '|' + gi, c = repDe(key, g.opciones.length, dias), s = c.reduce((x, y) => x + y, 0);
+    return `<div class="dgrp">${esc(cm.nombre)} · ${esc(g.nombre)} <span class="${s === dias ? '' : 'aviso'}">${s}/${dias} días</span></div>${g.opciones.map((o, oi) => `<div class="step"><span>${esc(o.nombre)}</span><button data-act="kRep" data-key="${key}" data-i="${oi}" data-n="${g.opciones.length}" data-d="-1">−</button><b>${c[oi]}</b><button data-act="kRep" data-key="${key}" data-i="${oi}" data-n="${g.opciones.length}" data-d="1">＋</button></div>`).join('')}`; })())).join('');
+  hoja(`<h2>🛒 Lista de la compra</h2>
+   <div class="step big"><span>Comprar para</span><button data-act="kDias" data-d="-1">−</button><b>${dias} días</b><button data-act="kDias" data-d="1">＋</button></div>
+   <details class="rep"><summary>Qué vas a comer esos días (reparto de opciones)</summary>${reparto}</details>
+   <div class="row" style="margin:12px 0 4px"><span class="muted small">${nOk}/${nTot} en el carro</span><span class="sp"></span><button class="btn sm" data-act="kCopiar">Copiar</button><button class="btn sm" data-act="kReset">Desmarcar</button></div>
+   ${grupos.map(([s, l]) => `<div class="dgrp">${esc(s)}</div>${l.sort((a, b) => a[0].n.localeCompare(b[0].n)).map(([a, q]) => `<button class="kit ${ok[a.id] ? 'ok' : ''}" data-act="kOk" data-id="${a.id}"><span class="ck">${ok[a.id] ? '✓' : ''}</span><span class="n">${esc(a.n)}${a.marca ? ` <small class="faint">${esc(a.marca)}</small>` : ''}</span><span class="q">${fCompra(a, q)}</span></button>`).join('')}`).join('')}
+   <div class="dgrp">Otras cosas</div>${(F.compra.extra || []).map((e, i) => `<div class="kit ${e.ok ? 'ok' : ''}"><button class="ck" data-act="kExOk" data-i="${i}">${e.ok ? '✓' : ''}</button><span class="n">${esc(e.n)}</span><button class="x" data-act="kExDel" data-i="${i}" aria-label="Quitar">✕</button></div>`).join('')}
+   <div class="row" style="margin-top:8px"><input type="text" id="kNuevo" placeholder="Añadir (papel de cocina, café…)" style="flex:1"><button class="btn sm primary" data-act="kExAdd">Añadir</button></div>`);
+  const det = $('#sheet details.rep'); if (det && hojaCtx.abierto) det.open = true; det?.addEventListener('toggle', () => { hojaCtx.abierto = det.open; });
+}
+let compraT = null;
+function guardaCompra() { clearTimeout(compraT); compraT = setTimeout(() => setDoc(fitRef('compra'), F.compra).catch(e => toast('No se pudo guardar: ' + (e.code || e.message))), 600); }
+
+document.addEventListener('click', async ev => {
+  const b = ev.target.closest('[data-act]'); if (!b) return;
+  switch (b.dataset.act) {
+    case 'rango': rangos[b.dataset.key] = +b.dataset.d; lsSet('jp-fit-rangos', rangos); if (!$('#sheet').hidden && hojaCtx?.tipo === 'ej') return verEjercicio(hojaCtx.k); return pinta();
+    case 'irProg': vista = 'ejercicios'; progTab = 'objetivos'; lsSet('jp-fit-vista', vista); scrollTo(0, 0); return pinta();
+    case 'progTab': progTab = b.dataset.t; lsSet('jp-fit-prog', progTab); return pinta();
+    case 'calModo': calModo = b.dataset.m; return pinta();
+    case 'calNav': { const d = new Date(calRef); calRef = calModo === 'mes' ? new Date(d.getFullYear(), d.getMonth() + (+b.dataset.d), 1).getTime() : new Date(d.getFullYear() + (+b.dataset.d), d.getMonth(), 1).getTime(); return pinta(); }
+    case 'calMes': { const d = new Date(calRef); calRef = new Date(d.getFullYear(), +b.dataset.m, 1).getTime(); calModo = 'mes'; return pinta(); }
+    case 'calDia': return hojaDia(b.dataset.f);
+    case 'calComida': diaSel = b.dataset.f; vista = 'comida'; lsSet('jp-fit-vista', vista); cierraHoja(); scrollTo(0, 0); return pinta();
+    case 'objEdit': return hojaObjetivos();
+    case 'objOk': { const a = F.ajustes; a.meta = $('#oMeta').value.trim(); a.objPeso = num($('#oPeso').value); a.objFecha = $('#oFecha').value || null; a.objIni = num($('#oIni').value); a.objSemana = Math.max(1, Math.min(7, parseInt($('#oSem').value) || 4));
+      guardaPerfil(0); cierraHoja(); pinta(); return toast('Objetivos guardados'); }
+    case 'kAbrir': return hojaCompra();
+    case 'kDias': F.compra.dias = Math.max(1, Math.min(31, (F.compra.dias || 7) + (+b.dataset.d))); F.compra.rep = {}; guardaCompra(); return hojaCompra();
+    case 'kRep': { const key = b.dataset.key, n = +b.dataset.n, c = repDe(key, n, F.compra.dias || 7).slice(); c[+b.dataset.i] = Math.max(0, c[+b.dataset.i] + (+b.dataset.d)); (F.compra.rep ||= {})[key] = c; guardaCompra(); return hojaCompra(); }
+    case 'kOk': { const ok = F.compra.ok ||= {}; ok[b.dataset.id] = !ok[b.dataset.id]; guardaCompra(); return hojaCompra(); }
+    case 'kExOk': F.compra.extra[+b.dataset.i].ok = !F.compra.extra[+b.dataset.i].ok; guardaCompra(); return hojaCompra();
+    case 'kExDel': F.compra.extra.splice(+b.dataset.i, 1); guardaCompra(); return hojaCompra();
+    case 'kExAdd': { const n = $('#kNuevo').value.trim(); if (!n) return; (F.compra.extra ||= []).push({ n, ok: false }); guardaCompra(); return hojaCompra(); }
+    case 'kReset': F.compra.ok = {}; (F.compra.extra || []).forEach(e => e.ok = false); guardaCompra(); return hojaCompra();
+    case 'kCopiar': { const tot = calculaCompra(), porS = {}; for (const [aid, q] of Object.entries(tot)) { const a = alim(aid); if (a && q) (porS[a.super || 'Otros'] ||= []).push(`- ${a.n}: ${fCompra(a, q).replace(/<[^>]+>/g, '')}`); }
+      const txt = `🛒 Compra para ${F.compra.dias || 7} días\n` + Object.entries(porS).map(([s, l]) => `\n${s}\n${l.join('\n')}`).join('\n') + ((F.compra.extra || []).length ? '\n\nOtras cosas\n' + F.compra.extra.map(e => '- ' + e.n).join('\n') : '');
+      try { await navigator.clipboard.writeText(txt); toast('Lista copiada: pégala en WhatsApp o Notas'); } catch (e) { toast('No pude copiar'); } return; }
+  }
+});
+
 // ---------- login (igual que el Organizador) ----------
 const gate = $('#gate'), gateMsg = $('#gateMsg'), gateBtn = $('#gateBtn');
 const showGate = msg => { gate.classList.remove('loading'); gate.hidden = false; gateMsg.textContent = msg || ''; gateBtn.disabled = false; };
@@ -866,6 +1085,7 @@ onAuthStateChanged(auth, user => {
       } else if (id === 'alimentos') { F.alimentos = d?.lista || [];
       } else if (id === 'dieta') { F.dieta = { comidas: d?.comidas || [], obj: d?.obj || null, ult: d?.ult || {} };
       } else if (id === 'cuerpo') { F.pesos = d?.pesos || {};
+      } else if (id === 'compra') { if (d) F.compra = { dias: 7, rep: {}, ok: {}, extra: [], ...d }; if (hojaCtx?.tipo === 'compra' && !$('#sheet').hidden) hojaCompra();
       } else if (id.startsWith('d-')) { if (d) Object.assign(F.diario, d.dias || {});
       } else if (id.startsWith('m-')) { if (d) F.meses[id.slice(2)] = d.e || {}; else delete F.meses[id.slice(2)]; }
     }
