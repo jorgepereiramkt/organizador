@@ -335,3 +335,24 @@ details.rep summary{font-weight:600;font-size:14px;cursor:pointer}
 .kit.falta.ok{background:linear-gradient(90deg,rgba(255,201,61,.10),transparent)}
 #kQ{margin-top:12px}
 select{width:100%;padding:11px 12px;border-radius:11px;border:1px solid var(--line);background:var(--surface-2);outline:none}
+
+/* Áreas arriba */
+.top{flex-wrap:wrap}
+.areas{order:10;flex-basis:100%;display:flex;gap:4px;margin-top:8px;overflow-x:auto;scrollbar-width:none}
+.areas::-webkit-scrollbar{display:none}
+.areas button{flex:1;min-width:max-content;display:flex;align-items:center;justify-content:center;gap:6px;padding:9px 12px;border-radius:12px;font-weight:700;font-size:14px;color:var(--muted);background:var(--surface-2)}
+.areas button span{font-size:16px}
+.areas button.on{background:var(--accent);color:var(--on-accent)}
+body.sinsub main{padding-bottom:calc(env(safe-area-inset-bottom) + 40px)}
+body.sinsub .enCurso{bottom:calc(env(safe-area-inset-bottom) + 14px)}
+/* Ritmo de la semana */
+.ritmo{background:linear-gradient(135deg,var(--accent-soft),transparent 70%),var(--surface);margin-top:14px}
+.ritmo.justo{background:linear-gradient(135deg,rgba(255,201,61,.14),transparent 70%),var(--surface)}
+.ritmo.mal{background:linear-gradient(135deg,rgba(255,90,90,.14),transparent 70%),var(--surface)}
+.aro{width:84px;height:84px;flex:none}
+.aro-f{fill:none;stroke:var(--surface-3);stroke-width:8}
+.aro-v{fill:none;stroke:var(--accent);stroke-width:8;stroke-linecap:round;transform:rotate(-90deg);transform-origin:40px 40px}
+.ritmo.justo .aro-v{stroke:var(--gold)} .ritmo.mal .aro-v{stroke:var(--danger)}
+.aro-t{font:700 18px var(--head);fill:var(--text)}
+.rtit{font:700 19px/1.25 var(--head);margin:2px 0 3px}
+@media (min-width:760px){ .areas{max-width:720px;margin:8px auto 0} }

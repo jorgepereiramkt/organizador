@@ -160,13 +160,37 @@ function coach() {
   return ['🎯', `Vas ${sem}/${obj} esta semana`, sug ? `La que más tiempo llevas sin hacer: «${sug.nombre}».` : 'Sigue sumando.'];
 }
 
+// ---------- áreas (arriba) y submenú (abajo) ----------
+const AREAS = [
+  { k: 'hoy', n: 'Hoy', ic: '🏠', subs: [['hoy', 'Hoy', '🏠']] },
+  { k: 'entreno', n: 'Entreno', ic: '🏋️', subs: [['rutinas', 'Rutinas', '📋'], ['historial', 'Historial', '🗓️'], ['ejercicios', 'Ejercicios', '📈']] },
+  { k: 'comida', n: 'Alimentación', ic: '🥗', subs: [['comida', 'Diario', '🍽️'], ['compra', 'Compra', '🛒'], ['dietas', 'Dietas', '📋'], ['alimentos', 'Alimentos', '📦']] },
+  { k: 'progreso', n: 'Progreso', ic: '📊', subs: [['objetivos', 'Objetivos', '🎯'], ['calendario', 'Calendario', '📅'], ['cuerpo', 'Cuerpo', '⚖️']] }];
+const areaDe = v => AREAS.find(a => a.subs.some(s => s[0] === v)) || AREAS[0];
+const ultSub = lsGet('jp-fit-ultsub', {});
+function ir(v) { if (!AREAS.some(a => a.subs.some(s => s[0] === v))) v = 'hoy'; vista = v; ultSub[areaDe(v).k] = v; lsSet('jp-fit-ultsub', ultSub); lsSet('jp-fit-vista', v); scrollTo(0, 0); pinta(); }
+function pintaNav() {
+  const ar = areaDe(vista);
+  $('#areas').innerHTML = AREAS.map(a => `<button data-act="area" data-a="${a.k}" class="${a === ar ? 'on' : ''}"><span>${a.ic}</span>${a.n}</button>`).join('');
+  const tb = $('#tabbar'); tb.hidden = ar.subs.length < 2 || !$('#wo').hidden; document.body.classList.toggle('sinsub', ar.subs.length < 2);
+  tb.innerHTML = ar.subs.map(([v, n, ic]) => `<button data-act="ir" data-v="${v}" class="${v === vista ? 'on' : ''}"><span>${ic}</span>${n}</button>`).join('');
+}
+document.addEventListener('click', ev => {
+  const b = ev.target.closest('[data-act]'); if (!b) return;
+  if (b.dataset.act === 'ir') return ir(b.dataset.v);
+  if (b.dataset.act === 'area') { const a = AREAS.find(x => x.k === b.dataset.a); return ir(ultSub[a.k] && a.subs.some(s => s[0] === ultSub[a.k]) ? ultSub[a.k] : a.subs[0][0]); }
+});
+
 // ---------- vistas ----------
 function pinta() {
   if (!listo) return;
-  document.querySelectorAll('#tabbar button').forEach(b => b.classList.toggle('on', b.dataset.v === vista || (vista === 'historial' && b.dataset.v === 'rutinas')));
+  if (!AREAS.some(a => a.subs.some(s => s[0] === vista))) vista = vista === 'ejercicios' ? 'ejercicios' : 'hoy';
+  pintaNav();
   const m = $('#main');
-  m.innerHTML = ({ hoy: vHoy, rutinas: vRutinas, comida: vComida, compra: vCompra, historial: vHistorial, ejercicios: vProgreso }[vista] || vHoy)();
+  m.innerHTML = ({ hoy: vHoy, rutinas: vRutinas, historial: vHistorial, ejercicios: vEjercicios, comida: vComida, compra: vCompra, dietas: htmlDietas, alimentos: vAlimentos,
+    objetivos: vObjetivos, calendario: vCalendario, cuerpo: vCuerpo }[vista] || vHoy)();
   if (vista === 'compra') filtraCompra();
+  if (vista === 'alimentos') pintaAlims();
   pintaEnCurso();
 }
 
@@ -180,13 +204,8 @@ function vHoy() {
   const vol = sem.reduce((a, w) => a + volumen(w), 0), dur = sem.reduce((a, w) => a + ((w.fin || w.ini) - w.ini), 0);
   const sug = sugerida(), ult = F.entrenos[0];
   return `<div class="hola"><h1>${saludo}, Jorge</h1><p>${fDia(Date.now())} · objetivo ${F.ajustes.objSemana || 4} entrenos/semana</p></div>
+  ${cardRitmo(dias, vol)}
   <div class="coach"><span class="av">${av}</span><div><b>${esc(t)}</b><span class="muted small">${esc(p)}</span></div></div>
-  <div class="semana">${dias}</div>
-  <div class="grid3" style="margin-top:12px">
-    <div class="stat"><b>${sem.length}/${F.ajustes.objSemana || 4}</b><span>Entrenos semana</span></div>
-    <div class="stat"><b>${vol >= 1000 ? fmtN(Math.round(vol / 100) / 10) + ' t' : fmtN(Math.round(vol)) + ' kg'}</b><span>Volumen semana</span></div>
-    <div class="stat"><b>${racha()}</b><span>Semanas cumpliendo</span></div>
-  </div>
   <div style="margin-top:16px">${activo ? `<button class="btn primary big" data-act="abrirWo">⏱️ Seguir con el entreno</button>` : `<button class="btn primary big" data-act="empezar">💪 Empezar entreno</button>`}</div>
   ${sug && !activo ? `<div class="sec"><h2>Te toca</h2></div>${cardRutina(sug)}` : ''}
   <div class="sec"><h2>Comida de hoy</h2></div>${resumenMacros(fISO(Date.now()), true)}
@@ -196,6 +215,32 @@ function vHoy() {
   ${dur ? `<p class="faint small" style="text-align:center;margin-top:18px">Esta semana: ${fDur(dur)} entrenando</p>` : ''}`;
 }
 
+// ---------- ¿cómo va la semana? (teniendo en cuenta qué día y qué hora es) ----------
+function ritmoSemana() {
+  const obj = F.ajustes.objSemana || 4, ws = semanaActual(), hechos = ws.length, now = new Date(), dow = (now.getDay() + 6) % 7;
+  const hoyHecho = ws.some(w => fISO(w.ini) === fISO(Date.now())), frac = (dow + now.getHours() / 24) / 7, esperado = obj * frac;
+  const diasDisp = 7 - dow - (hoyHecho ? 1 : 0), faltan = Math.max(0, obj - hechos);
+  let ic, tit, cls;
+  if (hechos >= obj) { ic = '🏆'; tit = 'Objetivo de la semana cumplido'; cls = 'top'; }
+  else if (faltan > diasDisp) { ic = '🚨'; tit = `Ya no llegas a ${obj}: como mucho ${hechos + diasDisp}`; cls = 'mal'; }
+  else if (hechos >= esperado + 0.75) { ic = '🔥'; tit = 'Vas por delante'; cls = 'top'; }
+  else if (hechos >= esperado - 0.6) { ic = '✅'; tit = 'Vas bien'; cls = 'bien'; }
+  else if (faltan === diasDisp) { ic = '⚠️'; tit = 'Vas justo: toca entrenar todos los días que quedan'; cls = 'justo'; }
+  else { ic = '⏳'; tit = 'Vas un poco por detrás'; cls = 'justo'; }
+  const sub = hechos >= obj ? `${hechos} entrenos esta semana. Lo que hagas de más es extra.` : `Te ${faltan === 1 ? 'queda 1 entreno' : 'quedan ' + faltan + ' entrenos'} y ${diasDisp === 1 ? '1 día' : diasDisp + ' días'}${hoyHecho ? ' (hoy ya entrenaste)' : ''}.`;
+  return { obj, hechos, ic, tit, sub, cls, pc: Math.min(1, hechos / obj), esperado };
+}
+function cardRitmo(dias, vol) {
+  const r = ritmoSemana(), R = 34, C = 2 * Math.PI * R;
+  if (!dias) { const l = lunes(Date.now()); dias = [...Array(7)].map((_, i) => { const d0 = l + i * DIA; const si = F.entrenos.some(w => w.ini >= d0 && w.ini < d0 + DIA); const hoy = Date.now() >= d0 && Date.now() < d0 + DIA; return `<div class="${si ? 'si' : ''} ${hoy ? 'hoy' : ''}"><i></i>${'LMXJVSD'[i]}</div>`; }).join(''); }
+  const sem = [...Array(7)].map((_, i) => fISO(lunes(Date.now()) + i * DIA + 3600e3)).filter(f => f <= fISO(Date.now()));
+  const okD = sem.filter(f => estadoDieta(f) === 'ok').length, regD = sem.filter(f => itemsDia(f).length).length;
+  return `<div class="card ritmo ${r.cls}"><div class="row" style="gap:14px"><svg viewBox="0 0 80 80" class="aro" aria-hidden="true"><circle cx="40" cy="40" r="${R}" class="aro-f"/><circle cx="40" cy="40" r="${R}" class="aro-v" stroke-dasharray="${(C * r.pc).toFixed(1)} ${C.toFixed(1)}"/><text x="40" y="46" text-anchor="middle" class="aro-t">${r.hechos}/${r.obj}</text></svg>
+    <div style="flex:1;min-width:0"><span class="muted small">Esta semana</span><div class="rtit">${r.ic} ${esc(r.tit)}</div><div class="muted small">${esc(r.sub)}</div></div></div>
+    <div class="semana">${dias}</div>
+    <div class="grid3" style="margin-top:10px"><div><b class="nb">${vol != null ? (vol >= 1000 ? fmtN(Math.round(vol / 100) / 10) + ' t' : fmtN(Math.round(vol)) + ' kg') : fmtN(Math.round(semanaActual().reduce((a, w) => a + volumen(w), 0) / 100) / 10) + ' t'}</b><span class="muted small">volumen</span></div>
+    <div><b class="nb">${okD}/${regD || sem.length}</b><span class="muted small">días dieta OK</span></div><div><b class="nb">${racha()}</b><span class="muted small">semanas cumpliendo</span></div></div></div>`;
+}
 function cardRutina(r) {
   const ult = F.entrenos.find(w => w.rut === r.id);
   return `<div class="card rut"><div class="row"><h3 style="flex:1">${esc(r.nombre)}</h3>${ult ? `<span class="pill">hace ${Math.max(0, Math.round((Date.now() - ult.ini) / DIA))} d</span>` : ''}</div>
@@ -204,7 +249,7 @@ function cardRutina(r) {
 }
 const segEnt = () => `<div class="seg"><button data-act="vEnt" data-v="rutinas" class="${vista === 'rutinas' ? 'on' : ''}">🏋️ Rutinas</button><button data-act="vEnt" data-v="historial" class="${vista === 'historial' ? 'on' : ''}">🗓️ Historial</button></div>`;
 function vRutinas() {
-  return `${segEnt()}<div class="sec" style="margin-top:4px"><h2>Mis rutinas</h2><span class="sp"></span><button class="btn sm" data-act="nuevaRut">＋ Nueva</button></div>
+  return `<div class="sec" style="margin-top:4px"><h2>Mis rutinas</h2><span class="sp"></span><button class="btn sm" data-act="nuevaRut">＋ Nueva</button></div>
   <div class="stack">${F.rutinas.map(cardRutina).join('') || '<div class="empty">Aún no tienes rutinas. Crea una o importa las de Hevy desde ⚙︎.</div>'}</div>
   <button class="btn big" style="margin-top:14px" data-act="vacio">Empezar entreno vacío</button>`;
 }
@@ -215,8 +260,8 @@ function cardEntreno(w) {
     <ul>${(w.ej || []).slice(0, 4).map(e => { const b = mejor(e); return `<li>${seriesBuenas(e).length} × ${esc(nombreDe(e))}${b ? ` <span class="faint">· ${fmtKgR(b.kg, b.r)}</span>` : ''}</li>`; }).join('')}${(w.ej || []).length > 4 ? `<li class="faint">+${w.ej.length - 4} más</li>` : ''}</ul></div>`;
 }
 function vHistorial() {
-  if (!F.entrenos.length) return segEnt() + '<div class="empty">Sin entrenos todavía.</div>';
-  let mes = '', out = segEnt() + `<p class="muted small" style="margin:2px 0 0">${F.entrenos.length} entrenos guardados</p>`;
+  if (!F.entrenos.length) return '<div class="empty">Sin entrenos todavía.</div>';
+  let mes = '', out = `<p class="muted small" style="margin:2px 0 0">${F.entrenos.length} entrenos guardados</p>`;
   for (const w of F.entrenos.slice(0, histN)) {
     const d = new Date(w.ini), m = MESES[d.getMonth()] + ' ' + d.getFullYear();
     if (m !== mes) { const nm = F.entrenos.filter(x => { const y = new Date(x.ini); return y.getMonth() === d.getMonth() && y.getFullYear() === d.getFullYear(); }).length;
@@ -491,7 +536,7 @@ document.addEventListener('click', async ev => {
     case 'verEnt': return verEntreno(id);
     case 'verEj': return verEjercicio(b.dataset.k);
     case 'masHist': histN += 40; return pinta();
-    case 'vEnt': vista = b.dataset.v; lsSet('jp-fit-vista', vista); return pinta();
+    case 'vEnt': return ir(b.dataset.v);
     case 'cierra': return cierraHoja();
     case 'borraEnt': if (!confirm('¿Eliminar este entreno? No se puede deshacer.')) return;
       try { await borraEntreno(F.porId[id]); } catch (e) { return toast('No se pudo borrar: ' + (e.code || e.message)); }
@@ -559,7 +604,7 @@ document.addEventListener('input', ev => {
   const fila = t.closest('tr[data-j]'); if (!fila || !t.dataset.f) return;
   const s = activo.ej[+fila.dataset.i].s[+fila.dataset.j]; s[t.dataset.f] = t.value.replace(',', '.'); guardaActivo(); if (s.ok) refrescaRes();
 });
-document.querySelectorAll('#tabbar button').forEach(b => b.addEventListener('click', () => { vista = b.dataset.v; lsSet('jp-fit-vista', vista); scrollTo(0, 0); pinta(); }));
+
 $('#enCurso').addEventListener('click', abreWo);
 $('#ajBtn').addEventListener('click', () => hoja(`<h2>Ajustes</h2>
   <label>Objetivo de entrenos por semana</label><input type="number" id="ajObj" min="1" max="7" value="${F.ajustes.objSemana || 4}">
@@ -716,6 +761,8 @@ function hojaDeDieta(k) {
   <button class="btn primary big" style="margin-top:12px" data-act="cDietaOk">Añadir a ${esc(cm.nombre.toLowerCase())}</button>`);
 }
 let alimFiltro = '';
+function vAlimentos() { hojaCtx = null; return `<h2 style="margin:4px 0 12px">Mis alimentos</h2><input class="buscar" id="alimQ" placeholder="Buscar por nombre, marca o súper…" value="${esc(alimFiltro)}" autocomplete="off"><div class="card pick" id="alimL" style="max-height:none;margin-top:10px"></div><button class="btn primary big" style="margin-top:12px" data-act="cNuevoAlim">＋ Crear alimento nuevo</button>`; }
+document.addEventListener('input', ev => { if (ev.target.id === 'alimQ' && vista === 'alimentos' && $('#sheet').hidden) { alimFiltro = ev.target.value; pintaAlims(); } });
 function hojaAlimentos(modo, k) { // modo 'add' (elegir para añadir a la comida k) o 'gest'
   hojaCtx = { tipo: 'calims', modo, k };
   hoja(`<h2>${modo === 'gest' ? 'Mis alimentos' : 'Añadir alimento'}</h2><input class="buscar" id="alimQ" placeholder="Buscar por nombre, marca o súper…" value="${esc(alimFiltro)}" autocomplete="off">
@@ -769,10 +816,10 @@ function preparaDia(f) { // rellena con la dieta las comidas que aún no se han 
   }
   return cambio;
 }
-function hojaDieta() {
+function hojaDieta() { if (vista === 'dietas') { cierraHoja(); return repinta(); } hojaCtx = { tipo: 'cverdieta' }; hoja(htmlDietas()); }
+function htmlDietas() {
   const o = objetivo(), od = objDieta();
-  hojaCtx = { tipo: 'cverdieta' };
-  hoja(`<h2>Mis dietas</h2>
+  return `<h2 style="margin:4px 0 12px">Mis dietas</h2>
   <div class="stack">${F.dietas.map(dt => `<div class="card dieta-it ${dt.id === F.dietaActiva ? 'activa' : ''}"><div class="row"><div style="flex:1"><b>${esc(dt.nombre)}</b><div class="faint small">${dt.id === F.dietaActiva ? '✅ Aplicada ahora' : 'Guardada'}${dt.at ? ' · ' + fDia(dt.at) : ''}</div></div>
     ${dt.id === F.dietaActiva ? '' : `<button class="btn sm primary" data-act="cDAplica" data-id="${dt.id}">Aplicar</button>`}<button class="btn sm" data-act="cDEdit" data-id="${dt.id}">✏️</button>${dt.id === F.dietaActiva ? '' : `<button class="btn sm ghost" data-act="cDBorra" data-id="${dt.id}">🗑</button>`}</div></div>`).join('')}</div>
   <p class="faint small">Al editar una dieta se guarda como una dieta nueva; tú eliges si la aplicas.</p>
@@ -782,7 +829,7 @@ function hojaDieta() {
   <div class="row" style="margin-top:10px"><button class="btn primary sm" data-act="cObjOk">Guardar objetivo</button><button class="btn sm" data-act="cObjDieta">Usar el de la dieta</button></div></div>
   <div class="sec"><h2>${esc(F.dieta.nombre || 'Dieta')}</h2></div>
   ${(F.dieta.comidas || []).map(cm => `<div class="dgrp" style="font-size:13px">${esc(cm.nombre)}</div>${cm.grupos.map(g => `${cm.grupos.length > 1 || g.opciones.length > 1 ? `<div class="faint small" style="margin-top:4px">${esc(g.nombre)}</div>` : ''}${g.opciones.map(op => { const its = op.items.map(deDieta).filter(Boolean);
-    return `<div class="dop"><b>${esc(op.nombre)}</b> ${tagM(suma(its))}<div class="muted small">${its.map(it => esc(it.n) + ' ' + fQ(alim(it.a), it.q)).join(' · ')}</div>${op.nota ? `<div class="faint small">${esc(op.nota)}</div>` : ''}</div>`; }).join('')}`).join('')}`).join('') || '<p class="muted">Aún no hay dieta cargada.</p>'}`);
+    return `<div class="dop"><b>${esc(op.nombre)}</b> ${tagM(suma(its))}<div class="muted small">${its.map(it => esc(it.n) + ' ' + fQ(alim(it.a), it.q)).join(' · ')}</div>${op.nota ? `<div class="faint small">${esc(op.nota)}</div>` : ''}</div>`; }).join('')}`).join('')}`).join('') || '<p class="muted">Aún no hay dieta cargada.</p>'}`;
 }
 let deCtx = null;
 function hojaEditDieta() {
@@ -837,7 +884,7 @@ function hojaPeso() {
 
 document.addEventListener('click', ev => {
   const b = ev.target.closest('[data-act]'); if (!b) return;
-  const a = b.dataset.act; if (!a.startsWith('c') || ['cierra', 'copia'].includes(a)) { if (a === 'irComida') { vista = 'comida'; lsSet('jp-fit-vista', vista); pinta(); } return; }
+  const a = b.dataset.act; if (!a.startsWith('c') || ['cierra', 'copia'].includes(a)) { if (a === 'irComida') ir('comida'); return; }
   const k = b.dataset.k;
   switch (a) {
     case 'cDia': { const t = deISO(diaSel) + (+b.dataset.d) * DIA; if (t > Date.now()) return; diaSel = fISO(t); return pinta(); }
@@ -848,7 +895,7 @@ document.addEventListener('click', ev => {
       diaDe(diaSel).c[hojaCtx.k].push(...its); (F.dieta.ult ||= {})[hojaCtx.k] = sel; guardaDia(diaSel); setDoc(fitRef('dieta'), { ult: F.dieta.ult }, { merge: true }).catch(() => {});
       cierraHoja(); pinta(); return toast(`Añadido: ${r0(suma(its).k)} kcal`); }
     case 'cAdd': alimFiltro = ''; return hojaAlimentos('add', k);
-    case 'cAlims': alimFiltro = ''; return hojaAlimentos('gest');
+    case 'cAlims': alimFiltro = ''; return ir('alimentos');
     case 'cAlim': { const al = alim(b.dataset.id); if (!al) return; if (hojaCtx?.modo === 'add') return hojaCantidad(al, hojaCtx.k, null);
       if (hojaCtx?.modo === 'dedit' && deCtx) { const [ci, gi, oi] = deCtx.dest; deCtx.d.comidas[ci].grupos[gi].opciones[oi].items.push({ a: al.id, q: al.gUd || 100 }); return hojaEditDieta(); } return hojaAlimento(al.id); }
     case 'cNuevoAlim': return hojaAlimento(null);
@@ -866,7 +913,7 @@ document.addEventListener('click', ev => {
       guardaDia(diaSel); cierraHoja(); pinta(); return; }
     case 'cQdel': diaDe(diaSel).c[hojaCtx.k].splice(hojaCtx.i, 1); guardaDia(diaSel); cierraHoja(); return pinta();
     case 'cItem': { const it = F.diario[diaSel].c[k][+b.dataset.i]; const al = alim(it.a) || { id: it.a, n: it.n, k: it.m[0], p: it.m[1], c: it.m[2], g: it.m[3] }; return hojaCantidad(al, k, +b.dataset.i); }
-    case 'cVerDieta': return hojaDieta();
+    case 'cVerDieta': if ($('#sheet').hidden || hojaCtx?.tipo !== 'dedit') return ir('dietas'); cierraHoja(); return vista === 'dietas' ? repinta() : hojaDieta();
     case 'cObjOk': F.dieta.obj = { k: num($('#oK').value) || 0, p: num($('#oP').value) || 0, c: num($('#oC').value) || 0, g: num($('#oG').value) || 0 }; guardaDieta(); cierraHoja(); pinta(); return toast('Objetivo guardado');
     case 'cObjDieta': F.dieta.obj = null; guardaDieta(); cierraHoja(); pinta(); return toast('Objetivo = tu dieta');
     case 'cPeso': return hojaPeso();
@@ -997,6 +1044,7 @@ function vProgreso() {
   const seg = `<div class="seg">${[['objetivos', '🎯 Objetivos'], ['calendario', '📅 Calendario'], ['ejercicios', '🏋️ Ejercicios']].map(([k, n]) => `<button data-act="progTab" data-t="${k}" class="${progTab === k ? 'on' : ''}">${n}</button>`).join('')}</div>`;
   return seg + (progTab === 'calendario' ? vCalendario() : progTab === 'ejercicios' ? vEjercicios() : vObjetivos());
 }
+function vCuerpo() { return `<div class="sec" style="margin-top:4px"><h2>Peso</h2></div>${cardPeso(false)}<div class="sec"><h2>Descanso y actividad</h2></div>${cardSalud()}`; }
 function vObjetivos() {
   const a = F.ajustes, hoy = new Date(), m0 = new Date(hoy.getFullYear(), hoy.getMonth(), 1).getTime();
   const semanas = [...Array(8)].map((_, i) => { const l = lunes(Date.now()) - (7 - i) * 7 * DIA; const n = F.entrenos.filter(w => w.ini >= l && w.ini < l + 7 * DIA).length; const d = new Date(l); return { lab: d.getDate() + '/' + (d.getMonth() + 1), v: n, hoy: i === 7 }; });
@@ -1007,9 +1055,7 @@ function vObjetivos() {
   const med = k => ult7.length ? r0(ult7.reduce((s, t) => s + t[k], 0) / ult7.length) : null, o = objetivo();
   return `<div class="card meta" data-act="objEdit"><span class="muted small">Mi objetivo</span><h2>${esc(a.meta || 'Toca para escribir tu objetivo (p. ej. «Estar definido en enero»)')}</h2>
     ${a.objFecha ? `<span class="pill">📅 ${fDia(deISO(a.objFecha))} · quedan ${Math.max(0, Math.ceil((deISO(a.objFecha) - Date.now()) / DIA))} días</span>` : ''}</div>
-  <div class="sec"><h2>Tu semana</h2></div>${cardSemana()}
-  <div class="sec"><h2>Peso</h2></div>${cardPeso(false)}
-  <div class="sec"><h2>Descanso y actividad</h2></div>${cardSalud()}
+  <div class="sec"><h2>Tu semana</h2></div>${cardRitmo()}<div style="height:10px"></div>${cardSemana()}
   <div class="sec"><h2>Entrenos</h2><span class="sp"></span><span class="muted small">objetivo ${a.objSemana || 4}/semana</span></div>
   <div class="card"><div class="grid3"><div><b class="nb">${delMes.length}</b><span class="muted small">este mes (de ~${esperados})</span></div><div><b class="nb">${racha()}</b><span class="muted small">semanas cumpliendo</span></div><div><b class="nb">${semanaActual().length}/${a.objSemana || 4}</b><span class="muted small">esta semana</span></div></div>
     <div style="margin-top:10px">${barras(semanas, a.objSemana || 4)}</div><p class="faint small" style="margin:2px 0 0">Entrenos por semana (últimas 8). La línea es tu objetivo.</p></div>
@@ -1116,17 +1162,17 @@ document.addEventListener('click', async ev => {
   const b = ev.target.closest('[data-act]'); if (!b) return;
   switch (b.dataset.act) {
     case 'rango': rangos[b.dataset.key] = +b.dataset.d; lsSet('jp-fit-rangos', rangos); if (!$('#sheet').hidden && hojaCtx?.tipo === 'ej') return verEjercicio(hojaCtx.k); return pinta();
-    case 'irProg': vista = 'ejercicios'; progTab = 'objetivos'; lsSet('jp-fit-vista', vista); scrollTo(0, 0); return pinta();
+    case 'irProg': return ir('cuerpo');
     case 'progTab': progTab = b.dataset.t; lsSet('jp-fit-prog', progTab); return pinta();
     case 'calModo': calModo = b.dataset.m; return pinta();
     case 'calNav': { const d = new Date(calRef); calRef = calModo === 'mes' ? new Date(d.getFullYear(), d.getMonth() + (+b.dataset.d), 1).getTime() : new Date(d.getFullYear() + (+b.dataset.d), d.getMonth(), 1).getTime(); return pinta(); }
     case 'calMes': { const d = new Date(calRef); calRef = new Date(d.getFullYear(), +b.dataset.m, 1).getTime(); calModo = 'mes'; return pinta(); }
     case 'calDia': return hojaDia(b.dataset.f);
-    case 'calComida': diaSel = b.dataset.f; vista = 'comida'; lsSet('jp-fit-vista', vista); cierraHoja(); scrollTo(0, 0); return pinta();
+    case 'calComida': diaSel = b.dataset.f; cierraHoja(); return ir('comida');
     case 'objEdit': return hojaObjetivos();
     case 'objOk': { const a = F.ajustes; a.meta = $('#oMeta').value.trim(); a.objPeso = num($('#oPeso').value); a.objFecha = $('#oFecha').value || null; a.objIni = num($('#oIni').value); a.objSemana = Math.max(1, Math.min(7, parseInt($('#oSem').value) || 4));
       guardaPerfil(0); cierraHoja(); pinta(); return toast('Objetivos guardados'); }
-    case 'kAbrir': vista = 'compra'; lsSet('jp-fit-vista', vista); scrollTo(0, 0); return pinta();
+    case 'kAbrir': return ir('compra');
     case 'kModo': kModo = b.dataset.m; lsSet('jp-fit-kmodo', kModo); return repinta();
     case 'kAgr': kAgr = b.dataset.a; lsSet('jp-fit-kagr', kAgr); return repinta();
     case 'kFalta': { const f = F.compra.falta ||= {}; if (f[b.dataset.id]) { delete f[b.dataset.id]; delete (F.compra.comprado || {})[b.dataset.id]; } else f[b.dataset.id] = true; guardaCompra(); repinta(); return filtraCompra(); }
