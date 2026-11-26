@@ -301,3 +301,12 @@ details.rep summary{font-weight:600;font-size:14px;cursor:pointer}
 .kit .x{color:var(--faint);width:26px}
 .btnrow{flex-wrap:wrap;gap:8px}
 .btnrow .btn{white-space:nowrap}
+
+.guia{padding-left:20px;margin:8px 0;font-size:14px;line-height:1.5}
+.guia li{margin-bottom:8px}
+.malc{color:var(--danger)}
+.semres ul{list-style:none;margin:0;padding:0;font-size:14px}
+.semres li{padding:5px 0 5px 26px;position:relative;border-bottom:1px solid var(--line)}
+.semres li:last-child{border-bottom:0}
+.semres li::before{position:absolute;left:2px;top:5px}
+.semres li.ok::before{content:"✅"} .semres li.ko::before{content:"❌"} .semres li.tip::before{content:"👉"}

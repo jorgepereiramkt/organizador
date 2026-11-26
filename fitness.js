@@ -5,7 +5,7 @@
 import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.14.1/firebase-app.js';
 import { getAuth, onAuthStateChanged, GoogleAuthProvider, signInWithPopup, signInWithRedirect, getRedirectResult, signInWithCredential, signOut }
   from 'https://www.gstatic.com/firebasejs/10.14.1/firebase-auth.js';
-import { initializeFirestore, persistentLocalCache, doc, collection, onSnapshot, setDoc, updateDoc, deleteField, FieldPath }
+import { initializeFirestore, persistentLocalCache, doc, collection, onSnapshot, setDoc, updateDoc, deleteField, FieldPath, getDoc }
   from 'https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore.js';
 
 const ALLOWED = 'jorgepereiramktdigital@gmail.com';
@@ -187,6 +187,7 @@ function vHoy() {
   <div style="margin-top:16px">${activo ? `<button class="btn primary big" data-act="abrirWo">⏱️ Seguir con el entreno</button>` : `<button class="btn primary big" data-act="empezar">💪 Empezar entreno</button>`}</div>
   ${sug && !activo ? `<div class="sec"><h2>Te toca</h2></div>${cardRutina(sug)}` : ''}
   <div class="sec"><h2>Comida de hoy</h2></div>${resumenMacros(fISO(Date.now()), true)}
+  <div class="sec"><h2>Descanso y actividad</h2></div>${cardSalud()}
   <div class="sec"><h2>Peso</h2></div>${cardPeso(true)}
   ${ult ? `<div class="sec"><h2>Último entreno</h2></div>${cardEntreno(ult)}` : ''}
   ${dur ? `<p class="faint small" style="text-align:center;margin-top:18px">Esta semana: ${fDur(dur)} entrenando</p>` : ''}`;
@@ -453,6 +454,7 @@ async function guardarWo() {
   w.prs = prs;
   const rut = F.rutinas.find(r => r.id === w.rut);
   activo = null; F.ultimoFin = w.id; lsSet('jp-fit-activo', null); guardaPerfil(0);
+  mandaSemana('cambio');
   try { await guardaEntreno(w); } catch (e) { toast('Guardado en este dispositivo; se subirá al volver la conexión'); }
   $('#rest').hidden = true; clearTimeout(restT);
   try { wakeLock && wakeLock.release(); } catch (e) {}
@@ -673,7 +675,7 @@ const objetivo = () => { const o = F.dieta.obj; return o && o.k ? o : objDieta()
 const fitRef = id => doc(db, 'users', U.uid, 'fit', id);
 const guardaAlimentos = () => setDoc(fitRef('alimentos'), { lista: F.alimentos }).catch(e => toast('No se pudo guardar: ' + (e.code || e.message)));
 const guardaDieta = () => setDoc(fitRef('dieta'), { comidas: F.dieta.comidas, obj: F.dieta.obj || null }).catch(e => toast('No se pudo guardar: ' + (e.code || e.message)));
-const guardaDia = f => setDoc(fitRef('d-' + f.slice(0, 7)), { dias: { [f]: F.diario[f] } }, { merge: true }).catch(e => toast('No se pudo guardar: ' + (e.code || e.message)));
+const guardaDia = f => (mandaSemana('cambio'), setDoc)(fitRef('d-' + f.slice(0, 7)), { dias: { [f]: F.diario[f] } }, { merge: true }).catch(e => toast('No se pudo guardar: ' + (e.code || e.message)));
 const guardaPeso = (f, kg) => (kg == null ? updateDoc(fitRef('cuerpo'), new FieldPath('pesos', f), deleteField()) : setDoc(fitRef('cuerpo'), { pesos: { [f]: kg } }, { merge: true })).catch(e => toast('No se pudo guardar: ' + (e.code || e.message)));
 
 function barra(v, o, cls = '') { const pc = o ? Math.min(100, v / o * 100) : 0; return `<div class="barra ${cls} ${o && v > o * 1.08 ? 'over' : ''}"><i style="width:${pc}%"></i></div>`; }
@@ -934,7 +936,9 @@ function vObjetivos() {
   const med = k => ult7.length ? r0(ult7.reduce((s, t) => s + t[k], 0) / ult7.length) : null, o = objetivo();
   return `<div class="card meta" data-act="objEdit"><span class="muted small">Mi objetivo</span><h2>${esc(a.meta || 'Toca para escribir tu objetivo (p. ej. «Estar definido en enero»)')}</h2>
     ${a.objFecha ? `<span class="pill">📅 ${fDia(deISO(a.objFecha))} · quedan ${Math.max(0, Math.ceil((deISO(a.objFecha) - Date.now()) / DIA))} días</span>` : ''}</div>
+  <div class="sec"><h2>Tu semana</h2></div>${cardSemana()}
   <div class="sec"><h2>Peso</h2></div>${cardPeso(false)}
+  <div class="sec"><h2>Descanso y actividad</h2></div>${cardSalud()}
   <div class="sec"><h2>Entrenos</h2><span class="sp"></span><span class="muted small">objetivo ${a.objSemana || 4}/semana</span></div>
   <div class="card"><div class="grid3"><div><b class="nb">${delMes.length}</b><span class="muted small">este mes (de ~${esperados})</span></div><div><b class="nb">${racha()}</b><span class="muted small">semanas cumpliendo</span></div><div><b class="nb">${semanaActual().length}/${a.objSemana || 4}</b><span class="muted small">esta semana</span></div></div>
     <div style="margin-top:10px">${barras(semanas, a.objSemana || 4)}</div><p class="faint small" style="margin:2px 0 0">Entrenos por semana (últimas 8). La línea es tu objetivo.</p></div>
@@ -970,7 +974,8 @@ function vCalendario() {
 }
 function hojaDia(f) {
   const ws = entrenosDia(f), kg = F.pesos[f], its = itemsDia(f);
-  hoja(`<h2>${fDia(deISO(f))}</h2>${kg ? `<p class="muted">⚖️ ${fmtN(kg)} kg</p>` : ''}
+  const sa = F.salud[f] || {};
+  hoja(`<h2>${fDia(deISO(f))}</h2>${kg ? `<p class="muted">⚖️ ${fmtN(kg)} kg</p>` : ''}${sa.sueno != null || sa.pasos != null ? `<p class="muted">😴 ${hDec(sa.sueno)} · 👟 ${fmtN(sa.pasos || 0)} pasos${sa.kcal ? ' · 🔥 ' + fmtN(Math.round(sa.kcal)) + ' kcal activas' : ''}</p>` : ''}
    <div class="sec" style="margin-top:6px"><h2>Entreno</h2></div>${ws.map(cardEntreno).join('<div style="height:8px"></div>') || '<p class="faint small">Sin entreno este día.</p>'}
    <div class="sec"><h2>Comida</h2></div>${its.length ? resumenMacros(f) : '<p class="faint small">No apuntaste comida este día.</p>'}
    <button class="btn" style="width:100%;margin-top:10px" data-act="calComida" data-f="${f}">🥗 Ver / apuntar la comida de este día</button>`);
@@ -1047,6 +1052,141 @@ document.addEventListener('click', async ev => {
   }
 });
 
+
+// ================= SALUD (Apple Watch vía Atajo → puente) Y RESUMEN SEMANAL =================
+// El Atajo del iPhone llama al puente: ?a=fitsalud&pasos=…&sueno=…&kcal=…&fc=…  (se guarda en tu Apps Script, no en la app)
+// La app lee ?a=fitsaludver y manda cada rato el resumen de la semana (?a=fitsemana) para el email de los domingos.
+let BR = null; F.salud = {};
+const OBJ_SUENO = 7.5, OBJ_PASOS = 8000;
+async function puente(params, cuerpo) {
+  if (!BR) throw new Error('sin puente');
+  const r = cuerpo ? await fetch(BR, { method: 'POST', headers: { 'Content-Type': 'text/plain' }, body: JSON.stringify(cuerpo), redirect: 'follow' })
+    : await fetch(BR + '?' + new URLSearchParams({ ...params, _t: Date.now() }), { redirect: 'follow', cache: 'no-store' });
+  if (!r.ok) throw new Error('puente ' + r.status); const j = await r.json(); if (j.error) throw new Error(j.error); return j;
+}
+let saludAt = 0;
+async function cargaSalud(forzar) {
+  if (!BR || (!forzar && Date.now() - saludAt < 5 * 60e3)) return; saludAt = Date.now();
+  try { const j = await puente({ a: 'fitsaludver', desde: fISO(Date.now() - 120 * DIA) }); F.salud = j.dias || {}; F.saludOk = true; if (listo && $('#wo').hidden && $('#sheet').hidden) pinta(); }
+  catch (e) { F.saludOk = false; F.saludErr = e.message; }
+}
+document.addEventListener('visibilitychange', () => { if (!document.hidden) { cargaSalud(); mandaSemana(); } });
+const hDec = h => h == null ? '—' : Math.floor(h) + ' h ' + String(Math.round((h % 1) * 60)).padStart(2, '0');
+function cardSalud() {
+  const hoy = fISO(Date.now()), ay = fISO(Date.now() - DIA), sH = F.salud[hoy] || {}, sA = F.salud[ay] || {};
+  const dias = [...Array(7)].map((_, i) => fISO(Date.now() - (6 - i) * DIA)), any = dias.some(f => F.salud[f]);
+  if (!any) return `<div class="card"><div class="row"><span style="font-size:26px">⌚️</span><div style="flex:1"><b>Conecta tu Apple Watch</b><div class="muted small">Sueño, pasos y calorías de la app Salud, cada día y sin tocar nada.</div></div></div>
+    <div class="row btnrow" style="margin-top:10px"><button class="btn sm primary" data-act="sGuia">Cómo conectarlo</button><button class="btn sm" data-act="sMano">Apuntar a mano</button></div></div>`;
+  const sueno = sH.sueno ?? null, pasosHoy = sH.pasos ?? null, pasosAy = sA.pasos ?? null;
+  const media = k => { const v = dias.map(f => F.salud[f]?.[k]).filter(x => x != null); return v.length ? v.reduce((a, b) => a + b, 0) / v.length : null; };
+  const barSu = barras(dias.map(f => ({ lab: 'LMXJVSD'[(new Date(deISO(f)).getDay() + 6) % 7], v: F.salud[f]?.sueno != null ? redondea(F.salud[f].sueno, 1) : 0, hoy: f === hoy })), OBJ_SUENO, 100);
+  const barPa = barras(dias.map(f => ({ lab: 'LMXJVSD'[(new Date(deISO(f)).getDay() + 6) % 7], v: F.salud[f]?.pasos != null ? Math.round(F.salud[f].pasos / 100) / 10 : 0, hoy: f === hoy })), OBJ_PASOS / 1000, 100);
+  return `<div class="card"><div class="grid3"><div><span class="muted small">😴 Sueño anoche</span><b class="nb ${sueno != null && sueno < 7 ? 'malc' : ''}">${hDec(sueno)}</b><span class="faint small">media 7 d ${hDec(media('sueno'))}</span></div>
+    <div><span class="muted small">👟 Pasos ${pasosHoy != null ? 'hoy' : 'ayer'}</span><b class="nb">${fmtN(pasosHoy ?? pasosAy ?? 0)}</b><span class="faint small">media ${fmtN(Math.round(media('pasos') || 0))}</span></div>
+    <div><span class="muted small">🔥 Kcal activas</span><b class="nb">${fmtN(Math.round((sH.kcal ?? sA.kcal) || 0)) || '—'}</b><span class="faint small">${sH.fc ? 'FC reposo ' + Math.round(sH.fc) : (sH.kcal != null ? 'hoy' : 'ayer')}</span></div></div>
+    <div class="f2" style="margin-top:10px"><div><span class="faint small">Sueño (h) · objetivo ${OBJ_SUENO}</span>${barSu}</div><div><span class="faint small">Pasos (miles) · objetivo ${OBJ_PASOS / 1000}</span>${barPa}</div></div>
+    <div class="row btnrow" style="margin-top:6px"><button class="btn sm" data-act="sMano">Apuntar a mano</button><button class="btn sm ghost" data-act="sGuia">⌚️ Atajo</button></div></div>`;
+}
+function hojaGuia() {
+  const url = BR ? BR + '?a=fitsalud' : '(abre antes el Organizador y conecta el puente de Google)';
+  hoja(`<h2>⌚️ Apple Watch → JP Fitness</h2>
+  <p class="muted small">Un <b>Atajo</b> del iPhone lee la app Salud cada noche y lo manda a tu puente de Google. Gratis y sin cuentas nuevas. Se monta una vez (5 min):</p>
+  <ol class="guia">
+   <li>Abre <b>Atajos</b> → pestaña <b>Automatización</b> → <b>＋</b> → <b>Hora del día</b>: <b>21:30</b>, <b>Diariamente</b>, <b>Ejecutar inmediatamente</b> → Siguiente → <b>Nuevo atajo en blanco</b>.</li>
+   <li>Añade <b>Buscar muestras de salud</b>: Tipo <b>Pasos</b>, filtro <b>Fecha de inicio · es hoy</b>. Luego <b>Calcular estadísticas</b> → <b>Suma</b>. Renómbralo «Pasos» (mantén pulsado → Renombrar).</li>
+   <li>Otra vez <b>Buscar muestras de salud</b>: Tipo <b>Análisis del sueño</b>, filtros <b>Fecha de finalización · es hoy</b>, <b>Valor · no es · En cama</b> y <b>Valor · no es · Despierto</b>. Añade <b>Obtener detalles de muestras de salud</b> → <b>Duración</b>, y <b>Calcular estadísticas</b> → <b>Suma</b>. Renómbralo «Sueño».</li>
+   <li>(Opcional) Igual con <b>Energía activa</b> (es hoy → Suma) como «Kcal» y <b>Frecuencia cardiaca en reposo</b> (es hoy → Media) como «FC».</li>
+   <li>Añade <b>Obtener contenido de URL</b> y pega la dirección de abajo. Toca cada <b>…=</b> del final y mete la variable que toca (Pasos, Sueño, Kcal, FC).</li>
+   <li>Pulsa ▶︎ para probar: debe salir <b>{"ok":true…}</b>. Desde ese momento se envía solo cada noche.</li>
+  </ol>
+  <label>Dirección para el Atajo (es tu llave: no la compartas)</label>
+  <div class="row"><input type="text" readonly value="${esc(url)}&pasos=&sueno=&kcal=&fc=" id="sUrl" style="flex:1"><button class="btn sm primary" data-act="sCopia">Copiar</button></div>
+  <p class="faint small">El sueño puede llegar en horas, minutos o «7:32»: el puente lo entiende igual. Si un día falla, apúntalo a mano.</p>`);
+}
+function hojaMano() {
+  const f = fISO(Date.now()), s = F.salud[f] || {};
+  hoja(`<h2>Apuntar sueño y pasos</h2><label>Día</label><input type="date" id="mF" value="${f}">
+   <div class="f2"><div><label>Sueño (horas, p. ej. 7,5)</label><input type="number" inputmode="decimal" id="mS" value="${s.sueno ?? ''}"></div><div><label>Pasos</label><input type="number" inputmode="numeric" id="mP" value="${s.pasos ?? ''}"></div>
+   <div><label>Kcal activas</label><input type="number" inputmode="numeric" id="mK" value="${s.kcal ?? ''}"></div><div><label>FC en reposo</label><input type="number" inputmode="numeric" id="mC" value="${s.fc ?? ''}"></div></div>
+   <button class="btn primary big" style="margin-top:12px" data-act="sManoOk">Guardar</button>`);
+}
+
+// ---- resumen de la semana (lo usa la app y el email del domingo) ----
+function estancados(keys) {
+  const out = [];
+  for (const k of keys) { const h = historialDe(k).slice(0, 4); if (h.length < 4) continue;
+    const best = o => Math.max(0, ...seriesBuenas(o.e).map(s => e1rm(s.kg, s.r) || (s.r || 0)));
+    if (best(h[0]) <= best(h[3]) + 0.01) out.push(nombreDe(h[0].e)); }
+  return out;
+}
+function resumenSemana(ref = Date.now()) {
+  const l = lunes(ref), fin = l + 7 * DIA, hoyF = fISO(Date.now()), obj = F.ajustes.objSemana || 4;
+  const ws = F.entrenos.filter(w => w.ini >= l && w.ini < fin), prev = F.entrenos.filter(w => w.ini >= l - 7 * DIA && w.ini < l);
+  const vol = ws.reduce((s, w) => s + volumen(w), 0), volPrev = prev.reduce((s, w) => s + volumen(w), 0);
+  const prs = [...new Set(ws.flatMap(w => w.prs || []))];
+  const dias = [...Array(7)].map((_, i) => fISO(l + i * DIA + 3600e3)).filter(f => f <= hoyF);
+  const reg = dias.filter(f => itemsDia(f).length), tots = reg.map(f => suma(itemsDia(f))), o = objetivo();
+  const kMed = tots.length ? r0(tots.reduce((s, t) => s + t.k, 0) / tots.length) : null, pMed = tots.length ? r0(tots.reduce((s, t) => s + t.p, 0) / tots.length) : null;
+  const okD = dias.filter(f => estadoDieta(f) === 'ok').length;
+  const ps = pesosOrden(), pesoFin = ps.filter(p => p.t < fin).pop(), pesoIni = ps.filter(p => p.t < l).pop(), pesSem = ps.filter(p => p.t >= l && p.t < fin);
+  const sal = dias.map(f => F.salud[f]).filter(Boolean), med = k => { const v = sal.map(s => s[k]).filter(x => x != null); return v.length ? v.reduce((a, b) => a + b, 0) / v.length : null; };
+  const sueno = med('sueno'), pasos = med('pasos');
+  const bien = [], fallos = [], consejos = [];
+  if (ws.length >= obj) bien.push(`Objetivo de entrenos cumplido: ${ws.length}/${obj}.`); else fallos.push(`Entrenaste ${ws.length} de ${obj} días.`);
+  if (prs.length) bien.push(`${prs.length} récord${prs.length > 1 ? 's' : ''}: ${prs.slice(0, 5).join(', ')}.`);
+  if (volPrev && vol > volPrev * 1.05) bien.push(`Volumen +${Math.round((vol / volPrev - 1) * 100)}% respecto a la semana pasada.`);
+  else if (volPrev && vol < volPrev * 0.9) fallos.push(`Volumen −${Math.round((1 - vol / volPrev) * 100)}% respecto a la semana pasada.`);
+  if (reg.length < dias.length) fallos.push(`Apuntaste la comida ${reg.length} de ${dias.length} días.`); else if (dias.length) bien.push('Apuntaste la comida todos los días.');
+  if (pMed != null && o.p) { if (pMed < o.p * 0.9) fallos.push(`Proteína media ${pMed} g (objetivo ${r0(o.p)} g).`); else bien.push(`Proteína en objetivo: ${pMed} g de media.`); }
+  if (kMed != null && o.k) { if (kMed > o.k * 1.1) fallos.push(`Te pasaste de kcal: ${fmtN(kMed)} de media (objetivo ${fmtN(r0(o.k))}).`); else if (kMed < o.k * 0.8) fallos.push(`Comiste poco: ${fmtN(kMed)} kcal de media (objetivo ${fmtN(r0(o.k))}).`); else bien.push(`Kcal en su sitio: ${fmtN(kMed)} de media.`); }
+  if (sueno != null) { if (sueno < 7) fallos.push(`Duermes poco: ${hDec(sueno)} de media.`); else bien.push(`Buen descanso: ${hDec(sueno)} de media.`); }
+  if (pasos != null) { if (pasos < OBJ_PASOS) fallos.push(`Pasos bajos: ${fmtN(Math.round(pasos))} al día.`); else bien.push(`${fmtN(Math.round(pasos))} pasos al día de media.`); }
+  if (!pesSem.length) fallos.push('No te has pesado esta semana.');
+  else if (pesoIni && pesoFin) { const d = redondea(pesoFin.kg - pesoIni.kg, 1), objP = F.ajustes.objPeso;
+    if (objP) ((objP < pesoFin.kg ? d < 0 : d > 0) ? bien : fallos).push(`Peso ${d > 0 ? '+' : ''}${fmtN(d)} kg (${fmtN(pesoFin.kg)} kg).`); }
+  const est = estancados([...new Set(ws.flatMap(w => w.ej.map(keyOf)))]);
+  if (est.length) consejos.push(`Estancado en ${est.slice(0, 3).join(', ')}: sube 2,5 kg o 1-2 reps la próxima vez.`);
+  if (ws.length < obj) consejos.push(`Agenda ya tus ${obj} entrenos de la semana que viene en el calendario.`);
+  if (pMed != null && o.p && pMed < o.p * 0.9) consejos.push('Mete un batido o un queso batido extra para llegar a la proteína.');
+  if (sueno != null && sueno < 7) consejos.push('Adelanta 30 min la hora de dormir: sin descanso no hay definición.');
+  if (reg.length < dias.length) consejos.push('Apunta la comida justo al terminar de comer: «De mi dieta» son dos toques.');
+  if (!consejos.length) consejos.push('Sigue así y sube un poco la exigencia: un kilo más o una serie más donde puedas.');
+  const nota = fallos.length === 0 ? 'Semana de 10. Así se llega al objetivo. 🔥' : bien.length > fallos.length ? 'Buena semana, pero hay cosas que pulir. Ve a por ellas.' : 'Semana floja. Toca apretar: la constancia es lo que te va a definir. 💪';
+  return { semana: fISO(l), hasta: fISO(fin - DIA), at: Date.now(), nota, meta: F.ajustes.meta || '',
+    cifras: { entrenos: ws.length, obj, volumen: r0(vol), volPrev: r0(volPrev), prs: prs.length, comidaDias: reg.length, dias: dias.length, okDias: okD, kMed, pMed, kObj: r0(o.k), pObj: r0(o.p), pesoIni: pesoIni?.kg ?? null, pesoFin: pesoFin?.kg ?? null, objPeso: F.ajustes.objPeso || null, sueno: sueno != null ? redondea(sueno, 1) : null, pasos: pasos != null ? Math.round(pasos) : null },
+    entrenos: ws.map(w => ({ t: w.t, dia: fDia(w.ini), min: Math.round(((w.fin || w.ini) - w.ini) / 60000), vol: r0(volumen(w)), prs: (w.prs || []).length })), bien, fallos, consejos };
+}
+function cardSemana() {
+  const r = resumenSemana(), c = r.cifras;
+  const li = (l, cls) => l.map(x => `<li class="${cls}">${esc(x)}</li>`).join('');
+  return `<div class="card semres"><b>${esc(r.nota)}</b><p class="faint small" style="margin:2px 0 8px">Semana del ${fDia(deISO(r.semana))} · el domingo a las 22:00 te llega por email</p>
+   <ul>${li(r.bien, 'ok')}${li(r.fallos, 'ko')}</ul>${r.consejos.length ? `<div class="dgrp">Para la semana que viene</div><ul>${li(r.consejos, 'tip')}</ul>` : ''}
+   <div class="row btnrow" style="margin-top:8px"><button class="btn sm" data-act="sEmailYa">📧 Mandármelo ahora</button></div></div>`;
+}
+let semanaT = null;
+function mandaSemana(forzar) {
+  if (!BR || !listo) return; clearTimeout(semanaT);
+  semanaT = setTimeout(async () => {
+    const ult = +lsGet('jp-fit-semana-at', 0); if (forzar !== 'cambio' && !forzar && Date.now() - ult < 15 * 60e3) return;
+    try { await puente(null, { a: 'fitsemana', resumen: resumenSemana() }); lsSet('jp-fit-semana-at', Date.now()); } catch (e) {}
+  }, forzar === true ? 0 : 8000);
+}
+document.addEventListener('click', async ev => {
+  const b = ev.target.closest('[data-act]'); if (!b) return;
+  switch (b.dataset.act) {
+    case 'sGuia': return hojaGuia();
+    case 'sMano': return hojaMano();
+    case 'sCopia': { const v = $('#sUrl').value; try { await navigator.clipboard.writeText(v); toast('Copiada. Pégala en «Obtener contenido de URL»'); } catch (e) { $('#sUrl').select(); toast('Selecciónala y cópiala'); } return; }
+    case 'sManoOk': { const f = $('#mF').value || fISO(Date.now()), q = { a: 'fitsalud', fecha: f, sueno: $('#mS').value.replace(',', '.'), pasos: $('#mP').value, kcal: $('#mK').value, fc: $('#mC').value };
+      try { await puente(q); } catch (e) { return toast('No pude guardar: ' + e.message, 5000); }
+      F.salud[f] = { ...(F.salud[f] || {}), ...(q.sueno ? { sueno: +q.sueno } : {}), ...(q.pasos ? { pasos: +q.pasos } : {}), ...(q.kcal ? { kcal: +q.kcal } : {}), ...(q.fc ? { fc: +q.fc } : {}) };
+      cierraHoja(); pinta(); return toast('Guardado'); }
+    case 'sEmailYa': { if (!BR) return toast('Falta el puente de Google'); b.disabled = true; b.textContent = 'Enviando…';
+      try { await puente(null, { a: 'fitsemana', resumen: resumenSemana() }); const j = await puente({ a: 'fitemail' }); toast(j.ok ? 'Email enviado: mira tu correo 📧' : 'No se pudo enviar', 5000); }
+      catch (e) { toast('No se pudo: ' + e.message, 6000); } b.disabled = false; b.textContent = '📧 Mandármelo ahora'; return; }
+  }
+});
+
 // ---------- login (igual que el Organizador) ----------
 const gate = $('#gate'), gateMsg = $('#gateMsg'), gateBtn = $('#gateBtn');
 const showGate = msg => { gate.classList.remove('loading'); gate.hidden = false; gateMsg.textContent = msg || ''; gateBtn.disabled = false; };
@@ -1077,6 +1217,7 @@ onAuthStateChanged(auth, user => {
   if (!user) { U = null; return showGate(); }
   if ((user.email || '').toLowerCase() !== ALLOWED || !user.emailVerified) { signOut(auth); return showGate('Esta cuenta de Google no tiene acceso.'); }
   U = user;
+  getDoc(doc(db, 'users', user.uid)).then(s => { BR = s.data()?.plan?.bridge || null; cargaSalud(true); mandaSemana(); }).catch(() => {});
   unsub = onSnapshot(collection(db, 'users', user.uid, 'fit'), snap => {
     for (const ch of snap.docChanges()) {
       const id = ch.doc.id, d = ch.type === 'removed' ? null : ch.doc.data();
@@ -1094,7 +1235,7 @@ onAuthStateChanged(auth, user => {
       } else if (id.startsWith('m-')) { if (d) F.meses[id.slice(2)] = d.e || {}; else delete F.meses[id.slice(2)]; }
     }
     reconstruye();
-    if (!listo) { listo = true; gate.hidden = true; }
+    if (!listo) { listo = true; gate.hidden = true; mandaSemana(); }
     if ($('#wo').hidden) pinta(); else if (!activo) minimizaWo();
     tickDescanso();
   }, e => { toast('Sincronización: ' + (e.code || e.message), 6000); if (!listo) showGate('No pude cargar tus datos: ' + (e.code || e.message)); });
