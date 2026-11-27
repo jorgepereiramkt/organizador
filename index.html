@@ -6,19 +6,19 @@
 <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' https://www.gstatic.com https://apis.google.com https://accounts.google.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://accounts.google.com; font-src https://fonts.gstatic.com; connect-src 'self' https://api.clickup.com https://script.google.com https://script.googleusercontent.com https://accounts.google.com https://firestore.googleapis.com https://identitytoolkit.googleapis.com https://securetoken.googleapis.com https://www.googleapis.com https://apis.google.com; frame-src 'self' https://organizador-jp.firebaseapp.com https://accounts.google.com; img-src 'self' data: https://lh3.googleusercontent.com https://www.google.com; manifest-src 'self'; base-uri 'none'; form-action 'self'; object-src 'none'">
 <meta name="referrer" content="no-referrer">
 <meta name="robots" content="noindex, nofollow">
-<link rel="manifest" href="manifest.json?v=20261127180950">
+<link rel="manifest" href="manifest.json?v=20261127235628">
 <link rel="icon" href="icon-192.png">
 <link rel="apple-touch-icon" href="icon-180.png">
 <meta name="theme-color" content="#0a0a0b">
 <meta name="apple-mobile-web-app-capable" content="yes">
-<meta name="apple-mobile-web-app-title" content="JP Organizador">
-<meta property="og:title" content="JP Organizador">
+<meta name="apple-mobile-web-app-title" content="JP Work">
+<meta property="og:title" content="JP Work">
 <meta property="og:description" content="Trabajo, clientes, calendario y tareas">
 <meta property="og:image" content="https://jorgepereiramkt.github.io/organizador/icon-512.png">
 <meta property="og:type" content="website">
 
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-<title>Organizador JP</title>
+<title>JP Work</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Space+Grotesk:wght@500;700&display=swap" rel="stylesheet">
 <style>
@@ -39,6 +39,7 @@ button{cursor:pointer;border:0;background:none}
 /* Cabecera */
 .top{display:flex;align-items:center;gap:14px;flex-wrap:wrap}
 .brand{display:flex;align-items:center;gap:10px;font:700 18px var(--head);letter-spacing:-.01em}
+.brand > a{display:flex;align-items:center;gap:10px;color:inherit;text-decoration:none}
 .logo{display:grid;place-items:center;width:34px;height:34px;border-radius:10px;background:var(--accent);color:#0a0a0b;font:700 15px var(--head)}
 .pill{font:500 11px var(--body);color:var(--muted);border:1px solid var(--line);padding:3px 8px;border-radius:99px}
 .tabs{display:flex;gap:4px;background:var(--surface);border:1px solid var(--line);padding:4px;border-radius:12px;margin-left:auto}
@@ -1583,7 +1584,7 @@ html{overflow-anchor:none}
   <div class="glow"></div>
   <div class="gate-box">
     <span class="jplogo big" aria-label="JP"><img class="lg-d" src="logo-oscuro.png" alt="JP"><img class="lg-l" src="logo-claro.png" alt=""></span>
-    <h1 id="gateHello">Organizador</h1>
+    <h1 id="gateHello">JP Work</h1>
     <p class="g-load">Preparando tu día…</p>
     <div class="g-bar"><span></span></div>
     <p class="g-login">Entra con tu cuenta de Google para ver tus tareas en todos tus dispositivos.</p>
@@ -1593,7 +1594,7 @@ html{overflow-anchor:none}
 </div>
 <div class="app">
   <header class="top">
-    <div class="brand"><span class="jplogo" aria-label="JP"><img class="lg-d" src="logo-oscuro.png" alt="JP"><img class="lg-l" src="logo-claro.png" alt=""></span><span class="txt">Organizador</span><span class="pill" id="mode">Datos de ejemplo</span></div>
+    <div class="brand"><a class="brand" href="inicio.html" title="Ir al menú central (JP Work · JP Fitness)"><span class="jplogo" aria-label="JP"><img class="lg-d" src="logo-oscuro.png" alt="JP"><img class="lg-l" src="logo-claro.png" alt=""></span><span class="txt">Work</span></a><span class="pill" id="mode">Datos de ejemplo</span></div>
     <span class="sp"></span>
     <nav class="tabs" id="tabs">
       <button data-view="dia"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="4" y="3" width="16" height="18" rx="2"/><path d="M8 8h8M8 12h8M8 16h5"/></svg>Calendario</button>
@@ -1661,18 +1662,18 @@ html{overflow-anchor:none}
 
 <div class="toast" id="toast"></div>
 
-<script src="refrescar.js?v=20261127180950"></script>
-<script src="app.js?v=20261127180950"></script>
-<script src="planner.js?v=20261127180950"></script>
-<script src="clients.js?v=20261127180950"></script>
-<script src="arbol.js?v=20261127180950"></script>
-<script src="quick.js?v=20261127180950"></script>
-<script src="ia.js?v=20261127180950"></script>
-<script src="hours.js?v=20261127180950"></script>
-<script src="cliente.js?v=20261127180950"></script>
-<script src="diario.js?v=20261127180950"></script>
-<script src="imagenes.js?v=20261127180950"></script>
-<script src="archivos.js?v=20261127180950"></script>
-<script type="module" src="cloud.js?v=20261127180950"></script>
+<script src="refrescar.js?v=20261127235628"></script>
+<script src="app.js?v=20261127235628"></script>
+<script src="planner.js?v=20261127235628"></script>
+<script src="clients.js?v=20261127235628"></script>
+<script src="arbol.js?v=20261127235628"></script>
+<script src="quick.js?v=20261127235628"></script>
+<script src="ia.js?v=20261127235628"></script>
+<script src="hours.js?v=20261127235628"></script>
+<script src="cliente.js?v=20261127235628"></script>
+<script src="diario.js?v=20261127235628"></script>
+<script src="imagenes.js?v=20261127235628"></script>
+<script src="archivos.js?v=20261127235628"></script>
+<script type="module" src="cloud.js?v=20261127235628"></script>
 </body>
 </html>
