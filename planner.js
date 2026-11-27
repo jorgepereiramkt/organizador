@@ -1130,8 +1130,11 @@ document.addEventListener('pointerdown', e => {
   const el = e.target.closest('.wk-ev.g-ev'); if (!el || e.button !== 0) return;
   const res = !!e.target.closest('.g-res');
   if (e.pointerType === 'touch' && !res){   // en el móvil: tocar abre la ficha (ahí se cambia la hora o el día)
-    const sx = e.clientX, sy = e.clientY;
-    addEventListener('pointerup', ev => { if (Math.hypot(ev.clientX - sx, ev.clientY - sy) < 8) wkEditEvent(el); }, {once: true}); return;
+    const sx = e.clientX, sy = e.clientY, t0 = Date.now();
+    // solo si es un toque corto sobre el mismo bloque (antes, si hacías scroll, quedaba pendiente y el siguiente toque abría la ficha)
+    const up = ev => { quita(); if (Date.now() - t0 < 700 && Math.hypot(ev.clientX - sx, ev.clientY - sy) < 8 && ev.target.closest && ev.target.closest('.wk-ev') === el && !ev.target.closest('.wk-subs')) wkEditEvent(el); };
+    const quita = () => { removeEventListener('pointerup', up); removeEventListener('pointercancel', quita); };
+    addEventListener('pointerup', up); addEventListener('pointercancel', quita); setTimeout(quita, 1500); return;
   }
   e.preventDefault(); e.stopPropagation();
   const s0 = +el.dataset.gs, e0 = +el.dataset.ge, len = e0 - s0, y0 = e.clientY, x0 = e.clientX, snap15 = m => Math.round(m / 15) * 15;
@@ -1796,7 +1799,7 @@ setInterval(importInbox, 5 * 60e3);
   const lista = k => { const pl = window.__org.S.plan; pl.subs = pl.subs || {}; return pl.subs[k] = pl.subs[k] || []; };
   const limpia = () => { const pl = window.__org.S.plan, lim = window.__org.iso(window.__org.addDays(new Date(), -30)); for (const k in (pl.subs || {})) if (k.slice(0, 10) < lim || !pl.subs[k].length) delete pl.subs[k]; };
   const para = e => { e.stopPropagation(); e.stopImmediatePropagation(); };
-  ['pointerdown', 'mousedown', 'touchstart'].forEach(t => document.addEventListener(t, e => { if (e.target.closest('.wk-subs')) para(e); }, true));
+  ['pointerdown', 'pointerup', 'mousedown', 'mouseup', 'touchstart', 'touchend'].forEach(t => document.addEventListener(t, e => { if (e.target.closest && e.target.closest('.wk-subs')) para(e); }, true));
   document.addEventListener('click', e => {
     const box = e.target.closest('.wk-subs'); if (!box) return; para(e); e.preventDefault();
     const k = box.dataset.subk;
