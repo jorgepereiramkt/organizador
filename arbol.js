@@ -185,7 +185,10 @@ function init() {
   a.addEventListener('pointerdown', e => {
     if (e.target.closest('.ar-ctrl, .ar-form, .ar-mas')) return;
     const t = e.target.closest('[data-atask]');
-    if (t && e.isPrimary && !ptrs.size) { arr = { id: t.dataset.atask, x: e.clientX, y: e.clientY, on: false, txt: t.textContent.trim() }; return; }
+    if (t && e.isPrimary && !ptrs.size) { arr = { id: t.dataset.atask, x: e.clientX, y: e.clientY, on: false, txt: t.textContent.trim(), pid: e.pointerId };
+      // con el dedo el navegador «engancha» el dedo a la tarjeta; al redibujar el árbol esa tarjeta desaparece y el iPad daba el arrastre por cancelado.
+      // Se engancha a la página entera (que no se redibuja) para que el arrastre siga hasta que sueltes.
+      try { document.documentElement.setPointerCapture(e.pointerId); } catch (_) {} return; }
     ptrs.set(e.pointerId, { x: e.clientX, y: e.clientY }); a._mov = false;
     if (ptrs.size === 2) { arr = null; const [p, q] = [...ptrs.values()]; pin = { d: Math.hypot(p.x - q.x, p.y - q.y), z: vista.z }; }
   });
@@ -216,8 +219,11 @@ document.addEventListener('pointermove', e => {
   const el = document.elementFromPoint(e.clientX, e.clientY), d = el && el.closest('[data-adrop]');
   if (sobre !== d) { sobre && sobre.classList.remove('sobre'); sobre = d; sobre && sobre.classList.add('sobre'); }
 }, { passive: true });
-const sueltaFin = () => {
-  if (!arr) return; const a = arr; arr = null;
+const sueltaFin = e => {
+  if (!arr) return;
+  if (e && e.type === 'pointercancel' && arr.on && e.pointerType === 'touch') return;   // el iPad a veces cancela al redibujar: se sigue esperando a que sueltes
+  const a = arr; arr = null;
+  try { document.documentElement.releasePointerCapture(a.pid); } catch (_) {}
   if (!a.on) return;   // fue un toque: lo abre el «click»
   fantasma && fantasma.remove(); fantasma = null;
   const d = sobre; sobre = null; mover = null; S._arSalto = true;

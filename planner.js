@@ -1030,7 +1030,9 @@ const calsCrear = () => misCals().filter(c => !/leadfluence/i.test(c.id) && !/ta
 const calDef = () => (calsCrear().find(c => c.id === CAL_DEF) || calsCrear()[0] || {}).id;
 const msAt = (day, min) => O.fromIso(day).getTime() + min * 60e3;
 const hmIn = v => toMin(v || '00:00');
-async function wkReload(...ds){ for (const d of ds) delete weekEv[d]; clearCache(); lastEvents = []; await loadWeek(); if (S.view === 'dia') O.render(); }
+async function wkReload(...ds){ clearCache(); lastEvents = []; const dias = [...new Set(ds.filter(Boolean))];
+  await Promise.all(dias.map(async d => { try { weekEv[d] = await fetchEvents(d); } catch(e){ delete weekEv[d]; } }));
+  if (dias.some(d => !weekEv[d])) await loadWeek(); if (S.view === 'dia') O.render(); }
 function wkCreate(day, s, e){
   evCur = {nuevo: true, day, s, e};
   const cals = calsCrear();
@@ -1096,7 +1098,11 @@ async function evDone(rv){
     if (c.nuevo){
       const cal = val('cal') || calDef();
       if (!cal) throw new Error('no hay calendario del puente');
-      await bridge({a: 'create', cal, title: (val('title') || '').trim() || 'Bloque', desc: val('desc') || '', start: msAt(c.day, s), end: msAt(c.day, en)});
+      const titulo = (val('title') || '').trim() || 'Bloque', colC = ((misCals().find(x => x.id === cal)) || {}).color || '#8E8E93';
+      const prov = {title: titulo, allDay: false, color: colC, cal: '', start: s, end: en, free: false, isCall: false, prov: true};
+      (weekEv[c.day] = weekEv[c.day] || []).push(prov); O.render();
+      try { await bridge({a: 'create', cal, title: titulo, desc: val('desc') || '', start: msAt(c.day, s), end: msAt(c.day, en)}); }
+      catch(err){ weekEv[c.day] = (weekEv[c.day] || []).filter(x => x !== prov); O.render(); throw err; }
       O.toast('Creado en tu Google Calendar ✓'); wkReload(c.day);
     } else {
       const day = val('day') || c.day;
@@ -1110,6 +1116,9 @@ async function evDone(rv){
         for (const k in weekEv) delete weekEv[k];
         O.toast('Guardado en este y en los siguientes ✓'); wkReload(c.day, day); return;
       }
+      const ev = (weekEv[c.day] || []).find(x => x.gid === c.gid && String(x.gstart) === String(c.orig));
+      if (ev){ Object.assign(ev, {start: s, end: en, ...(q.title != null ? {title: q.title} : {})});
+        if (day !== c.day){ weekEv[c.day] = weekEv[c.day].filter(x => x !== ev); (weekEv[day] = weekEv[day] || []).push(ev); } O.render(); }
       await bridge(q);
       O.toast('Guardado en tu Google Calendar ✓'); wkReload(c.day, day);
     }
