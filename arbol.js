@@ -81,8 +81,9 @@ function aplica() { const l = document.getElementById('arLienzo'); if (l && vist
 function guarda() { lsSet('jp-arbol-vista', vista); }
 function centra() {
   const a = document.getElementById('arbol'), l = document.getElementById('arLienzo'); if (!a || !l) return;
-  const W = a.clientWidth, H = a.clientHeight, w = l.offsetWidth, h = l.offsetHeight, z = Math.max(0.25, Math.min(1, W / w, H / h * 1.6));
-  vista = { x: Math.max(10, (W - w * z) / 2), y: 10, z }; aplica(); guarda();
+  const W = a.clientWidth, H = a.clientHeight, w = l.offsetWidth, h = l.offsetHeight, z = Math.max(0.65, Math.min(1, W / w));   // que se lea: como mucho se aleja hasta 65 %
+  const r = document.querySelector('.an-0'), ry = r ? r.offsetTop : 0;
+  vista = { x: Math.max(12, (W - w * z) / 2), y: h * z < H ? (H - h * z) / 2 : Math.max(12 - ry * z + H / 2 - 40, H - h * z - 12), z }; aplica(); guarda();
 }
 function zoomEn(f, cx, cy) {
   const z = Math.max(0.2, Math.min(2.5, vista.z * f)), k = z / vista.z;
@@ -90,7 +91,7 @@ function zoomEn(f, cx, cy) {
 }
 function init() {
   const a = document.getElementById('arbol'); if (!a) return;
-  if (!vista) centra(); else aplica();
+  if (!vista || !init.hecho) { init.hecho = true; centra(); } else aplica();
   const ptrs = new Map(); let pin = null, mov = false;
   a.addEventListener('pointerdown', e => {
     if (e.target.closest('.ar-ctrl')) return;
