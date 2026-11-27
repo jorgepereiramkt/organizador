@@ -1799,7 +1799,7 @@ setInterval(importInbox, 5 * 60e3);
   const lista = k => { const pl = window.__org.S.plan; pl.subs = pl.subs || {}; return pl.subs[k] = pl.subs[k] || []; };
   const limpia = () => { const pl = window.__org.S.plan, lim = window.__org.iso(window.__org.addDays(new Date(), -30)); for (const k in (pl.subs || {})) if (k.slice(0, 10) < lim || !pl.subs[k].length) delete pl.subs[k]; };
   const para = e => { e.stopPropagation(); e.stopImmediatePropagation(); };
-  ['pointerdown', 'pointerup', 'mousedown', 'mouseup', 'touchstart', 'touchend'].forEach(t => document.addEventListener(t, e => { if (e.target.closest && e.target.closest('.wk-subs')) para(e); }, true));
+  ['pointerdown', 'mousedown', 'touchstart'].forEach(t => document.addEventListener(t, e => { if (e.target.closest && e.target.closest('.wk-subs')) para(e); }, true));
   document.addEventListener('click', e => {
     const box = e.target.closest('.wk-subs'); if (!box) return; para(e); e.preventDefault();
     const k = box.dataset.subk;
