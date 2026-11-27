@@ -590,7 +590,7 @@ function weekView(){
       if ((gAttr || i.kind === 'routine') && i.kind !== 'work' && h > 44){
         const sk = `${d}|${i.gid || 'r:' + (i.id || i.title)}`, subs = (P().subs || {})[sk] || [];
         inner += `<div class="wk-subs" data-subk="${esc(sk)}">${subs.map((x, ix) => `<div class="wk-sub${x.ok ? ' ok' : ''}"><button type="button" class="wk-subchk" data-subok="${ix}" aria-label="Hecha">${x.ok ? '✓' : ''}</button><span>${esc(x.t)}</span><button type="button" class="wk-subdel" data-subdel="${ix}" aria-label="Quitar">✕</button></div>`).join('')}
-          ${d >= hoy ? '<button type="button" class="wk-subadd" data-subadd>＋ subtarea</button>' : ''}</div>`;
+          ${d >= hoy ? '<button type="button" class="wk-subadd" data-subadd title="Añadir subtarea" aria-label="Añadir subtarea">＋</button>' : ''}</div>`;
         if (subs.length) extra = ` · ✓ ${subs.filter(x => x.ok).length}/${subs.length}`;
       }
       const past = d < hoy || (d === hoy && i.end <= nowMin);
@@ -1808,7 +1808,7 @@ setInterval(importInbox, 5 * 60e3);
     const add = e.target.closest('[data-subadd]');
     if (add){
       const inp = document.createElement('input'); inp.className = 'wk-subin'; inp.placeholder = 'Qué quieres hacer…'; inp.setAttribute('enterkeyhint', 'done');
-      add.replaceWith(inp); inp.focus();
+      add.style.visibility = 'hidden'; box.appendChild(inp); inp.focus();
       let hecho = false;
       const fin = mas => { if (hecho) return; hecho = true; const t = inp.value.trim(); if (t){ lista(k).push({t, ok: false}); limpia(); window.__org.save(); }
         window.__org.render(); if (mas && t) setTimeout(() => { const b = document.querySelector(`.wk-subs[data-subk="${CSS.escape(k)}"] [data-subadd]`); b && b.click(); }, 30); };
