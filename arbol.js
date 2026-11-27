@@ -10,7 +10,8 @@ const plegados = new Set(lsGet('jp-arbol-pleg2', []));
 let vista = null, mover = null;   // mover = id de la tarea que estás arrastrando
 const UCOL = { super: '#FF3B30', alta: '#FF8A00', normal: '#F5B400', baja: '#34C759' };
 // columnas dentro de cada cliente: cliente → hoy/resto → urgencia → tareas
-const CX = [0, 168, 272, 384], CW = [150, 88, 96, 230], COLW = 640, FILA = 32;
+const CX = [0, 148, 236, 334], CW = [130, 72, 82, 210], COLW = 575, FILA = 30;
+const UCORTO = { super: 'Súper', alta: 'Urgente', normal: 'Media', baja: 'Baja' };
 const esHoy = t => t.today === O.today() || (S.slots && S.slots[t.id] && S.slots[t.id].day === O.today());
 
 function grupos() {
@@ -45,7 +46,7 @@ function bloque({ c, ts }) {
       x.y = uy0 + filas * FILA / 2;
       x.tu.forEach((t, i) => { const ty = y + i * FILA + FILA / 2; nodos.push({ tipo: 't', t, x: CX[3], y: ty, col: UCOL[x.u] }); lineas.push([CX[2] + CW[2], x.y, CX[3], ty, UCOL[x.u]]); });
       y += filas * FILA + 6;
-      nodos.push({ tipo: 'u', x: CX[2], y: x.y, col: UCOL[x.u], txt: `${x.info.icon} ${x.info.label}`, n: x.tu.length, drop: `${r.k}:${x.u}`, vacio: !x.tu.length });
+      nodos.push({ tipo: 'u', x: CX[2], y: x.y, col: UCOL[x.u], txt: `${x.info.icon} ${UCORTO[x.u] || x.info.label}`, n: x.tu.length, drop: `${r.k}:${x.u}`, vacio: !x.tu.length });
     }
     r.y = (y0 + y - 6) / 2;
     nodos.push({ tipo: 'r', x: CX[1], y: r.y, col: cc, txt: r.nom, n: r.sub.length, drop: r.k, vacio: !r.sub.length });
@@ -64,7 +65,7 @@ function arbol() {
   O.setToolbar('Clientes', 'tus tareas en árbol', '', 'Arrastra una tarea para cambiarle la urgencia o el «hoy»');
   const { out, total } = grupos();
   const W = (document.getElementById('main') || {}).clientWidth || 1000;
-  const cols = Math.max(1, Math.min(3, Math.floor((W - 40) / (COLW * 0.72))));
+  const cols = Math.max(1, Math.min(3, Math.floor((W - 40) / (COLW * 0.7))));
   let html = '', lin = '', y = 70, anchoT = 760;
   const ROOT = { x: 16, y: 30 };
   html += `<div class="an an-0" style="left:${ROOT.x}px;top:${ROOT.y}px;width:170px"><b>🌳 Mis tareas</b><small>${total} pendientes</small></div>`;
@@ -104,7 +105,7 @@ function arbol() {
 function aplica() { const l = document.getElementById('arLienzo'); if (l && vista) l.style.transform = `translate(${vista.x}px,${vista.y}px) scale(${vista.z})`; }
 function centra() {
   const a = document.getElementById('arbol'), l = document.getElementById('arLienzo'); if (!a || !l) return;
-  const W = a.clientWidth, H = a.clientHeight, w = l.offsetWidth, h = l.offsetHeight, z = Math.max(0.55, Math.min(1, W / w, H / h));
+  const W = a.clientWidth, H = a.clientHeight, w = l.offsetWidth, h = l.offsetHeight, z = Math.max(0.6, Math.min(1, W / w, Math.max(H / h, 0.75)));
   vista = { x: Math.max(8, (W - w * z) / 2), y: h * z < H ? (H - h * z) / 2 : 8, z }; aplica();
 }
 function zoomEn(f, cx, cy) { const z = Math.max(0.2, Math.min(2.5, vista.z * f)), k = z / vista.z; vista = { x: cx - (cx - vista.x) * k, y: cy - (cy - vista.y) * k, z }; aplica(); }
