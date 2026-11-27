@@ -1187,6 +1187,9 @@ document.addEventListener('pointerdown', e => {
     fin(); wkJustMade = true; setTimeout(() => wkJustMade = false, 150);
     if (!moved) return wkEditEvent(el);
     if (day === el.dataset.gday && s === s0 && en === e0) return;
+    // se queda ya en su sitio nuevo (sin esperar a Google, que tarda 1-3 s)
+    const evo = (weekEv[el.dataset.gday] || []).find(x => x.gid === el.dataset.gid && String(x.gstart) === el.dataset.gorig);
+    if (evo){ evo.start = s; evo.end = en; if (day !== el.dataset.gday){ weekEv[el.dataset.gday] = weekEv[el.dataset.gday].filter(x => x !== evo); (weekEv[day] = weekEv[day] || []).push(evo); } O.render(); }
     try { await bridge({a: 'update', cal: el.dataset.gcal, id: el.dataset.gid, orig: el.dataset.gorig, start: msAt(day, s), end: msAt(day, en)}); O.toast(`Movido a ${toHM(s)} – ${toHM(en)} ✓`); }
     catch(err){ O.toast('No se pudo mover: ' + err.message); }
     wkReload(el.dataset.gday, day);
