@@ -78,13 +78,30 @@
     if (taskId !== actual) return;
     const fs = lista(taskId);
     caja.innerHTML = `<div class="fchips">${fs.map(f => `<span class="fchip"><a href="#" data-fopen="${esc(taskId)}|${f.id}" title="Abrir">${f.kind === 'dir' ? '📁' : '📎'} ${esc(f.name)}</a><button type="button" data-fdel="${f.id}" aria-label="Quitar">×</button></span>`).join('')}</div>
-      <div class="fbtns"><button type="button" class="btn" data-fadd="file">📎 Vincular archivo</button><button type="button" class="btn" data-fadd="dir">📁 Vincular carpeta</button>
+      <div class="fbtns"><button type="button" class="btn piz-btn" data-fpiz>🎨 ${(O.S.plan && O.S.plan.tpiz || {})[taskId] ? 'Abrir su pizarra' : 'Pizarra'}</button><button type="button" class="btn" data-fadd="file">📎 Vincular archivo</button><button type="button" class="btn" data-fadd="dir">📁 Vincular carpeta</button>
       <small>${puede ? 'No se sube nada: solo se abre desde este ordenador. También puedes arrastrarlos aquí.' : 'Vincular archivos del ordenador solo funciona en Chrome en el Mac.'}</small></div>`;
   }
   // se engancha al abrir el editor: el título del editor no cambia, así que se mira qué tarea es al mostrarse
   new MutationObserver(() => { const ed = document.getElementById('ed'); if (ed.open){ const id = O.editingId && O.editingId(); if (id && id !== actual){ actual = id; pintar(id); } } else actual = null; })
     .observe(document.getElementById('ed'), { attributes: true, attributeFilter: ['open'] });
+  // Pizarra de la tarea: se abre encima de la ficha (sin cerrarla) y se guarda en tu Drive como el resto de pizarras
+  function abrePizarra(id){
+    if (!(O.S.plan && O.S.plan.bridge)) return O.toast('Falta conectar el puente de Google para guardar la pizarra');
+    O.save();   // la pizarra lee la tarea de este dispositivo
+    let d = document.getElementById('pizTDlg');
+    if (!d){ d = document.createElement('dialog'); d.id = 'pizTDlg'; d.className = 'piz-dlg'; document.body.appendChild(d);
+      d.addEventListener('cancel', ev => ev.preventDefault()); }
+    const v = ((document.querySelector('script[src*="app.js?v="]') || {}).src || '').split('v=')[1] || '';
+    d.innerHTML = `<iframe src="pizarra.html?t=${encodeURIComponent(id)}&v=${v}" title="Pizarra de la tarea" allow="clipboard-read; clipboard-write; fullscreen"></iframe>`;
+    d.showModal();
+    const m = O.S.plan.tpiz = O.S.plan.tpiz || {}; if (!m[id]){ m[id] = 1; O.save(); pintar(id); }
+  }
+  window.addEventListener('message', e => {
+    if (e.origin !== location.origin || !e.data || e.data.pizarra !== 'close') return;
+    const d = document.getElementById('pizTDlg'); if (d && d.open){ d.close(); d.innerHTML = ''; }
+  });
   caja.addEventListener('click', async e => {
+    if (e.target.closest('[data-fpiz]')) return actual && abrePizarra(actual);
     const a = e.target.closest('[data-fadd]');
     if (a){
       if (!puede) return O.toast('Esto solo funciona en Chrome en el Mac');

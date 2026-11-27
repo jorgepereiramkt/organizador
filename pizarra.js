@@ -1,16 +1,17 @@
 // Pizarra infinita de cada cliente (Excalidraw). Se guarda como archivo en tu Google Drive a través de tu Apps Script.
 (() => {
   const $ = s => document.querySelector(s);
-  const q = new URLSearchParams(location.search), ID = q.get('c') || '';
+  const q = new URLSearchParams(location.search), TID = q.get('t'), ID = TID ? 't_' + TID : (q.get('c') || '');   // ?c=cliente o ?t=tarea
   let st = {};
   try { st = JSON.parse(localStorage.getItem('jp-organizador-v1')) || {}; } catch (e) {}
   const BRIDGE = (st.plan && st.plan.bridge) || '';
-  const cli = (st.clients || []).find(c => c.id === ID);
+  const tarea = TID ? (st.tasks || []).find(t => t.id === TID) : null;
+  const cli = TID ? (tarea ? { name: '✏️ ' + tarea.title, color: ((st.clients || []).find(c => c.id === tarea.client) || {}).color || '#ff5a1f' } : null) : (st.clients || []).find(c => c.id === ID);
   const msg = t => { $('#msg').hidden = !t; $('#msg').textContent = t || ''; };
   const setSt = t => { $('#st').textContent = t; };
   const inFrame = window.parent !== window;
 
-  if (!ID || !cli) return msg('No encuentro este cliente. Ábrela desde su ficha en el Organizador.');
+  if (!ID || !cli) return msg(TID ? 'No encuentro esta tarea. Ábrela desde la tarea en el Organizador.' : 'No encuentro este cliente. Ábrela desde su ficha en el Organizador.');
   if (!BRIDGE) return msg('Falta conectar tu Apps Script (en Día → calendarios) para guardar las pizarras en tu Drive.');
   document.title = 'Pizarra · ' + cli.name;
   $('#nm').textContent = cli.name;
