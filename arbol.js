@@ -58,7 +58,7 @@ function bloque({ c, ts }) {
   const nh = ts.filter(esHoy).length;
   nodos.push({ tipo: 'c', x: 0, y: cy, col: cc, txt: (c.proyecto ? '📁 ' : '') + c.name, sub: `${ts.length} pend.${nh ? ' · ' + nh + ' hoy' : ''}`, id: 'c:' + c.id, pleg });
   if (!pleg) for (const r of ramas) lineas.push([CW[0], cy, CX[1], r.y, r.sub.length ? cc : 'rgba(128,128,128,.5)', !r.sub.length]);
-  return { nodos, lineas, alto: pleg ? FILA + 14 : alto, cid: c.id };
+  return { nodos, lineas, alto: pleg ? FILA + 14 : alto, cid: c.id, todo };
 }
 
 function arbol() {
@@ -86,7 +86,7 @@ function arbol() {
         const L = bx + n.x, T = by + n.y;
         if (n.tipo === 't') html += `<button type="button" class="an an-t${n.t.id === mover ? ' moviendo' : ''}" data-atask="${esc(n.t.id)}" style="left:${L}px;top:${T}px;width:${CW[3]}px;--c:${n.col}" title="${esc(n.t.title)}"><span>${esc(n.t.title)}</span></button>`;
         else if (n.tipo === 'c') html += `<button type="button" class="an an-2${n.pleg ? ' pleg' : ''}" data-anodo="${esc(n.id)}" style="left:${L}px;top:${T}px;width:${CW[0]}px;--c:${n.col}"><b>${esc(n.txt)}</b><small>${esc(n.sub)}</small>${n.pleg ? '<i>＋</i>' : ''}</button>`;
-        else html += `<div class="an an-${n.tipo === 'r' ? 3 : 4}${n.vacio ? ' vacio' : ''}${mover ? ' destino' : ''}" ${mover ? `data-adrop="${esc(b.cid)}|${n.drop}"` : ''} style="left:${L}px;top:${T}px;width:${CW[n.tipo === 'r' ? 1 : 2]}px;--c:${n.col}"><b>${esc(n.txt)}</b><small>${n.n}</small></div>`;
+        else html += `<div class="an an-${n.tipo === 'r' ? 3 : 4}${n.vacio ? ' vacio' : ''}${b.todo ? ' destino' : ''}" ${b.todo ? `data-adrop="${esc(b.cid)}|${n.drop}"` : ''} style="left:${L}px;top:${T}px;width:${CW[n.tipo === 'r' ? 1 : 2]}px;--c:${n.col}"><b>${esc(n.txt)}</b><small>${n.n}</small></div>`;
       }
     }
     lin += `<path d="M${x0 - 18} ${busY} H${x0 - 18 + (Math.min(cols, bl.length) - 1) * COLW}" stroke="${g.col}" opacity=".35"/>`;
