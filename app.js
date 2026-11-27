@@ -1156,3 +1156,23 @@ window.__org = {ordenFact, openEditor, snap, afterChange, esInterno, cliEf, sync
   setInterval(() => { if (document.visibilityState === 'visible') mira(false); }, 5 * 60e3);
   document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') mira(false); });
 })();
+
+/* ---------- La barra de cada vista (Semana, ‹ Hoy ›, Foco · Semana · Árbol…) reaparece al deslizar hacia arriba ---------- */
+(() => {
+  const tb = document.getElementById('toolbar'), top = document.querySelector('.top'); if (!tb || !top) return;
+  const marca = document.createElement('div'); marca.className = 'tb-marca'; tb.before(marca);
+  const alto = () => { const h = top.getBoundingClientRect().height; document.documentElement.style.setProperty('--toph', Math.round(h) + 'px'); return h; };
+  let h = alto(), lastY = scrollY, raf = 0;
+  addEventListener('resize', () => { h = alto(); });
+  addEventListener('scroll', () => {
+    if (raf) return;
+    raf = requestAnimationFrame(() => {
+      raf = 0; const y = scrollY, peg = marca.getBoundingClientRect().top < h - 2;
+      tb.classList.toggle('pegada', peg);
+      if (!peg) tb.classList.remove('oculta');
+      else if (y > lastY + 3) tb.classList.add('oculta');      // bajando: se esconde
+      else if (y < lastY - 3) tb.classList.remove('oculta');   // subiendo: aparece
+      lastY = y;
+    });
+  }, { passive: true });
+})();
