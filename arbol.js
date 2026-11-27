@@ -10,7 +10,7 @@ const plegados = new Set(lsGet('jp-arbol-pleg2', []));
 let vista = null, mover = null;   // mover = id de la tarea que estás arrastrando
 const UCOL = { super: '#FF3B30', alta: '#FF8A00', normal: '#F5B400', baja: '#34C759' };
 // columnas dentro de cada cliente: cliente → hoy/resto → urgencia → tareas
-const CX = [0, 148, 236, 334], CW = [130, 72, 82, 210], COLW = 575, FILA = 30;
+const CX = [0, 146, 246, 360], CW = [130, 86, 98, 196], COLW = 580, FILA = 30;
 const UCORTO = { super: 'Súper', alta: 'Urgente', normal: 'Media', baja: 'Baja' };
 const esHoy = t => t.today === O.today() || (S.slots && S.slots[t.id] && S.slots[t.id].day === O.today());
 
