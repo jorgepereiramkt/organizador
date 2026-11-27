@@ -586,6 +586,13 @@ function weekView(){
       else if (i.kind === 'free'){ cls = 'free'; }
       const gAttr = i.gid && i.mine ? ` data-gid="${esc(i.gid)}" data-gcal="${esc(i.gcal)}" data-gday="${d}" data-gs="${i.start}" data-ge="${i.end}" data-gorig="${i.gstart}"` : '';
       if (gAttr){ cls += ' g-ev'; const nt = plainDesc(i.desc).split('\n').find(x => x.trim()); if (nt && h > 40) inner = `<p class="wk-note">📝 ${esc(nt)}</p>`; }
+      // subtareas personales dentro de tus bloques (Ropa y compras, Pádel…): se guardan en tu cuenta
+      if ((gAttr || i.kind === 'routine') && i.kind !== 'work' && h > 44){
+        const sk = `${d}|${i.gid || 'r:' + (i.id || i.title)}`, subs = (P().subs || {})[sk] || [];
+        inner += `<div class="wk-subs" data-subk="${esc(sk)}">${subs.map((x, ix) => `<div class="wk-sub${x.ok ? ' ok' : ''}"><button type="button" class="wk-subchk" data-subok="${ix}" aria-label="Hecha">${x.ok ? '✓' : ''}</button><span>${esc(x.t)}</span><button type="button" class="wk-subdel" data-subdel="${ix}" aria-label="Quitar">✕</button></div>`).join('')}
+          ${d >= hoy ? '<button type="button" class="wk-subadd" data-subadd>＋ subtarea</button>' : ''}</div>`;
+        if (subs.length) extra = ` · ✓ ${subs.filter(x => x.ok).length}/${subs.length}`;
+      }
       const past = d < hoy || (d === hoy && i.end <= nowMin);
       // pasado: casi transparente (salvo bloques con tareas sin hacer, que avisan) · hoy: lo más claro · futuro: intermedio
       const pend = past && pendN > 0;
@@ -1771,4 +1778,31 @@ if (S.view === 'dia') O.render();
 // Buzón: al abrir la app y cada 5 minutos
 setTimeout(importInbox, 2500);
 setInterval(importInbox, 5 * 60e3);
+})();
+
+/* ---------- Subtareas personales dentro de los bloques del calendario ---------- */
+(() => {
+  const P = () => window.__org.S.plan || {};
+  const guarda = () => { window.__org.save(); window.__org.render(); };
+  const lista = k => { const pl = window.__org.S.plan; pl.subs = pl.subs || {}; return pl.subs[k] = pl.subs[k] || []; };
+  const limpia = () => { const pl = window.__org.S.plan, lim = window.__org.iso(window.__org.addDays(new Date(), -30)); for (const k in (pl.subs || {})) if (k.slice(0, 10) < lim || !pl.subs[k].length) delete pl.subs[k]; };
+  const para = e => { e.stopPropagation(); e.stopImmediatePropagation(); };
+  ['pointerdown', 'mousedown', 'touchstart'].forEach(t => document.addEventListener(t, e => { if (e.target.closest('.wk-subs')) para(e); }, true));
+  document.addEventListener('click', e => {
+    const box = e.target.closest('.wk-subs'); if (!box) return; para(e); e.preventDefault();
+    const k = box.dataset.subk;
+    const ok = e.target.closest('[data-subok]'); if (ok){ const l = lista(k), x = l[+ok.dataset.subok]; if (x){ x.ok = !x.ok; guarda(); } return; }
+    const del = e.target.closest('[data-subdel]'); if (del){ lista(k).splice(+del.dataset.subdel, 1); limpia(); guarda(); return; }
+    const add = e.target.closest('[data-subadd]');
+    if (add){
+      const inp = document.createElement('input'); inp.className = 'wk-subin'; inp.placeholder = 'Qué quieres hacer…'; inp.setAttribute('enterkeyhint', 'done');
+      add.replaceWith(inp); inp.focus();
+      let hecho = false;
+      const fin = mas => { if (hecho) return; hecho = true; const t = inp.value.trim(); if (t){ lista(k).push({t, ok: false}); limpia(); window.__org.save(); }
+        window.__org.render(); if (mas && t) setTimeout(() => { const b = document.querySelector(`.wk-subs[data-subk="${CSS.escape(k)}"] [data-subadd]`); b && b.click(); }, 30); };
+      inp.addEventListener('keydown', ev => { ev.stopPropagation(); if (ev.key === 'Enter'){ ev.preventDefault(); fin(true); } if (ev.key === 'Escape'){ inp.value = ''; fin(false); } });
+      inp.addEventListener('blur', () => fin(false));
+      ['click', 'pointerdown'].forEach(t => inp.addEventListener(t, para));
+    }
+  }, true);
 })();
