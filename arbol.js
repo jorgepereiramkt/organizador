@@ -51,12 +51,12 @@ function bloque({ c, ts }) {
       for (const t of x.tu) { const h = altoT(t.title); ys.push(yy + h / 2); yy += h + 5; }
       const usado = x.tu.length ? yy - y - 5 : FILA;
       x.y = uy0 + usado / 2;
-      x.tu.forEach((t, i) => { nodos.push({ tipo: 't', t, x: CX[3], y: ys[i], col: UCOL[x.u] }); lin.push([CX[2] + CW[2], x.y, CX[3], ys[i], UCOL[x.u]]); });
+      x.tu.forEach((t, i) => { nodos.push({ tipo: 't', t, x: CX[3], y: ys[i], col: UCOL[x.u], hoy: r.k === 'hoy' }); lin.push([CX[2] + CW[2], x.y, CX[3], ys[i], UCOL[x.u]]); });
       y += usado + 8;
       nodos.push({ tipo: 'u', x: CX[2], y: x.y, col: UCOL[x.u], txt: `${x.info.icon} ${UCORTO[x.u] || x.info.label}`, n: x.tu.length, drop: `${r.k}:${x.u}`, vacio: !x.tu.length });
     }
     r.y = (y0 + y - 6) / 2;
-    nodos.push({ tipo: 'r', x: CX[1], y: r.y, col: cc, txt: r.nom, n: r.sub.length, drop: r.k, vacio: !r.sub.length });
+    nodos.push({ tipo: 'r', x: CX[1], y: r.y, col: r.k === 'hoy' ? '#F5B400' : cc, txt: r.nom, n: r.sub.length, drop: r.k, vacio: !r.sub.length, hoy: r.k === 'hoy' });
     for (const x of r.us) lin.push([CX[1] + CW[1], r.y, CX[2], x.y, x.tu.length ? cc : 'rgba(128,128,128,.5)', !x.tu.length]);
     y += 10;
   }
@@ -77,32 +77,44 @@ function arbol() {
   let html = '', lin = '', y = 70, anchoT = 760;
   const ROOT = { x: 16, y: 30 };
   html += `<div class="an an-0" style="left:${ROOT.x}px;top:${ROOT.y}px;width:170px"><b>🌳 Mis tareas</b><small>${total} pendientes</small></div>`;
-  for (const g of out) {
-    const gx = 40, gy = y + 26;
-    lin += `<path d="M${ROOT.x + 24} ${ROOT.y + 20} V${gy} H${gx}" stroke="${g.col}" opacity=".6"/>`;
-    html += `<div class="an an-1" style="left:${gx}px;top:${gy}px;width:190px;--c:${g.col}"><b>${g.nom}</b><small>${g.cs.length} clientes · ${g.n} tareas</small></div>`;
-    // reparte los clientes en columnas (cada uno va a la columna que menos ocupa)
-    const bl = g.cs.map(bloque), x0 = 70, busY = gy + 34, alt = Array(cols).fill(gy + 50);
-    let filaY = gy + 50;
-    bl.forEach((b, i) => { const k = i % cols; if (k === 0 && i) filaY = Math.max(...bl.slice(i - cols, i).map(x => x.fin)); b.k = k; b.by = filaY; b.fin = filaY + b.alto + 26; });
+  const zonas = [];
+  // dibuja una tanda de clientes en filas (izq → der, arriba → abajo) a partir de la altura y0
+  const tanda = (bl, y0, gcol) => {
+    const x0 = 86, busY = y0 - 12; let filaY = y0, fin = y0;
+    bl.forEach((b, i) => { const k = i % cols; if (k === 0 && i) filaY = Math.max(...bl.slice(i - cols, i).map(x => x.fin)); b.k = k; b.by = filaY; b.fin = filaY + b.alto + 26; fin = Math.max(fin, b.fin); });
     for (const b of bl) {
-      const k = b.k, bx = x0 + k * COLW, by = b.by;
-      alt[k] = Math.max(alt[k], b.fin);
-      const cn = b.nodos.find(n => n.tipo === 'c');
-      lin += `<path d="M${bx - 18} ${busY} V${by + cn.y} H${bx}" stroke="${g.col}" opacity=".35"/>`;
+      const bx = x0 + b.k * COLW, by = b.by, cn = b.nodos.find(n => n.tipo === 'c');
+      lin += `<path d="M${bx - 18} ${busY} V${by + cn.y} H${bx}" stroke="${gcol}" opacity=".45"/>`;
       for (const [x1, y1, x2, y2, col, punt] of b.lineas) { const m = (x1 + x2) / 2;
         lin += `<path d="M${bx + x1} ${by + y1} C${bx + m} ${by + y1} ${bx + m} ${by + y2} ${bx + x2} ${by + y2}" stroke="${col}" ${punt ? 'stroke-dasharray="4 4"' : 'opacity=".8"'}/>`; }
       for (const n of b.nodos) {
         const L = bx + n.x, T = by + n.y;
-        if (n.tipo === 't') html += `<button type="button" class="an an-t${n.t.id === mover ? ' moviendo' : ''}" data-atask="${esc(n.t.id)}" style="left:${L}px;top:${T}px;width:${CW[3]}px;--c:${n.col}" title="${esc(n.t.title)}"><span>${esc(n.t.title)}</span></button>`;
+        if (n.tipo === 't') html += `<button type="button" class="an an-t${n.hoy ? ' hoy' : ''}${n.t.id === mover ? ' moviendo' : ''}" data-atask="${esc(n.t.id)}" style="left:${L}px;top:${T}px;width:${CW[3]}px;--c:${n.col}" title="${esc(n.t.title)}"><span>${n.hoy ? '☀️ ' : ''}${esc(n.t.title)}</span></button>`;
         else if (n.tipo === 'c') html += `<button type="button" class="an an-2${n.pleg ? ' pleg' : ''}" data-anodo="${esc(n.id)}" style="left:${L}px;top:${T}px;width:${CW[0]}px;--c:${n.col}"><b>${esc(n.txt)}</b><small>${esc(n.sub)}</small>${n.pleg ? '<i>＋</i>' : ''}</button>`;
-        else html += `<div class="an an-${n.tipo === 'r' ? 3 : 4}${n.vacio ? ' vacio' : ''}${b.todo ? ' destino' : ''}" ${b.todo ? `data-adrop="${esc(b.cid)}|${n.drop}"` : ''} style="left:${L}px;top:${T}px;width:${CW[n.tipo === 'r' ? 1 : 2]}px;--c:${n.col}"><b>${esc(n.txt)}</b><small>${n.n}</small></div>`;
+        else html += `<div class="an an-${n.tipo === 'r' ? 3 : 4}${n.hoy ? ' hoy' : ''}${n.vacio ? ' vacio' : ''}${b.todo ? ' destino' : ''}" ${b.todo ? `data-adrop="${esc(b.cid)}|${n.drop}"` : ''} style="left:${L}px;top:${T}px;width:${CW[n.tipo === 'r' ? 1 : 2]}px;--c:${n.col}"><b>${esc(n.txt)}</b><small>${n.n}</small></div>`;
       }
     }
-    lin += `<path d="M${x0 - 18} ${busY} H${x0 - 18 + (Math.min(cols, bl.length) - 1) * COLW}" stroke="${g.col}" opacity=".35"/>`;
-    anchoT = Math.max(anchoT, x0 + Math.min(cols, bl.length) * COLW);
-    y = Math.max(...alt) + 20;
+    lin += `<path d="M${x0 - 18} ${busY} H${x0 - 18 + (Math.min(cols, bl.length) - 1) * COLW}" stroke="${gcol}" opacity=".45"/>`;
+    anchoT = Math.max(anchoT, x0 + Math.min(cols, bl.length) * COLW + 20);
+    return fin;
+  };
+  for (const g of out) {
+    const gy = y + 34;
+    lin += `<path d="M${ROOT.x + 24} ${ROOT.y + 20} V${gy} H${40}" stroke="${g.col}" opacity=".7" stroke-width="3"/>`;
+    const internos = g.g === 'agency' ? g.cs.filter(x => O.esInterno(x.c)) : [], clientes = g.cs.filter(x => !internos.includes(x));
+    html += `<div class="an an-1" style="left:40px;top:${gy}px;width:230px;--c:${g.col}"><b>${g.nom}</b><small>${clientes.length} cliente${clientes.length === 1 ? '' : 's'}${internos.length ? ' · ' + internos.length + ' proyectos' : ''} · ${g.n} tareas</small></div>`;
+    let fin = tanda(clientes.map(bloque), gy + 64, g.col);
+    if (internos.length) {
+      const iy = fin + 14;
+      zonas.push({ cls: 'ar-zona-int', y: iy - 8, txt: '📁 Proyectos internos · van después de los clientes', col: g.col, fin: null });
+      html += `<div class="ar-subt" style="left:66px;top:${iy + 6}px;--c:${g.col}">📁 Proyectos internos <span>menos prioridad</span></div>`;
+      fin = tanda(internos.map(bloque), iy + 56, g.col);
+      zonas[zonas.length - 1].fin = fin;
+    }
+    zonas.push({ cls: 'ar-zona ' + (g.g === 'mine' ? 'z-mine' : 'z-ag'), y: y + 8, fin, col: g.col });
+    y = fin + 34;
   }
+  html = zonas.map(z => `<div class="${z.cls}" style="left:${z.cls.startsWith('ar-zona-int') ? 54 : 20}px;top:${z.y}px;width:${anchoT - (z.cls.startsWith('ar-zona-int') ? 54 : 20)}px;height:${z.fin - z.y + 6}px;--c:${z.col}"></div>`).join('') + html;
   const altoT = y + 20;
   return `<div class="arbol${mover ? ' arrastrando' : ''}" id="arbol"><div class="ar-lienzo" id="arLienzo" style="width:${anchoT}px;height:${altoT}px">
       <svg class="ar-lineas" width="${anchoT}" height="${altoT}" fill="none" stroke-width="2">${lin}</svg>${html}</div>
