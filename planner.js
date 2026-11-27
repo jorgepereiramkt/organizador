@@ -1058,12 +1058,37 @@ function wkEditEvent(el){
     <label>Título<input name="title" value="${esc(ev.title || '')}" autocomplete="off"></label>
     <div class="row"><label>Día<input type="date" name="day" value="${el.dataset.gday}"></label><label>Empieza<input type="time" name="s" step="900" value="${toHM(+el.dataset.gs)}"></label><label>Acaba<input type="time" name="e" step="900" value="${toHM(+el.dataset.ge)}"></label></div>
     <label>Notas<textarea name="desc" rows="6" placeholder="Apunta aquí lo que necesites…">${esc(plainDesc(ev.desc))}</textarea></label>
+    <label>Subtareas</label><div class="ev-subs" id="evSubs" data-subk="${esc(el.dataset.gday + '|' + el.dataset.gid)}"></div>
     <label>Color</label>${swatches(ev.ecolor || '', 'data-gcol', GCOL)}
     ${ev.rec ? `<label>Este evento se repite. Cambiar…</label><div class="modes ev-scope"><button type="button" class="chip" data-evscope="one" aria-pressed="false">Solo este</button><button type="button" class="chip" data-evscope="following" aria-pressed="true">Este y los siguientes</button></div>` : ''}
     <p class="iahint">Los cambios se guardan en tu Google Calendar.</p>
     <div class="actions">${ev.rec ? '<button type="button" class="btn danger" data-evdel>Borrar solo este</button><button type="button" class="btn danger" data-evdel="all">Borrar todos</button>' : '<button type="button" class="btn danger" data-evdel>Borrar</button>'}<span class="sp"></span><button type="button" class="btn" data-evcancel>Cancelar</button><button class="btn primary" value="ok">Guardar</button></div>`;
-  evDlg.showModal();
+  evDlg.showModal(); pintaEvSubs();
 }
+// Subtareas del evento dentro de su ficha: se guardan al momento en tu cuenta (no hace falta darle a «Guardar»)
+function pintaEvSubs(){
+  const box = document.getElementById('evSubs'); if (!box) return;
+  const l = ((P().subs || {})[box.dataset.subk]) || [];
+  box.innerHTML = l.map((x, i) => `<div class="ev-sub${x.ok ? ' ok' : ''}"><button type="button" class="wk-subchk" data-evsubok="${i}" aria-label="Hecha">${x.ok ? '✓' : ''}</button><input data-evsubtxt="${i}" value="${esc(x.t)}" aria-label="Subtarea"><button type="button" class="wk-subdel" data-evsubdel="${i}" aria-label="Quitar">✕</button></div>`).join('')
+    + `<div class="ev-sub nueva"><span>＋</span><input data-evsubnew placeholder="Añadir subtarea (Intro)" enterkeyhint="done"></div>`;
+}
+const evSubLista = k => { const pl = P(); pl.subs = pl.subs || {}; return pl.subs[k] = pl.subs[k] || []; };
+evForm.addEventListener('click', e => {
+  const box = e.target.closest('#evSubs'); if (!box) return; const k = box.dataset.subk;
+  const ok = e.target.closest('[data-evsubok]'); if (ok){ const x = evSubLista(k)[+ok.dataset.evsubok]; if (x){ x.ok = !x.ok; O.save(); pintaEvSubs(); O.render(); } return; }
+  const del = e.target.closest('[data-evsubdel]'); if (del){ evSubLista(k).splice(+del.dataset.evsubdel, 1); O.save(); pintaEvSubs(); O.render(); }
+});
+evForm.addEventListener('change', e => {
+  const t = e.target.closest('[data-evsubtxt]'); if (!t) return; const k = t.closest('#evSubs').dataset.subk, x = evSubLista(k)[+t.dataset.evsubtxt];
+  if (x){ const v = t.value.trim(); if (v) x.t = v; else evSubLista(k).splice(+t.dataset.evsubtxt, 1); O.save(); pintaEvSubs(); O.render(); }
+});
+evForm.addEventListener('keydown', e => {
+  const n = e.target.closest('[data-evsubnew],[data-evsubtxt]'); if (!n || e.key !== 'Enter') return;
+  e.preventDefault(); e.stopPropagation();   // Intro aquí no guarda el evento
+  if (n.dataset.evsubnew !== undefined){ const v = n.value.trim(); if (!v) return; evSubLista(n.closest('#evSubs').dataset.subk).push({t: v, ok: false}); O.save(); pintaEvSubs(); O.render();
+    setTimeout(() => document.querySelector('#evSubs [data-evsubnew]')?.focus(), 0); }
+  else n.blur();
+}, true);
 evForm.addEventListener('click', async e => {
   if (e.target.closest('[data-evcancel]')){ evDlg.close('cancel'); return; }
   const t = e.target.closest('[data-evt]');
@@ -1811,6 +1836,16 @@ setInterval(importInbox, 5 * 60e3);
     if (e.target.closest('[data-subver]')) return window.__org.subVer(k);
     const ok = e.target.closest('[data-subok]'); if (ok){ const l = lista(k), x = l[+ok.dataset.subok]; if (x){ x.ok = !x.ok; guarda(); } return; }
     const del = e.target.closest('[data-subdel]'); if (del){ lista(k).splice(+del.dataset.subdel, 1); limpia(); guarda(); return; }
+    const txt = e.target.closest('.wk-sub > span');
+    if (txt){   // tocar el texto: se edita ahí mismo
+      const fila = txt.closest('.wk-sub'), ix = [...box.querySelectorAll('.wk-sub')].indexOf(fila), x = lista(k)[ix]; if (!x) return;
+      const inp = document.createElement('input'); inp.className = 'wk-subed'; inp.value = x.t; txt.replaceWith(inp); inp.focus(); inp.select();
+      let hecho = false;
+      const fin = () => { if (hecho) return; hecho = true; const v = inp.value.trim(); if (v) x.t = v; else lista(k).splice(ix, 1); limpia(); guarda(); };
+      inp.addEventListener('keydown', ev => { ev.stopPropagation(); if (ev.key === 'Enter'){ ev.preventDefault(); fin(); } if (ev.key === 'Escape'){ inp.value = x.t; fin(); } });
+      inp.addEventListener('blur', fin); ['click', 'pointerdown'].forEach(t => inp.addEventListener(t, para));
+      return;
+    }
     const add = e.target.closest('[data-subadd]');
     if (add){
       const inp = document.createElement('input'); inp.className = 'wk-subin'; inp.placeholder = 'Qué quieres hacer…'; inp.setAttribute('enterkeyhint', 'done');
