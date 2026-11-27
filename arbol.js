@@ -73,7 +73,7 @@ function arbol() {
   O.setToolbar('Clientes', 'tus tareas en árbol', '', 'Arrastra una tarea para cambiarle la urgencia o el «hoy»');
   const { out, total } = grupos();
   const W = (document.getElementById('main') || {}).clientWidth || 1000;
-  const cols = Math.max(1, Math.min(3, Math.floor((W - 40) / (COLW * 0.7))));
+  const cols = Math.max(1, Math.min(3, Math.floor((W - 40) / (COLW * 0.6))));
   let html = '', lin = '', y = 70, anchoT = 760;
   const ROOT = { x: 16, y: 30 };
   html += `<div class="an an-0" style="left:${ROOT.x}px;top:${ROOT.y}px;width:170px"><b>🌳 Mis tareas</b><small>${total} pendientes</small></div>`;
