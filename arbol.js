@@ -231,6 +231,7 @@ const sueltaFin = e => {
   setTimeout(() => { S._arSalto = false; }, 120);
 };
 document.addEventListener('pointerup', sueltaFin); document.addEventListener('pointercancel', sueltaFin);
+addEventListener('touchend', () => { if (arr && arr.on) setTimeout(() => sueltaFin({ type: 'touchend' }), 30); }, true);   // respaldo en el iPad
 function suelta(id, destino) {
   const t = O.task(id); if (!t) return O.render();
   const [cid, resto] = destino.split('|'), [k, u] = (resto || '').split(':');
