@@ -82,8 +82,9 @@ function bloque({ c, ts }) {
   return { nodos, lineas: lin, alto: Math.max(alto, hc), cid: c.id, todo };
 }
 
-function arbol() {
-  O.setToolbar('Clientes', 'tus tareas en árbol', '', 'Izquierda: hoy · derecha: futuras · arrastra una tarea para moverla');
+function arbol(enCal) {
+  if (enCal) O.setToolbar('Árbol', 'hoy a la izquierda · futuras a la derecha', `<div class="modes"><button class="chip" data-dmode="foco" aria-pressed="false">🎯 Foco</button><button class="chip" data-dmode="semana" aria-pressed="false">Semana</button><button class="chip" data-dmode="arbol" aria-pressed="true">🌳 Árbol</button><button class="chip" data-dmode="diario" aria-pressed="false">📒 Clientes</button></div>`, 'Arrastra una tarea para moverla · ＋ para añadir');
+  else O.setToolbar('Clientes', 'tus tareas en árbol', '', 'Izquierda: hoy · derecha: futuras · arrastra una tarea para moverla');
   const { out, total } = grupos();
   let html = '', lin = '', y = 70;
   const anchoT = ANCHO + PAD * 2;
@@ -255,6 +256,7 @@ document.addEventListener('click', e => {
   if (pl) { plegados.clear(); if (pl.dataset.apleg === 'todo') S.clients.forEach(c => plegados.add('c:' + c.id)); lsSet('jp-arbol-pleg2', [...plegados]); vista = null; O.render(); }
 });
 
+window.__arbol = { vista: arbol, init };   // también como modo del Calendario (Foco · Semana · Árbol · Clientes)
 // Se engancha a la vista Clientes como un modo más
 const antes = O.views.clientes, despues = antes.after;
 O.views.clientes = function () { return S.clientMode === 'arbol' ? arbol() : antes(); };

@@ -89,7 +89,7 @@
       `<button class="icon" data-dday="-1" aria-label="Día anterior"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m15 18-6-6 6-6"/></svg></button>
        <button class="chip" data-dday="0">Ayer</button>
        <button class="icon" data-dday="1" aria-label="Día siguiente"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m9 18 6-6-6-6"/></svg></button>
-       <div class="modes"><button class="chip" data-dmode="foco" aria-pressed="false">🎯 Foco</button><button class="chip" data-dmode="dia" aria-pressed="false">Día</button><button class="chip" data-dmode="semana" aria-pressed="false">Semana</button><button class="chip" data-dmode="diario" aria-pressed="true">📒 Clientes</button></div>
+       <div class="modes"><button class="chip" data-dmode="foco" aria-pressed="false">🎯 Foco</button><button class="chip" data-dmode="semana" aria-pressed="false">Semana</button><button class="chip" data-dmode="arbol" aria-pressed="false">🌳 Árbol</button><button class="chip" data-dmode="diario" aria-pressed="true">📒 Clientes</button></div>
        <span class="dprog${hechos === cs.length && cs.length ? ' full' : ''}">Revisados ${hechos}/${cs.length}</span>`,
       'Cada mañana: revisa cómo fue ayer cada cliente');
     const ocs = S.clients.filter(c => ocultos()[c.id] && (S.group === 'all' || c.group === S.group));
