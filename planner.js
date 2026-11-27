@@ -590,11 +590,9 @@ function weekView(){
       if ((gAttr || i.kind === 'routine') && i.kind !== 'work' && h > 44){
         const sk = `${d}|${i.gid || 'r:' + (i.id || i.title)}`, subs = (P().subs || {})[sk] || [];
         // si no caben todas en el bloque: las que entran + «＋N más» (que despliega el bloque por encima)
-        const abierto = subAbierto === sk, cabe = Math.max(1, Math.floor((h - 46) / 21));
-        const ver = abierto || subs.length <= cabe ? subs.length : Math.max(0, cabe - 1);
-        if (abierto) cls += ' sub-abierto';
+        const ver = subs.length;   // siempre todas (en columnas a lo ancho del bloque)
+        if (subs.length) cls += ' con-subs';
         inner += `<div class="wk-subs" data-subk="${esc(sk)}">${subs.slice(0, ver).map((x, ix) => `<div class="wk-sub${x.ok ? ' ok' : ''}"><button type="button" class="wk-subchk" data-subok="${ix}" aria-label="Hecha">${x.ok ? '✓' : ''}</button><span>${esc(x.t)}</span><button type="button" class="wk-subdel" data-subdel="${ix}" aria-label="Quitar">✕</button></div>`).join('')}
-          ${subs.length > ver ? `<button type="button" class="wk-submas" data-subver>＋${subs.length - ver} más</button>` : abierto ? '<button type="button" class="wk-submas" data-subver>Cerrar</button>' : ''}
           ${d >= hoy ? '<button type="button" class="wk-subadd" data-subadd title="Añadir subtarea" aria-label="Añadir subtarea">＋</button>' : ''}</div>`;
         if (subs.length) extra = ` · ✓ ${subs.filter(x => x.ok).length}/${subs.length}`;
       }
