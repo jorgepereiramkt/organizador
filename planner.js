@@ -1132,7 +1132,7 @@ async function evDone(rv){
 evDlg.addEventListener('click', e => { if (e.target === evDlg) evDlg.close('cancel'); });
 // Arrastrar un evento (cambiarlo de hora o de día) o estirarlo desde el borde de abajo
 document.addEventListener('pointerdown', e => {
-  const el = e.target.closest('.wk-ev.g-ev'); if (!el || e.button !== 0) return;
+  const el = e.target.closest('.wk-ev.g-ev'); if (!el || e.button !== 0 || e.target.closest('.wk-subs')) return;   // las subtareas (＋, ✓, ✕) no mueven ni abren el bloque
   const res = !!e.target.closest('.g-res');
   if (e.pointerType === 'touch' && !res){   // en el móvil: tocar abre la ficha (ahí se cambia la hora o el día)
     const sx = e.clientX, sy = e.clientY, t0 = Date.now();
@@ -1242,9 +1242,9 @@ document.addEventListener('pointerdown', e => {
     addEventListener('pointerup', up); addEventListener('pointercancel', fin); return;
   }
   e.preventDefault(); wkGesture = true;
-  const g = document.createElement('div'); g.className = 'wk-ev work wk-new'; col.appendChild(g);
+  const g = document.createElement('div'); g.className = 'wk-ev wk-new'; col.appendChild(g);
   let s = s0, en = s0 + 15;
-  const draw = () => { g.style.top = wkY(s) + 'px'; g.style.height = wkY(en) - wkY(s) + 'px'; g.style.left = 'calc(var(--lw) + 1px)'; g.style.width = 'calc(100% - var(--lw) - 3px)'; g.innerHTML = `<b>Trabajo</b><small>${toHM(s)} – ${toHM(en)}</small>`; };
+  const draw = () => { g.style.top = wkY(s) + 'px'; g.style.height = wkY(en) - wkY(s) + 'px'; g.style.left = 'calc(var(--lw) + 1px)'; g.style.width = 'calc(100% - var(--lw) - 3px)'; g.innerHTML = `<b>Nuevo bloque</b><small>${toHM(s)} – ${toHM(en)}</small>`; };
   draw();
   const mv = ev => { const m = atY(ev.clientY); if (m >= s0){ s = s0; en = Math.max(s0 + 15, m); } else { s = m; en = s0 + 15; } draw(); };
   const fin = () => { removeEventListener('pointermove', mv); removeEventListener('pointerup', up); removeEventListener('pointercancel', fin); g.remove(); wkGesture = false; };
