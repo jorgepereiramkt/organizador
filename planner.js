@@ -1017,19 +1017,23 @@ const evDlg = document.createElement('dialog'); evDlg.id = 'evDlg';
 evDlg.innerHTML = '<form method="dialog" class="sheet" id="evForm"></form>'; document.body.appendChild(evDlg);
 const evForm = evDlg.querySelector('form'); let evCur = null;
 const misCals = () => ((P().accounts.find(a => a.bridge) || {}).cals || []).filter(c => !/holiday|#/.test(c.id));
+// donde se crean los eventos nuevos: solo tus calendarios propios (no el de la agencia ni el de «Tareas»), por defecto «JP | Marketing»
+const CAL_DEF = 'jorgepereiramktdigital@gmail.com';
+const calsCrear = () => misCals().filter(c => !/leadfluence/i.test(c.id) && !/tareas/i.test(c.name));
+const calDef = () => (calsCrear().find(c => c.id === CAL_DEF) || calsCrear()[0] || {}).id;
 const msAt = (day, min) => O.fromIso(day).getTime() + min * 60e3;
 const hmIn = v => toMin(v || '00:00');
 async function wkReload(...ds){ for (const d of ds) delete weekEv[d]; clearCache(); lastEvents = []; await loadWeek(); if (S.view === 'dia') O.render(); }
 function wkCreate(day, s, e){
   evCur = {nuevo: true, day, s, e};
-  const cals = misCals();
+  const cals = calsCrear();
   evForm.innerHTML = `<h2>Nuevo bloque · ${toHM(s)} – ${toHM(e)}</h2>
     <div class="modes evtype"><button type="button" class="chip" data-evt="work" aria-pressed="false">🧱 Trabajo (tareas)</button><button type="button" class="chip" data-evt="ev" aria-pressed="true">📅 Evento / bloque</button><button type="button" class="chip" data-evt="rut" aria-pressed="false">🔁 Bloque fijo (de la app)</button></div>
     <div class="evfields"><label>Título<input name="title" placeholder="Ej.: Gestiones personales, Grabar reels, Médico…" autocomplete="off"></label>
     <div class="row"><label>Empieza<input type="time" name="s" step="900" value="${toHM(s)}"></label><label>Acaba<input type="time" name="e" step="900" value="${toHM(e)}"></label></div>
     <label>Notas<textarea name="desc" rows="4" placeholder="Lo que quieras apuntar para organizarte en este bloque…"></textarea></label>
-    ${cals.length > 1 ? `<label>Calendario<select name="cal">${cals.map(c => `<option value="${esc(c.id)}" ${c.on ? 'selected' : ''}>${esc(c.name)}</option>`).join('')}</select></label>` : ''}
-    <p class="iahint">Se crea en tu Google Calendar (cuenta personal).</p></div>
+    ${cals.length > 1 ? `<label>Calendario<select name="cal">${cals.map(c => `<option value="${esc(c.id)}" ${c.id === calDef() ? 'selected' : ''}>${esc(c.name)}</option>`).join('')}</select></label>` : ''}
+    <p class="iahint">Se crea solo en tu Google Calendar «${esc((cals.find(c => c.id === calDef()) || {}).name || 'JP | Marketing')}».</p></div>
     <div class="actions"><span class="sp"></span><button type="button" class="btn" data-evcancel>Cancelar</button><button class="btn primary" value="ok">Crear</button></div>`;
   evDlg.showModal(); setTimeout(() => evForm.querySelector('[name=title]').focus(), 50);
 }
@@ -1083,7 +1087,7 @@ async function evDone(rv){
   if (en <= s) return O.toast('La hora de fin tiene que ser después del inicio');
   try {
     if (c.nuevo){
-      const cal = val('cal') || (misCals().find(x => x.on) || misCals()[0] || {}).id;
+      const cal = val('cal') || calDef();
       if (!cal) throw new Error('no hay calendario del puente');
       await bridge({a: 'create', cal, title: (val('title') || '').trim() || 'Bloque', desc: val('desc') || '', start: msAt(c.day, s), end: msAt(c.day, en)});
       O.toast('Creado en tu Google Calendar ✓'); wkReload(c.day);

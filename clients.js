@@ -54,7 +54,8 @@ O.views.clientes.after = () => {
   sw.className = 'modes';
   sw.innerHTML = `<button class="chip" data-cmode="fichas" aria-pressed="${S.clientMode === 'fichas'}">Fichas</button>
     <button class="chip" data-cmode="tareas" aria-pressed="${S.clientMode === 'tareas'}">Tareas</button>
-    <button class="chip" data-cmode="hoy" aria-pressed="${S.clientMode === 'hoy'}">Tareas hoy</button>`;
+    <button class="chip" data-cmode="hoy" aria-pressed="${S.clientMode === 'hoy'}">Tareas hoy</button>
+    <button class="chip" data-cmode="arbol" aria-pressed="${S.clientMode === 'arbol'}">🌳 Árbol</button>`;
   tb.insertBefore(sw, tb.querySelector('.sp'));
 };
 $('#toolbar').addEventListener('click', e => {
