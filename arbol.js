@@ -14,8 +14,8 @@ const UCORTO = { super: 'Súper', alta: 'Urgente', normal: 'Media', baja: 'Baja'
 const HOYC = '#F5B400';
 // posiciones (en espejo): tareas de hoy | urgencia | ☀️ Hoy | CLIENTE | 🗓 Futuras | urgencia | tareas futuras
 const W = { t: 236, u: 108, r: 96, c: 168 };
-const X = { tL: 0, uL: 262, rL: 396, c: 520, rR: 716, uR: 840, tR: 974 };
-const ANCHO = X.tR + W.t, PAD = 40, FILA = 30;
+const X = { uL: 0, tL: 134, rL: 396, c: 520, rR: 716, tR: 840, uR: 1102 };
+const ANCHO = X.uR + W.u, PAD = 40, FILA = 30;
 const lineasTxt = (txt, ancho, px = 6.9) => Math.max(1, Math.ceil(String(txt || '').length * px / (ancho - 26)));
 const altoT = t => 12 + lineasTxt(t, W.t) * 17;
 const esHoy = t => t.today === O.today() || (S.slots && S.slots[t.id] && S.slots[t.id].day === O.today());
@@ -50,14 +50,16 @@ function lado(k, sub, todo, cc) {
     x.y = y0 + usado / 2;
     x.tu.forEach((t, i) => {
       nodos.push({ tipo: 't', t, x: izq ? X.tL : X.tR, y: ys[i], col: UCOL[x.u], hoy: izq, cc });
-      lin.push(izq ? [X.uL, x.y, X.tL + W.t, ys[i], UCOL[x.u]] : [X.uR + W.u, x.y, X.tR, ys[i], UCOL[x.u]]);
+      lin.push(izq ? [X.tL, ys[i], X.uL + W.u, x.y, UCOL[x.u]] : [X.tR + W.t, ys[i], X.uR, x.y, UCOL[x.u]]);   // tarea → su urgencia (por fuera)
     });
     nodos.push({ tipo: 'u', x: izq ? X.uL : X.uR, y: x.y, col: UCOL[x.u], txt: `${x.info.icon} ${UCORTO[x.u]}`, n: x.tu.length, drop: `${k}:${x.u}`, vacio: !x.tu.length });
     y += usado + 8;
   }
   const alto = y - 8, ry = (us[0].y + us[us.length - 1].y) / 2;
   nodos.push({ tipo: 'r', x: izq ? X.rL : X.rR, y: ry, col: cc, txt: izq ? '☀️ Hoy' : '🗓 Futuras', n: sub.length, drop: k, vacio: !sub.length, hoy: izq });
-  for (const x of us) lin.push(izq ? [X.rL, ry, X.uL + W.u, x.y, x.tu.length ? cc : 'rgba(128,128,128,.5)', !x.tu.length] : [X.rR + W.r, ry, X.uR, x.y, x.tu.length ? cc : 'rgba(128,128,128,.5)', !x.tu.length]);
+  // Hoy/Futuras → cada tarea; si una urgencia está vacía (al arrastrar), la rama va directa a ella
+  for (const n of nodos) if (n.tipo === 't') lin.push(izq ? [X.rL, ry, X.tL + W.t, n.y, cc] : [X.rR + W.r, ry, X.tR, n.y, cc]);
+  for (const x of us) if (!x.tu.length) lin.push(izq ? [X.rL, ry, X.uL + W.u, x.y, 'rgba(128,128,128,.5)', true] : [X.rR + W.r, ry, X.uR, x.y, 'rgba(128,128,128,.5)', true]);
   return { nodos, lin, alto, ry };
 }
 function bloque({ c, ts }) {
@@ -86,8 +88,8 @@ function arbol() {
   let html = '', lin = '', y = 70;
   const anchoT = ANCHO + PAD * 2;
   // títulos de las dos mitades
-  html += `<div class="ar-mitad hoy" style="left:${PAD + X.tL}px;top:22px;width:${X.rL + W.r - X.tL}px">☀️ HOY</div>
-    <div class="ar-mitad fut" style="left:${PAD + X.rR}px;top:22px;width:${X.tR + W.t - X.rR}px">🗓 FUTURAS</div>
+  html += `<div class="ar-mitad hoy" style="left:${PAD + X.uL}px;top:22px;width:${X.rL + W.r - X.uL}px">☀️ HOY</div>
+    <div class="ar-mitad fut" style="left:${PAD + X.rR}px;top:22px;width:${X.uR + W.u - X.rR}px">🗓 FUTURAS</div>
     <div class="an an-0" style="left:${PAD + X.c}px;top:40px;width:${W.c}px"><b>🌳 Mis tareas</b><small>${total} pendientes</small></div>`;
   const zonas = [];
   const pinta = (bl, y0) => {
@@ -97,7 +99,7 @@ function arbol() {
         lin += `<path d="M${PAD + x1} ${by + y1} C${PAD + m} ${by + y1} ${PAD + m} ${by + y2} ${PAD + x2} ${by + y2}" stroke="${col}" ${punt ? 'stroke-dasharray="4 4"' : 'opacity=".8"'}/>`; }
       for (const n of b.nodos) {
         const L = PAD + n.x, T = by + n.y;
-        if (n.tipo === 't') html += `<button type="button" class="an an-t${n.hoy ? ' hoy izq' : ''}${n.t.id === mover ? ' moviendo' : ''}" data-atask="${esc(n.t.id)}" style="left:${L}px;top:${T}px;width:${W.t}px;--c:${n.col};--cc:${n.cc || n.col}" title="${esc(n.t.title)}"><span>${n.hoy ? '☀️ ' : ''}${esc(n.t.title)}</span></button>`;
+        if (n.tipo === 't') html += `<button type="button" class="an an-t${n.hoy ? ' hoy izq' : ' der'}${n.t.id === mover ? ' moviendo' : ''}" data-atask="${esc(n.t.id)}" style="left:${L}px;top:${T}px;width:${W.t}px;--c:${n.col};--cc:${n.cc || n.col}" title="${esc(n.t.title)}"><span>${n.hoy ? '☀️ ' : ''}${esc(n.t.title)}</span></button>`;
         else if (n.tipo === 'c') html += `<button type="button" class="an an-2${n.pleg ? ' pleg' : ''}" data-anodo="${esc(n.id)}" style="left:${L}px;top:${T}px;width:${W.c}px;--c:${n.col}"><b>${esc(n.txt)}</b><small>${esc(n.sub)}</small>${n.pleg ? '<i>＋</i>' : ''}</button>
           <button type="button" class="ar-mas izq" data-amas="${esc(n.cid)}|hoy" style="left:${L - 15}px;top:${T}px;--cc:${n.col}" title="Añadir tarea para hoy" aria-label="Añadir tarea para hoy">＋</button>
           <button type="button" class="ar-mas der" data-amas="${esc(n.cid)}|resto" style="left:${L + W.c - 15}px;top:${T}px" title="Añadir tarea para más adelante" aria-label="Añadir tarea para más adelante">＋</button>`;
