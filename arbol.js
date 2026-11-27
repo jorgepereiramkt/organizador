@@ -82,8 +82,7 @@ function guarda() { lsSet('jp-arbol-vista', vista); }
 function centra() {
   const a = document.getElementById('arbol'), l = document.getElementById('arLienzo'); if (!a || !l) return;
   const W = a.clientWidth, H = a.clientHeight, w = l.offsetWidth, h = l.offsetHeight, z = Math.max(0.65, Math.min(1, W / w));   // que se lea: como mucho se aleja hasta 65 %
-  const r = document.querySelector('.an-0'), ry = r ? r.offsetTop : 0;
-  vista = { x: Math.max(12, (W - w * z) / 2), y: h * z < H ? (H - h * z) / 2 : Math.max(12 - ry * z + H / 2 - 40, H - h * z - 12), z }; aplica(); guarda();
+  vista = { x: Math.max(12, (W - w * z) / 2), y: h * z < H ? (H - h * z) / 2 : 12, z }; aplica(); guarda();
 }
 function zoomEn(f, cx, cy) {
   const z = Math.max(0.2, Math.min(2.5, vista.z * f)), k = z / vista.z;
