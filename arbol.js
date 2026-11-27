@@ -10,7 +10,10 @@ const plegados = new Set(lsGet('jp-arbol-pleg2', []));
 let vista = null, mover = null;   // mover = id de la tarea que estás arrastrando
 const UCOL = { super: '#FF3B30', alta: '#FF8A00', normal: '#F5B400', baja: '#34C759' };
 // columnas dentro de cada cliente: cliente → hoy/resto → urgencia → tareas
-const CX = [0, 146, 246, 360], CW = [130, 86, 98, 196], COLW = 580, FILA = 30;
+const CX = [0, 172, 284, 414], CW = [150, 92, 110, 236], COLW = 690, FILA = 30;
+// alto de una tarjeta para que quepa el texto entero (sin «…»)
+const lineas = (txt, ancho, px = 6.9) => Math.max(1, Math.ceil(String(txt || '').length * px / (ancho - 26)));
+const altoT = t => 12 + lineas(t, CW[3]) * 17;
 const UCORTO = { super: 'Súper', alta: 'Urgente', normal: 'Media', baja: 'Baja' };
 const esHoy = t => t.today === O.today() || (S.slots && S.slots[t.id] && S.slots[t.id].day === O.today());
 
@@ -19,8 +22,10 @@ function grupos() {
   const out = [];
   for (const [g, nom] of [['agency', '🏢 Agencia'], ['mine', '🔒 Mis clientes']]) {
     if (S.group !== 'all' && S.group !== g) continue;
-    const cs = O.byClientOrder(S.clients.filter(c => c.group === g && !O.isApartado(c)))
-      .map(c => ({ c, ts: T.filter(t => O.cliEf(t) === c.id) })).filter(x => x.ts.length);
+    const cs = S.clients.filter(c => c.group === g && !O.isApartado(c))
+      .map(c => ({ c, ts: T.filter(t => O.cliEf(t) === c.id) })).filter(x => x.ts.length)
+      .sort((a, b) => { const ia = g === 'agency' && O.esInterno(a.c) ? 1 : 0, ib = g === 'agency' && O.esInterno(b.c) ? 1 : 0; if (ia !== ib) return ia - ib;
+        const ka = O.ordenFact(a.c), kb = O.ordenFact(b.c); return kb.v - ka.v || ka.k - kb.k || a.c.name.localeCompare(b.c.name, 'es'); });
     if (cs.length) out.push({ g, nom, cs, col: g === 'mine' ? O.GROUP.mine.color : O.GROUP.agency.color, n: cs.reduce((s, x) => s + x.ts.length, 0) });
   }
   return { out, total: T.length };
@@ -28,7 +33,7 @@ function grupos() {
 // Un cliente: sus ramas en coordenadas propias (0,0 = esquina de su bloque)
 function bloque({ c, ts }) {
   const cc = O.clientColor(c), todo = mover && ts.some(t => t.id === mover), pleg = plegados.has('c:' + c.id) && !todo;
-  const nodos = [], lineas = [], ramas = [];
+  const nodos = [], lin = [], ramas = [];
   let y = 0;
   for (const [k, nom, f] of [['hoy', '☀️ Hoy', esHoy], ['resto', '🗂 Resto', t => !esHoy(t)]]) {
     const sub = ts.filter(f); if (!sub.length && !todo) continue;
@@ -42,23 +47,26 @@ function bloque({ c, ts }) {
   if (!pleg) for (const r of ramas) {
     const y0 = y;
     for (const x of r.us) {
-      const uy0 = y, filas = Math.max(1, x.tu.length);
-      x.y = uy0 + filas * FILA / 2;
-      x.tu.forEach((t, i) => { const ty = y + i * FILA + FILA / 2; nodos.push({ tipo: 't', t, x: CX[3], y: ty, col: UCOL[x.u] }); lineas.push([CX[2] + CW[2], x.y, CX[3], ty, UCOL[x.u]]); });
-      y += filas * FILA + 6;
+      const uy0 = y; let yy = y; const ys = [];
+      for (const t of x.tu) { const h = altoT(t.title); ys.push(yy + h / 2); yy += h + 5; }
+      const usado = x.tu.length ? yy - y - 5 : FILA;
+      x.y = uy0 + usado / 2;
+      x.tu.forEach((t, i) => { nodos.push({ tipo: 't', t, x: CX[3], y: ys[i], col: UCOL[x.u] }); lin.push([CX[2] + CW[2], x.y, CX[3], ys[i], UCOL[x.u]]); });
+      y += usado + 8;
       nodos.push({ tipo: 'u', x: CX[2], y: x.y, col: UCOL[x.u], txt: `${x.info.icon} ${UCORTO[x.u] || x.info.label}`, n: x.tu.length, drop: `${r.k}:${x.u}`, vacio: !x.tu.length });
     }
     r.y = (y0 + y - 6) / 2;
     nodos.push({ tipo: 'r', x: CX[1], y: r.y, col: cc, txt: r.nom, n: r.sub.length, drop: r.k, vacio: !r.sub.length });
-    for (const x of r.us) lineas.push([CX[1] + CW[1], r.y, CX[2], x.y, x.tu.length ? cc : 'rgba(128,128,128,.5)', !x.tu.length]);
+    for (const x of r.us) lin.push([CX[1] + CW[1], r.y, CX[2], x.y, x.tu.length ? cc : 'rgba(128,128,128,.5)', !x.tu.length]);
     y += 10;
   }
   const alto = Math.max(FILA + 14, y);
   const cy = pleg || !ramas.length ? Math.min(alto, FILA + 14) / 2 : (ramas[0].y + ramas[ramas.length - 1].y) / 2;
   const nh = ts.filter(esHoy).length;
   nodos.push({ tipo: 'c', x: 0, y: cy, col: cc, txt: (c.proyecto ? '📁 ' : '') + c.name, sub: `${ts.length} pend.${nh ? ' · ' + nh + ' hoy' : ''}`, id: 'c:' + c.id, pleg });
-  if (!pleg) for (const r of ramas) lineas.push([CW[0], cy, CX[1], r.y, r.sub.length ? cc : 'rgba(128,128,128,.5)', !r.sub.length]);
-  return { nodos, lineas, alto: pleg ? FILA + 14 : alto, cid: c.id, todo };
+  if (!pleg) for (const r of ramas) lin.push([CW[0], cy, CX[1], r.y, r.sub.length ? cc : 'rgba(128,128,128,.5)', !r.sub.length]);
+  const hc = 30 + lineas(c.name, CW[0], 7.4) * 17;
+  return { nodos, lineas: lin, alto: Math.max(pleg ? hc : alto, hc), cid: c.id, todo };
 }
 
 function arbol() {
@@ -75,9 +83,11 @@ function arbol() {
     html += `<div class="an an-1" style="left:${gx}px;top:${gy}px;width:190px;--c:${g.col}"><b>${g.nom}</b><small>${g.cs.length} clientes · ${g.n} tareas</small></div>`;
     // reparte los clientes en columnas (cada uno va a la columna que menos ocupa)
     const bl = g.cs.map(bloque), x0 = 70, busY = gy + 34, alt = Array(cols).fill(gy + 50);
+    let filaY = gy + 50;
+    bl.forEach((b, i) => { const k = i % cols; if (k === 0 && i) filaY = Math.max(...bl.slice(i - cols, i).map(x => x.fin)); b.k = k; b.by = filaY; b.fin = filaY + b.alto + 26; });
     for (const b of bl) {
-      const k = alt.indexOf(Math.min(...alt)), bx = x0 + k * COLW, by = alt[k];
-      alt[k] += b.alto + 22;
+      const k = b.k, bx = x0 + k * COLW, by = b.by;
+      alt[k] = Math.max(alt[k], b.fin);
       const cn = b.nodos.find(n => n.tipo === 'c');
       lin += `<path d="M${bx - 18} ${busY} V${by + cn.y} H${bx}" stroke="${g.col}" opacity=".35"/>`;
       for (const [x1, y1, x2, y2, col, punt] of b.lineas) { const m = (x1 + x2) / 2;
