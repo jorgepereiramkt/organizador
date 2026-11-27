@@ -165,7 +165,7 @@ const AREAS = [
   { k: 'hoy', n: 'Hoy', ic: '🏠', subs: [['hoy', 'Hoy', '🏠']] },
   { k: 'entreno', n: 'Entreno', ic: '🏋️', subs: [['rutinas', 'Rutinas', '📋'], ['historial', 'Historial', '🗓️'], ['ejercicios', 'Ejercicios', '📈']] },
   { k: 'comida', n: 'Alimentación', ic: '🥗', subs: [['comida', 'Diario', '🍽️'], ['compra', 'Compra', '🛒'], ['dietas', 'Dietas', '📋'], ['alimentos', 'Alimentos', '📦']] },
-  { k: 'progreso', n: 'Progreso', ic: '📊', subs: [['objetivos', 'Objetivos', '🎯'], ['calendario', 'Calendario', '📅'], ['cuerpo', 'Cuerpo', '⚖️']] }];
+  { k: 'progreso', n: 'Progreso', ic: '📊', subs: [['objetivos', 'Objetivos', '🎯'], ['calendario', 'Calendario', '📅'], ['cuerpo', 'Cuerpo', '⚖️'], ['fotos', 'Fotos', '📸']] }];
 const areaDe = v => AREAS.find(a => a.subs.some(s => s[0] === v)) || AREAS[0];
 const ultSub = lsGet('jp-fit-ultsub', {});
 function ir(v) { if (!AREAS.some(a => a.subs.some(s => s[0] === v))) v = 'hoy'; vista = v; ultSub[areaDe(v).k] = v; lsSet('jp-fit-ultsub', ultSub); lsSet('jp-fit-vista', v); scrollTo(0, 0); pinta(); }
@@ -188,7 +188,8 @@ function pinta() {
   pintaNav();
   const m = $('#main');
   m.innerHTML = ({ hoy: vHoy, rutinas: vRutinas, historial: vHistorial, ejercicios: vEjercicios, comida: vComida, compra: vCompra, dietas: htmlDietas, alimentos: vAlimentos,
-    objetivos: vObjetivos, calendario: vCalendario, cuerpo: vCuerpo }[vista] || vHoy)();
+    objetivos: vObjetivos, calendario: vCalendario, cuerpo: vCuerpo, fotos: vFotos }[vista] || vHoy)();
+  if (vista === 'fotos') cargaFotos();
   if (vista === 'compra') filtraCompra();
   if (vista === 'alimentos') pintaAlims();
   pintaEnCurso();
@@ -204,7 +205,7 @@ function vHoy() {
   const vol = sem.reduce((a, w) => a + volumen(w), 0), dur = sem.reduce((a, w) => a + ((w.fin || w.ini) - w.ini), 0);
   const sug = sugerida(), ult = F.entrenos[0];
   return `<div class="hola"><h1>${saludo}, Jorge</h1><p>${fDia(Date.now())} · objetivo ${F.ajustes.objSemana || 4} entrenos/semana</p></div>
-  ${cardRitmo(dias, vol)}
+  ${cardRitmo(dias, vol)}${cardFotosHoy()}
   <div class="coach"><span class="av">${av}</span><div><b>${esc(t)}</b><span class="muted small">${esc(p)}</span></div></div>
   <div style="margin-top:16px">${activo ? `<button class="btn primary big" data-act="abrirWo">⏱️ Seguir con el entreno</button>` : `<button class="btn primary big" data-act="empezar">💪 Empezar entreno</button>`}</div>
   ${sug && !activo ? `<div class="sec"><h2>Te toca</h2></div>${cardRutina(sug)}` : ''}
@@ -1326,6 +1327,79 @@ document.addEventListener('click', async ev => {
   }
 });
 
+
+// ================= FOTOS DE PROGRESO (cada miércoles por la mañana: frontal, lateral, espalda y el otro lateral) =================
+// Las fotos van a TU Google Drive (carpeta «Organizador · Imágenes», por el puente); en la cuenta solo se guarda qué foto es de qué semana.
+// fit/fotos = { s: { 'AAAA-MM-DD (miércoles de esa semana)': { frontal: idDrive, lateral, espalda, lateral2, at } } }
+const POSES = [['frontal', 'Frontal', '🧍'], ['lateral', 'Lateral derecho', '➡️'], ['espalda', 'Espalda', '🔙'], ['lateral2', 'Lateral izquierdo', '⬅️']];
+F.fotos = {};
+const miercoles = (t = Date.now()) => fISO(lunes(t) + 2 * DIA + 3600e3);
+const fotoCache = new Map(); let fotoCmp = { a: null, b: null, pose: 'frontal' };
+async function cargaFotos() {   // pone las imágenes que ya están en pantalla (pocas a la vez)
+  const imgs = [...document.querySelectorAll('img[data-fid]')].filter(i => !i.src || i.dataset.cargada !== '1');
+  for (const im of imgs) {
+    const id = im.dataset.fid;
+    if (fotoCache.has(id)) { im.src = fotoCache.get(id); im.dataset.cargada = '1'; continue; }
+    try { const j = await puente({ a: 'img', id }); const url = `data:${j.mime || 'image/jpeg'};base64,${j.data}`; fotoCache.set(id, url);
+      document.querySelectorAll(`img[data-fid="${CSS.escape(id)}"]`).forEach(x => { x.src = url; x.dataset.cargada = '1'; }); }
+    catch (e) { im.alt = 'No se pudo cargar'; }
+  }
+}
+const fotoImg = (id, cls = '') => id ? `<img data-fid="${esc(id)}" class="${cls}" alt="">` : '';
+function vFotos() {
+  const k = miercoles(), ses = F.fotos[k] || {}, hechas = POSES.filter(([p]) => ses[p]).length;
+  const dow = (new Date().getDay() + 6) % 7, fechas = Object.keys(F.fotos).filter(f => POSES.some(([p]) => F.fotos[f][p])).sort().reverse();
+  if (!fotoCmp.a && fechas[0]) fotoCmp.a = fechas[0]; if (!fotoCmp.b && fechas.length > 1) fotoCmp.b = fechas[fechas.length - 1];
+  const aviso = dow === 2 && hechas < 4 ? `<div class="card foto-aviso">📸 <b>Hoy es miércoles: toca fotos.</b> Por la mañana, en ayunas, misma luz y mismo sitio. Te faltan ${4 - hechas}.</div>`
+    : dow > 2 && hechas < 4 ? `<div class="card foto-aviso tarde">⏰ Las fotos de esta semana tocaban el miércoles: aún puedes hacerlas (${hechas}/4).</div>` : '';
+  const slot = ([p, n, ic]) => `<label class="foto-slot${ses[p] ? ' llena' : ''}"><input type="file" accept="image/*" data-fpose="${p}" hidden>
+    ${ses[p] ? fotoImg(ses[p]) + `<span class="foto-n">${ic} ${n} · cambiar</span>` : `<span class="foto-vacia"><b>${ic}</b>${n}<small>Toca para hacerla o elegirla</small></span>`}</label>`;
+  const cmp = fechas.length > 1 ? `<div class="sec"><h2>Comparar</h2></div><div class="card">
+    <div class="chips">${POSES.map(([p, n, ic]) => `<button class="${fotoCmp.pose === p ? 'on' : ''}" data-act="fCmpPose" data-p="${p}">${ic} ${n}</button>`).join('')}</div>
+    <div class="foto-cmp">${['a', 'b'].map(x => `<div><select data-fcmp="${x}">${fechas.map(f => `<option value="${f}" ${fotoCmp[x] === f ? 'selected' : ''}>${fDia(deISO(f))} ${f.slice(0, 4)}</option>`).join('')}</select>
+      <div class="foto-marco">${fotoImg((F.fotos[fotoCmp[x]] || {})[fotoCmp.pose]) || '<span class="faint small">Sin esta foto</span>'}</div>${F.pesos[fotoCmp[x]] || pesoCerca(fotoCmp[x]) ? `<small class="muted">⚖️ ${fmtN(F.pesos[fotoCmp[x]] || pesoCerca(fotoCmp[x]))} kg</small>` : ''}</div>`).join('')}</div></div>` : '';
+  return `<h2 style="margin:4px 0 4px">📸 Fotos de progreso</h2><p class="muted small" style="margin:0 0 12px">Cada miércoles por la mañana: frontal, lateral, espalda y el otro lateral. Se guardan en tu Google Drive, solo las ves tú.</p>
+  ${aviso}<div class="card"><div class="row"><b style="flex:1">Esta semana · miércoles ${fDia(deISO(k))}</b><span class="pill">${hechas}/4</span></div>
+  <div class="foto-grid">${POSES.map(slot).join('')}</div>${BR ? '' : '<p class="aviso small">Falta el puente de Google para guardar fotos (se conecta en el Organizador).</p>'}</div>
+  ${cmp}
+  <div class="sec"><h2>Historial</h2><span class="sp"></span><span class="muted small">${fechas.length} semanas</span></div>
+  ${fechas.map(f => `<div class="card foto-ses"><div class="row"><b style="flex:1">${fDia(deISO(f))} ${f.slice(0, 4)}</b>${pesoCerca(f) ? `<span class="muted small">⚖️ ${fmtN(pesoCerca(f))} kg</span>` : ''}</div>
+    <div class="foto-mini">${POSES.map(([p, n]) => `<div title="${n}">${fotoImg(F.fotos[f][p]) || '<span>—</span>'}</div>`).join('')}</div></div>`).join('') || '<p class="faint small">Aún no hay fotos.</p>'}`;
+}
+function pesoCerca(f) { const t = deISO(f); const p = pesosOrden().filter(x => Math.abs(x.t - t) <= 3 * DIA).sort((a, b) => Math.abs(a.t - t) - Math.abs(b.t - t))[0]; return p ? p.kg : null; }
+async function comprime(file) {   // la foto se reduce (máx. 1400 px, JPG) antes de subirla: más rápida y no llena tu Drive
+  const bmp = await createImageBitmap(file, { imageOrientation: 'from-image' }).catch(() => null);
+  const img = bmp || await new Promise((ok, ko) => { const i = new Image(); i.onload = () => ok(i); i.onerror = ko; i.src = URL.createObjectURL(file); });
+  const W = img.width, H = img.height, k = Math.min(1, 1400 / Math.max(W, H));
+  const cv = document.createElement('canvas'); cv.width = Math.round(W * k); cv.height = Math.round(H * k);
+  cv.getContext('2d').drawImage(img, 0, 0, cv.width, cv.height);
+  return cv.toDataURL('image/jpeg', 0.82).split(',')[1];
+}
+document.addEventListener('change', async ev => {
+  const inp = ev.target.closest && ev.target.closest('[data-fpose]'); if (!inp || !inp.files || !inp.files[0]) return;
+  if (!BR) return toast('Falta el puente de Google para guardar fotos');
+  const pose = inp.dataset.fpose, k = miercoles(), file = inp.files[0]; inp.value = '';
+  const slot = inp.closest('.foto-slot'); slot && slot.classList.add('subiendo');
+  toast('Subiendo foto…', 15000);
+  try {
+    const b64 = await comprime(file);
+    const { id } = await puente(null, { a: 'imgsave', data: b64, mime: 'image/jpeg', name: `JP Fitness · ${k} · ${pose}.jpg` });
+    const viejo = (F.fotos[k] || {})[pose];
+    (F.fotos[k] ||= {})[pose] = id; F.fotos[k].at = Date.now();
+    fotoCache.set(id, 'data:image/jpeg;base64,' + b64);
+    await setDoc(fitRef('fotos'), { s: { [k]: { [pose]: id, at: Date.now() } } }, { merge: true });
+    if (viejo) puente(null, { a: 'imgdel', id: viejo }).catch(() => {});
+    toast('Foto guardada ✓'); pinta();
+  } catch (e) { toast('No se pudo subir: ' + e.message, 6000); slot && slot.classList.remove('subiendo'); }
+});
+document.addEventListener('change', ev => { const s = ev.target.closest && ev.target.closest('[data-fcmp]'); if (!s) return; fotoCmp[s.dataset.fcmp] = s.value; pinta(); });
+document.addEventListener('click', ev => { const b = ev.target.closest('[data-act="fCmpPose"]'); if (!b) return; fotoCmp.pose = b.dataset.p; pinta(); });
+function cardFotosHoy() {   // en «Hoy»: los miércoles (y si se te pasó, hasta el domingo) te recuerda las fotos
+  const dow = (new Date().getDay() + 6) % 7, ses = F.fotos[miercoles()] || {}, hechas = POSES.filter(([p]) => ses[p]).length;
+  if (dow < 2 || hechas === 4) return '';
+  return `<div class="card foto-aviso${dow > 2 ? ' tarde' : ''}" data-act="ir" data-v="fotos" style="cursor:pointer;margin-top:12px">📸 <b>${dow === 2 ? 'Hoy toca fotos de progreso' : 'Te faltan las fotos de esta semana'}</b> · ${hechas}/4 <span class="muted small">frontal, lateral, espalda y el otro lateral</span></div>`;
+}
+
 // ---------- login (igual que el Organizador) ----------
 const gate = $('#gate'), gateMsg = $('#gateMsg'), gateBtn = $('#gateBtn');
 const showGate = msg => { gate.classList.remove('loading'); gate.hidden = false; gateMsg.textContent = msg || ''; gateBtn.disabled = false; };
@@ -1369,6 +1443,7 @@ onAuthStateChanged(auth, user => {
       } else if (id === 'alimentos') { F.alimentos = d?.lista || [];
       } else if (id === 'dieta') { const ds = d?.dietas || (d?.comidas ? [{ id: 'd1', nombre: 'Dieta 1', comidas: d.comidas, obj: d.obj || null, at: Date.now() }] : []);
         F.dietas = ds; F.dietaActiva = d?.activa || ds[0]?.id || null; F.dieta = ds.find(x => x.id === F.dietaActiva) || { comidas: [], obj: null }; F.dieta.ult = d?.ult || {};
+      } else if (id === 'fotos') { F.fotos = d?.s || {};
       } else if (id === 'cuerpo') { F.pesos = d?.pesos || {};
       } else if (id === 'compra') { if (d) F.compra = { falta: d.falta || {}, comprado: d.comprado || {}, extra: d.extra || [] };
       } else if (id.startsWith('d-')) { if (d) Object.assign(F.diario, d.dias || {});

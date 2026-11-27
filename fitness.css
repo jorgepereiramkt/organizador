@@ -361,3 +361,24 @@ body.sinsub .enCurso{bottom:calc(env(safe-area-inset-bottom) + 14px)}
 .areas button{min-width:0;flex-direction:column;gap:1px;padding:7px 2px;font-size:12px;line-height:1.15}
 .areas button span{font-size:18px}
 @media (min-width:600px){ .areas button{flex-direction:row;gap:6px;font-size:14px;padding:9px 10px} }
+
+/* Fotos de progreso */
+.foto-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-top:10px}
+@media (max-width:560px){.foto-grid{grid-template-columns:repeat(2,1fr)}}
+.foto-slot{position:relative;aspect-ratio:3/4;border-radius:14px;overflow:hidden;cursor:pointer;border:2px dashed var(--line);background:var(--surface-2);display:grid}
+.foto-slot.llena{border:0}
+.foto-slot img{width:100%;height:100%;object-fit:cover;display:block}
+.foto-slot.subiendo{opacity:.5;pointer-events:none}
+.foto-vacia{place-self:center;text-align:center;font-weight:700;font-size:13.5px;padding:8px}
+.foto-vacia b{display:block;font-size:30px;margin-bottom:4px}
+.foto-vacia small{display:block;font-weight:500;font-size:11.5px;color:var(--muted);margin-top:4px}
+.foto-n{position:absolute;left:6px;right:6px;bottom:6px;padding:4px 8px;border-radius:9px;background:rgba(0,0,0,.55);color:#fff;font-size:11.5px;font-weight:700;text-align:center}
+.foto-aviso{background:linear-gradient(135deg,var(--accent-soft),transparent 70%),var(--surface);margin-bottom:12px}
+.foto-aviso.tarde{background:linear-gradient(135deg,rgba(255,201,61,.16),transparent 70%),var(--surface)}
+.foto-cmp{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:10px}
+.foto-cmp select{width:100%;margin-bottom:6px}
+.foto-marco{aspect-ratio:3/4;border-radius:12px;overflow:hidden;background:var(--surface-2);display:grid;place-items:center}
+.foto-marco img{width:100%;height:100%;object-fit:cover}
+.foto-mini{display:grid;grid-template-columns:repeat(4,1fr);gap:6px;margin-top:8px}
+.foto-mini div{aspect-ratio:3/4;border-radius:9px;overflow:hidden;background:var(--surface-2);display:grid;place-items:center;color:var(--faint)}
+.foto-mini img{width:100%;height:100%;object-fit:cover}
