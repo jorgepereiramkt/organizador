@@ -49,15 +49,15 @@ function lado(k, sub, todo, cc) {
     const usado = x.tu.length ? yy - y - 5 : FILA;
     x.y = y0 + usado / 2;
     x.tu.forEach((t, i) => {
-      nodos.push({ tipo: 't', t, x: izq ? X.tL : X.tR, y: ys[i], col: UCOL[x.u], hoy: izq });
+      nodos.push({ tipo: 't', t, x: izq ? X.tL : X.tR, y: ys[i], col: UCOL[x.u], hoy: izq, cc });
       lin.push(izq ? [X.uL, x.y, X.tL + W.t, ys[i], UCOL[x.u]] : [X.uR + W.u, x.y, X.tR, ys[i], UCOL[x.u]]);
     });
     nodos.push({ tipo: 'u', x: izq ? X.uL : X.uR, y: x.y, col: UCOL[x.u], txt: `${x.info.icon} ${UCORTO[x.u]}`, n: x.tu.length, drop: `${k}:${x.u}`, vacio: !x.tu.length });
     y += usado + 8;
   }
   const alto = y - 8, ry = (us[0].y + us[us.length - 1].y) / 2;
-  nodos.push({ tipo: 'r', x: izq ? X.rL : X.rR, y: ry, col: izq ? HOYC : cc, txt: izq ? '☀️ Hoy' : '🗓 Futuras', n: sub.length, drop: k, vacio: !sub.length, hoy: izq });
-  for (const x of us) lin.push(izq ? [X.rL, ry, X.uL + W.u, x.y, x.tu.length ? HOYC : 'rgba(128,128,128,.5)', !x.tu.length] : [X.rR + W.r, ry, X.uR, x.y, x.tu.length ? cc : 'rgba(128,128,128,.5)', !x.tu.length]);
+  nodos.push({ tipo: 'r', x: izq ? X.rL : X.rR, y: ry, col: cc, txt: izq ? '☀️ Hoy' : '🗓 Futuras', n: sub.length, drop: k, vacio: !sub.length, hoy: izq });
+  for (const x of us) lin.push(izq ? [X.rL, ry, X.uL + W.u, x.y, x.tu.length ? cc : 'rgba(128,128,128,.5)', !x.tu.length] : [X.rR + W.r, ry, X.uR, x.y, x.tu.length ? cc : 'rgba(128,128,128,.5)', !x.tu.length]);
   return { nodos, lin, alto, ry };
 }
 function bloque({ c, ts }) {
@@ -73,7 +73,7 @@ function bloque({ c, ts }) {
     for (const l of s.lin) lin.push([l[0], l[1] + o, l[2], l[3] + o, l[4], l[5]]);
     alto = Math.max(alto, o + s.alto);
   }
-  if (L) lin.push([X.c, cy, X.rL + W.r, cy, HOYC]);
+  if (L) lin.push([X.c, cy, X.rL + W.r, cy, cc]);
   if (R) lin.push([X.c + W.c, cy, X.rR, cy, cc]);
   const nh = ts.filter(esHoy).length;
   nodos.push({ tipo: 'c', x: X.c, y: cy, col: cc, txt: (c.proyecto ? '📁 ' : '') + c.name, sub: `${nh ? '☀️ ' + nh + ' hoy · ' : ''}${ts.length - nh} futuras`, id: 'c:' + c.id, cid: c.id, pleg });
@@ -97,9 +97,9 @@ function arbol() {
         lin += `<path d="M${PAD + x1} ${by + y1} C${PAD + m} ${by + y1} ${PAD + m} ${by + y2} ${PAD + x2} ${by + y2}" stroke="${col}" ${punt ? 'stroke-dasharray="4 4"' : 'opacity=".8"'}/>`; }
       for (const n of b.nodos) {
         const L = PAD + n.x, T = by + n.y;
-        if (n.tipo === 't') html += `<button type="button" class="an an-t${n.hoy ? ' hoy izq' : ''}${n.t.id === mover ? ' moviendo' : ''}" data-atask="${esc(n.t.id)}" style="left:${L}px;top:${T}px;width:${W.t}px;--c:${n.col}" title="${esc(n.t.title)}"><span>${n.hoy ? '☀️ ' : ''}${esc(n.t.title)}</span></button>`;
+        if (n.tipo === 't') html += `<button type="button" class="an an-t${n.hoy ? ' hoy izq' : ''}${n.t.id === mover ? ' moviendo' : ''}" data-atask="${esc(n.t.id)}" style="left:${L}px;top:${T}px;width:${W.t}px;--c:${n.col};--cc:${n.cc || n.col}" title="${esc(n.t.title)}"><span>${n.hoy ? '☀️ ' : ''}${esc(n.t.title)}</span></button>`;
         else if (n.tipo === 'c') html += `<button type="button" class="an an-2${n.pleg ? ' pleg' : ''}" data-anodo="${esc(n.id)}" style="left:${L}px;top:${T}px;width:${W.c}px;--c:${n.col}"><b>${esc(n.txt)}</b><small>${esc(n.sub)}</small>${n.pleg ? '<i>＋</i>' : ''}</button>
-          <button type="button" class="ar-mas izq" data-amas="${esc(n.cid)}|hoy" style="left:${L - 15}px;top:${T}px" title="Añadir tarea para hoy" aria-label="Añadir tarea para hoy">＋</button>
+          <button type="button" class="ar-mas izq" data-amas="${esc(n.cid)}|hoy" style="left:${L - 15}px;top:${T}px;--cc:${n.col}" title="Añadir tarea para hoy" aria-label="Añadir tarea para hoy">＋</button>
           <button type="button" class="ar-mas der" data-amas="${esc(n.cid)}|resto" style="left:${L + W.c - 15}px;top:${T}px" title="Añadir tarea para más adelante" aria-label="Añadir tarea para más adelante">＋</button>`;
         else html += `<div class="an an-${n.tipo === 'r' ? 3 : 4}${n.hoy ? ' hoy' : ''}${n.vacio ? ' vacio' : ''}${b.todo ? ' destino' : ''}" ${b.todo ? `data-adrop="${esc(b.cid)}|${n.drop}"` : ''} style="left:${L}px;top:${T}px;width:${n.tipo === 'r' ? W.r : W.u}px;--c:${n.col}"><b>${esc(n.txt)}</b><small>${n.n}</small></div>`;
       }
